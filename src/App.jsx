@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2 } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -164,8 +164,6 @@ function Timeline({ stageIdx }) {
 
 function TrackScreen({ order, onBack }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
-  const [sent, setSent] = useState(false);
-  const [sending, setSending] = useState(false);
 
   // LIVE: poll the backend for this order's real progress every few seconds.
   // The backend's GPS poller advances it (mock movement now, real One Step GPS
@@ -182,20 +180,6 @@ function TrackScreen({ order, onBack }) {
     const iv = setInterval(tick, 4000);
     return () => { alive = false; clearInterval(iv); };
   }, [order.id]);
-
-  useEffect(() => { if (!sent) return; const t = setTimeout(() => setSent(false), 2600); return () => clearTimeout(t); }, [sent]);
-
-  const handlePlusLoad = async () => {
-    setSending(true);
-    try {
-      await requestPlusLoad(order.id);   // writes a real request the office dashboard can see
-      setSent(true);
-    } catch (e) {
-      alert("Could not send request: " + e.message);
-    } finally {
-      setSending(false);
-    }
-  };
 
   const etaMin = Math.max(0, Math.round((1 - progress) * 22));
   const stageIdx = progress >= 1 ? 2 : progress > 0.02 ? 1 : 0;
@@ -215,16 +199,9 @@ function TrackScreen({ order, onBack }) {
         <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div></div>
       </div>
       <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
-      <div className="grid grid-cols-2 gap-3 mt-3">
-        <button onClick={handlePlusLoad} disabled={sending} className="rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform disabled:opacity-60" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{sending ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />} Request plus load</button>
-        <button className="rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
+      <div className="mt-3">
+        <button className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
       </div>
-      {sent && (
-        <div className="mt-3 rounded-2xl px-4 py-3 flex items-center gap-2.5" style={{ background: "rgba(39,192,138,0.12)", border: "1px solid rgba(39,192,138,0.4)" }}>
-          <Send size={16} color={GREEN} />
-          <span className="text-sm" style={{ color: GREEN, fontFamily: C.body }}>Request sent to Aussieblock dispatch</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -1100,21 +1077,18 @@ function orderDay(when, today) {
 function DispatchApp({ email, onLogout }) {
   const [orders, setOrders] = useState([]);
   const [trucks, setTrucks] = useState([]);
-  const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [busyId, setBusyId] = useState(null);
   const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
 
-  // Pull all three feeds at once, reusing the existing endpoints.
+  // Pull orders + fleet at once, reusing the existing endpoints.
   const refresh = async () => {
     try {
-      const [os, ts, rs] = await Promise.all([getOrders(), getTrucks(), getPlusLoads()]);
+      const [os, ts] = await Promise.all([getOrders(), getTrucks()]);
       setOrders(os);
       setTrucks(ts);
-      setRequests(rs);
       setErr("");
     } catch (e) {
       setErr(e.message);
@@ -1131,18 +1105,6 @@ function DispatchApp({ email, onLogout }) {
     const tick = setInterval(() => { if (alive) forceTick((n) => n + 1); }, 1000);
     return () => { alive = false; clearInterval(poll); clearInterval(tick); };
   }, []);
-
-  const markHandled = async (id) => {
-    setBusyId(id);
-    try {
-      await handlePlusLoad(id);
-      setRequests((rs) => rs.filter((r) => r.id !== id));   // drop immediately; next poll confirms
-    } catch (e) {
-      alert("Could not mark handled: " + e.message);
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   // Drop a freshly-updated order (returned by the status/assign endpoints) back
   // into the list so the row reflects it immediately, without waiting for the
@@ -1224,8 +1186,8 @@ function DispatchApp({ email, onLogout }) {
           {/* stat tiles */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
             <StatTile icon={Package} label="Today's orders" value={todayOrders.length} accent={ORANGE} />
-            <StatTile icon={Navigation} label="Trucks moving" value={`${movingTrucks}/${trucks.length}`} accent={ORANGE_HOT} />
-            <StatTile icon={Activity} label="Open plus-loads" value={requests.length} accent={GREEN} />
+            <StatTile icon={CalendarPlus} label="Scheduled orders" value={upcomingOrders.length} accent={ORANGE_HOT} />
+            <StatTile icon={Navigation} label="Trucks moving" value={`${movingTrucks}/${trucks.length}`} accent={GREEN} />
           </div>
 
           {/* main grid: map + orders (left), plus-loads (right) */}
@@ -1251,17 +1213,6 @@ function DispatchApp({ email, onLogout }) {
             </div>
 
             <div className="lg:col-span-1 flex flex-col gap-4">
-              <Panel title="Plus-load requests" icon={Inbox} count={requests.length}>
-                {requests.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 py-10 text-center">
-                    <Inbox size={36} className="text-white/20" />
-                    <div className="text-white/55 text-base font-semibold" style={{ fontFamily: C.cond }}>All caught up</div>
-                    <div className="text-white/35 text-sm" style={{ fontFamily: C.body }}>New requests appear here automatically.</div>
-                  </div>
-                ) : (
-                  requests.map((r) => <PlusLoadCard key={r.id} r={r} onHandle={markHandled} busy={busyId === r.id} />)
-                )}
-              </Panel>
               <CustomerLogins />
             </div>
           </div>
