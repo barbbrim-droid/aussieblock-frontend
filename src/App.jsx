@@ -1090,11 +1090,12 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
   };
 
   return (
-    <div className="rounded-2xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="rounded-2xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)", borderLeft: o.prepay_required ? "3px solid #6aa9ff" : undefined }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.ref}</span>
+            {o.prepay_required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: o.prepaid ? GREEN + "22" : "#6aa9ff22", color: o.prepaid ? GREEN : "#6aa9ff", fontFamily: C.body }}>{o.prepaid ? "COD · PAID" : "COD · UNPAID"}</span>}
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
             <span className="text-white/30 text-xs">·</span>
@@ -1332,7 +1333,7 @@ function CustomerLogins() {
             key={c.id}
             onClick={() => pick(c)}
             className="w-full text-left rounded-lg px-3 py-2 mb-1 flex items-center justify-between active:scale-[0.99] transition-transform"
-            style={{ background: sel === c.id ? ORANGE + "22" : NAVY, border: `1px solid ${sel === c.id ? ORANGE : "rgba(255,255,255,0.06)"}` }}
+            style={{ background: sel === c.id ? ORANGE + "22" : (c.cod ? "#6aa9ff14" : NAVY), border: `1px solid ${sel === c.id ? ORANGE : (c.cod ? "#6aa9ff55" : "rgba(255,255,255,0.06)")}` }}
           >
             <span className="text-white text-sm truncate" style={{ fontFamily: C.body }}>{c.name}</span>
             <span className="flex items-center gap-1 shrink-0">
@@ -1657,9 +1658,15 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
           <label className={lbl}>Customer</label>
           {selCust ? (
-            <div className="flex items-center justify-between rounded-lg px-3 py-2 mb-3" style={{ background: NAVY, border: `1px solid ${ORANGE}` }}>
-              <span className="text-white text-sm truncate">{selCust.name}</span>
-              <button onClick={() => { setCustomerId(null); setCustFilter(""); }} className="text-xs shrink-0 ml-2" style={{ color: ORANGE }}>change</button>
+            <div className="mb-3">
+              <div className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: `1px solid ${selCust.cod ? "#6aa9ff" : ORANGE}` }}>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="text-white text-sm truncate">{selCust.name}</span>
+                  {selCust.cod && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#6aa9ff22", color: "#6aa9ff" }}>COD</span>}
+                </span>
+                <button onClick={() => { setCustomerId(null); setCustFilter(""); }} className="text-xs shrink-0 ml-2" style={{ color: ORANGE }}>change</button>
+              </div>
+              {selCust.cod && <div className="mt-1.5 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5" style={{ background: "#6aa9ff1a", color: "#6aa9ff", fontFamily: C.body }}><CreditCard size={13} /> COD customer — payment required before this order can be dispatched.</div>}
             </div>
           ) : (
             <div className="mb-3">
@@ -1670,7 +1677,10 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
               {shown.length > 0 && (
                 <div className="max-h-40 overflow-y-auto mt-1 rounded-lg" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                   {shown.map((c) => (
-                    <button key={c.id} onClick={() => setCustomerId(c.id)} className="w-full text-left px-3 py-2 text-sm text-white border-b border-white/5 active:bg-white/10">{c.name}</button>
+                    <button key={c.id} onClick={() => setCustomerId(c.id)} className="w-full text-left px-3 py-2 text-sm text-white border-b border-white/5 active:bg-white/10 flex items-center justify-between gap-2">
+                      <span className="truncate">{c.name}</span>
+                      {c.cod && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#6aa9ff22", color: "#6aa9ff" }}>COD</span>}
+                    </button>
                   ))}
                 </div>
               )}
