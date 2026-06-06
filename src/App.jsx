@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -706,6 +706,21 @@ function CustomerLogins() {
     }
   };
 
+  const remove = async () => {
+    if (!window.confirm(`Remove the login for ${selCust.name}? They won't be able to sign in until you create a new one.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      await removeCustomerLogin(sel);
+      setMsg({ ok: true, text: `Login removed for ${selCust.name}.` });
+      setEmailVal(""); setPw("");
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const f = filter.trim().toLowerCase();
   const shown = (f ? customers.filter((c) => c.name.toLowerCase().includes(f)) : customers).slice(0, 60);
   const selCust = customers.find((c) => c.id === sel);
@@ -775,6 +790,16 @@ function CustomerLogins() {
             {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
             {selCust.login_email ? "Reset password" : "Create login"}
           </button>
+          {selCust.login_email && (
+            <button
+              onClick={remove}
+              disabled={busy}
+              className="w-full mt-2 rounded-lg py-2 text-xs font-semibold active:scale-[0.98] transition-transform disabled:opacity-50"
+              style={{ background: "transparent", color: "#ff8a85", border: "1px solid rgba(239,83,80,0.4)", fontFamily: C.body }}
+            >
+              Remove login
+            </button>
+          )}
         </div>
       )}
 

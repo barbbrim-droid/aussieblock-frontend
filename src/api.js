@@ -112,6 +112,9 @@ export function setCustomerLogin(customerId, email, password) {
     body: JSON.stringify({ email, password }),
   })
 }
+export function removeCustomerLogin(customerId) {
+  return request(`/customers/${customerId}/login`, { method: 'DELETE' })
+}
 export function handlePlusLoad(requestId) {
   return request(`/dispatch/plus-loads/${requestId}/handle`, { method: 'POST' })
 }
