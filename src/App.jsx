@@ -294,7 +294,12 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
 
-  const toggleAdmix = (a) => setAdmix((cur) => cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]);
+  // Accelerant and Set Control are opposites — selecting one clears the other.
+  const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
+  const toggleAdmix = (a) => setAdmix((cur) => {
+    if (cur.includes(a)) return cur.filter((x) => x !== a);
+    return [...cur.filter((x) => x !== OPPOSITE[a]), a];
+  });
   const canSubmit = mix && qty.trim() && date && site.trim() && !busy;
   const submit = async () => {
     setErr(""); setBusy(true);
