@@ -60,6 +60,7 @@ const RECOMMENDED_MIX = "3500 PSI";
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
+const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Other"];
 
 const INV_STATUS = {
   paid: { label: "Paid", color: GREEN },
@@ -232,6 +233,7 @@ ${row("Status", statusLbl)}
 ${row("Scheduled", dateLine || "—")}
 ${row("Customer", order.customer)}
 ${row("Job site", order.site)}
+${row("For", order.use_for)}
 ${row("Product", order.mix)}
 ${row("Slump", order.slump)}
 ${row("Admixtures", order.admixtures)}
@@ -306,6 +308,8 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [mix, setMix] = useState(RECOMMENDED_MIX);
   const [slump, setSlump] = useState("5\"");
   const [admix, setAdmix] = useState([]);   // selected admixtures
+  const [useFor, setUseFor] = useState("");             // what the concrete is for
+  const [useOther, setUseOther] = useState("");         // shown when "Other" is picked
   const [colorDetail, setColorDetail] = useState("");   // shown when "Color" is picked
   const [extraSet, setExtraSet] = useState("1 hr");     // additional set time, when "Set Control" picked
   const [fiberExtra, setFiberExtra] = useState("");     // additional fiber lbs/yd beyond the standard 3
@@ -340,7 +344,8 @@ function OrderConcreteModal({ onClose, onPlaced }) {
       });
       let finalNotes = notes.trim();
       if (shortLoad) finalNotes = (finalNotes ? finalNotes + " — " : "") + "Short load fee $200 (accepted)";
-      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: finalNotes, slump, admixtures });
+      const use_for = useFor === "Other" ? useOther.trim() : useFor;
+      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: finalNotes, slump, admixtures, use_for });
       setDone(true);
       onPlaced && onPlaced();
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -371,6 +376,13 @@ function OrderConcreteModal({ onClose, onPlaced }) {
             <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
               {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
             </select>
+
+            <label className={lbl}>What's it for?</label>
+            <select value={useFor} onChange={(e) => setUseFor(e.target.value)} className={inCls + (useFor === "Other" ? "" : " mb-3")} style={inSt}>
+              <option value="">Select… (optional)</option>
+              {USES.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+            {useFor === "Other" && <input value={useOther} onChange={(e) => setUseOther(e.target.value)} placeholder="Describe what it's for" className={inCls + " mt-2 mb-3"} style={inSt} />}
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
@@ -915,6 +927,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.site}</div>
           <div className="text-white/50 text-sm mt-0.5 truncate">{o.customer} · {o.mix}</div>
           {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
+          {o.use_for && <div className="text-white/40 text-xs mt-0.5 truncate">For: {o.use_for}</div>}
           {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
         </div>
         <div className="text-right shrink-0">
