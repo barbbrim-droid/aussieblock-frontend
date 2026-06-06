@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2 } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
@@ -955,6 +955,96 @@ function ManageTrucksModal({ onClose, onChanged }) {
   );
 }
 
+// Staff modal: month calendar for delivery planning. Each day cell shows the
+// total yards scheduled; clicking a day lists that day's orders (with controls).
+function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onClose }) {
+  const now = new Date();
+  const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const todayKey = localToday();
+  const [selected, setSelected] = useState(todayKey);
+
+  const active = orders.filter((o) => o.status !== "complete");
+  const byDay = {};
+  for (const o of active) (byDay[o.when] ||= []).push(o);
+  const yardsFor = (key) => (byDay[key] || []).reduce((s, o) => s + parseYards(o.qty), 0);
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const monthPrefix = `${ym.y}-${pad(ym.m + 1)}`;
+  const keyOf = (d) => `${monthPrefix}-${pad(d)}`;
+  const firstDow = new Date(ym.y, ym.m, 1).getDay();          // 0 = Sunday
+  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const monthLabel = new Date(ym.y, ym.m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthYards = active.filter((o) => (o.when || "").startsWith(monthPrefix)).reduce((s, o) => s + parseYards(o.qty), 0);
+  const shiftMonth = (delta) => setYm(({ y, m }) => { const d = new Date(y, m + delta, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const selOrders = byDay[selected] || [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-3xl rounded-2xl overflow-hidden max-h-[94vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><CalendarDays size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Delivery calendar</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-4 sm:p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {/* month nav + month total */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <button onClick={() => shiftMonth(-1)} title="Previous month" className="p-1.5 rounded-lg active:scale-90" style={{ background: NAVY }}><ChevronLeft size={16} color="#fff" /></button>
+              <div style={{ fontFamily: C.cond }} className="text-white text-lg sm:text-xl font-bold text-center" >{monthLabel}</div>
+              <button onClick={() => shiftMonth(1)} title="Next month" className="p-1.5 rounded-lg active:scale-90" style={{ background: NAVY }}><ChevronRight size={16} color="#fff" /></button>
+              <button onClick={() => setYm({ y: now.getFullYear(), m: now.getMonth() })} className="ml-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95" style={{ background: NAVY, color: ORANGE }}>Today</button>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-white/45 text-xs">Month total </span>
+              <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-lg font-bold">{fmtYards(monthYards)} CY</span>
+            </div>
+          </div>
+          {/* weekday row */}
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div key={d} className="text-center text-white/40 text-[11px] uppercase tracking-wide py-1">{d}</div>)}
+          </div>
+          {/* day grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((d, i) => {
+              if (d === null) return <div key={i} />;
+              const key = keyOf(d);
+              const y = yardsFor(key);
+              const isToday = key === todayKey;
+              const isSel = key === selected;
+              return (
+                <button key={i} onClick={() => setSelected(key)} className="aspect-square rounded-lg p-1 flex flex-col items-center active:scale-95 transition-transform overflow-hidden"
+                  style={{ background: isSel ? ORANGE + "26" : NAVY, border: `1px solid ${isSel ? ORANGE : isToday ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.05)"}` }}>
+                  <span className="text-xs font-semibold self-start px-0.5" style={{ color: isToday ? ORANGE : "#fff", fontFamily: C.body }}>{d}</span>
+                  {y > 0 && (
+                    <span className="mt-auto mb-0.5 text-[11px] sm:text-sm font-bold leading-none" style={{ color: ORANGE, fontFamily: C.cond }}>{fmtYards(y)}<span className="text-[8px] text-white/40"> CY</span></span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {/* selected-day detail */}
+          <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="flex items-end justify-between mb-2">
+              <div style={{ fontFamily: C.cond }} className="text-white text-lg font-bold">{formatOrderDateLong(selected)}</div>
+              <div className="text-right shrink-0"><span style={{ color: ORANGE, fontFamily: C.cond }} className="text-xl font-bold">{fmtYards(yardsFor(selected))}</span> <span className="text-white/45 text-xs">CY · {selOrders.length} order{selOrders.length === 1 ? "" : "s"}</span></div>
+            </div>
+            {selOrders.length === 0 ? (
+              <div className="text-white/40 text-sm py-4 text-center">No orders this day.</div>
+            ) : (
+              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} />)
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Staff modal: schedule a new order for a customer. Truck is optional — orders
 // start 'scheduled' and a truck can be assigned later from the board.
 function NewOrderModal({ trucks, onClose, onCreated }) {
@@ -1114,6 +1204,7 @@ function DispatchApp({ email, onLogout }) {
   const [err, setErr] = useState("");
   const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
+  const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
 
   // Pull orders + fleet at once, reusing the existing endpoints.
@@ -1168,6 +1259,9 @@ function DispatchApp({ email, onLogout }) {
   return (
     <div className="min-h-screen w-full flex items-start justify-center p-4 sm:p-6" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
+      {showCal && (
+        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onClose={() => setShowCal(false)} />
+      )}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
@@ -1203,7 +1297,10 @@ function DispatchApp({ email, onLogout }) {
               <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">Dispatch board</h1>
               <p className="text-white/45 text-sm" style={{ fontFamily: C.body }}>Signed in as {email}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <CalendarDays size={16} color={ORANGE} /> Calendar
+              </button>
               <button onClick={() => setShowTrucks(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <Truck size={16} color={ORANGE} /> Trucks
               </button>
