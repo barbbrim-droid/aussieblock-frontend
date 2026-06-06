@@ -1182,15 +1182,17 @@ function StatTile({ icon: Icon, label, value, accent }) {
   );
 }
 
-function Panel({ title, icon: Icon, count, children }) {
+// `fill` makes the panel fill its column height with an internally scrolling
+// body — used by the single-screen dispatch dashboard so the page never scrolls.
+function Panel({ title, icon: Icon, count, children, fill = false }) {
   return (
-    <div className="rounded-2xl p-4" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center gap-2 mb-3">
+    <div className={"rounded-2xl p-4" + (fill ? " flex flex-col min-h-0 h-full" : "")} style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center gap-2 mb-3 shrink-0">
         <Icon size={16} color={ORANGE} />
         <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold">{title}</h2>
         {count != null && <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({count})</span>}
       </div>
-      {children}
+      {fill ? <div className="overflow-y-auto min-h-0 flex-1 -mr-1 pr-1">{children}</div> : children}
     </div>
   );
 }
@@ -1756,6 +1758,7 @@ function DispatchApp({ email, onLogout }) {
   const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
+  const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
 
   // Pull orders + fleet at once, reusing the existing endpoints.
@@ -1808,10 +1811,18 @@ function DispatchApp({ email, onLogout }) {
   if (loading) return <Splash label="Loading dispatch…" />;
 
   return (
-    <div className="min-h-screen w-full flex items-start justify-center p-4 sm:p-6" style={{ background: "#0c1117" }}>
+    <div className="h-screen w-full flex justify-center p-3" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
         <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onClose={() => setShowCal(false)} />
+      )}
+      {showLogins && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
+          <div className="w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CustomerLogins />
+            <button onClick={() => setShowLogins(false)} className="w-full mt-2 rounded-xl py-2 text-sm font-semibold text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>Close</button>
+          </div>
+        </div>
       )}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
@@ -1823,9 +1834,9 @@ function DispatchApp({ email, onLogout }) {
           onCreated={(o) => { setOrders((os) => [o, ...os.filter((x) => x.ref !== o.ref)]); setShowNew(false); }}
         />
       )}
-      <div className="w-full max-w-6xl rounded-[1.6rem] overflow-hidden shadow-2xl" style={{ background: NAVY_DEEP, fontFamily: C.body, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="w-full max-w-[1500px] h-full flex flex-col rounded-[1.6rem] overflow-hidden shadow-2xl" style={{ background: NAVY_DEEP, fontFamily: C.body, border: "1px solid rgba(255,255,255,0.08)" }}>
         {/* brand header */}
-        <div className="px-5 sm:px-6 pt-3.5 pb-3.5" style={{ background: ORANGE }}>
+        <div className="px-5 sm:px-6 py-2.5 shrink-0" style={{ background: ORANGE }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <Roo size={34} />
@@ -1841,14 +1852,14 @@ function DispatchApp({ email, onLogout }) {
           </div>
         </div>
 
-        <div className="px-5 sm:px-6 py-5">
-          {/* title + refresh */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">Dispatch board</h1>
-              <p className="text-white/45 text-sm" style={{ fontFamily: C.body }}>Signed in as {email}</p>
-            </div>
+        <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-5 py-3 gap-3">
+          {/* title + actions */}
+          <div className="flex items-center justify-between shrink-0 gap-2">
+            <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight shrink-0">Dispatch board</h1>
             <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <KeyRound size={16} color={ORANGE} /> Logins
+              </button>
               <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <CalendarDays size={16} color={ORANGE} /> Calendar
               </button>
@@ -1871,63 +1882,56 @@ function DispatchApp({ email, onLogout }) {
           )}
 
           {/* stat tiles */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-3 gap-3 shrink-0">
             <StatTile icon={Package} label="Today's orders" value={todayOrders.length} accent={ORANGE} />
             <StatTile icon={CalendarPlus} label="Scheduled orders" value={upcomingOrders.length} accent={ORANGE_HOT} />
             <StatTile icon={Navigation} label="Trucks moving" value={`${movingTrucks}/${trucks.length}`} accent={GREEN} />
           </div>
 
-          {/* main grid: map + orders (left), plus-loads (right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 flex flex-col gap-4">
-              <Panel title="Fleet" icon={MapPin} count={trucks.length}>
-                <FleetMap trucks={trucks} />
-              </Panel>
-              <Panel title="Today's orders" icon={List} count={todayOrders.length}>
-                {todayOrders.length === 0 ? (
-                  <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No orders scheduled for today.</div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 mb-3 rounded-lg px-3 py-2" style={{ background: NAVY }}>
-                      <Package size={15} color={ORANGE} />
-                      <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(todayYards)} CY scheduled today</span>
-                      <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
-                    </div>
-                    {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
-                  </>
-                )}
-              </Panel>
-              <Panel title="Upcoming orders" icon={CalendarPlus} count={upcomingOrders.length}>
-                {upcomingOrders.length === 0 ? (
-                  <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>Nothing scheduled ahead.</div>
-                ) : (
-                  upcomingDays.map((day) => {
-                    const dayOrders = upcomingByDay[day];
-                    const yards = dayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
-                    return (
-                      <div key={day} className="mb-5">
-                        {/* big date header + daily yard total for planning */}
-                        <div className="flex items-end justify-between mb-2.5 pb-2" style={{ borderBottom: "2px solid rgba(255,255,255,0.08)" }}>
-                          <div>
-                            <div style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-none">{formatOrderDateLong(day)}</div>
-                            <div className="text-white/40 text-xs mt-1" style={{ fontFamily: C.body }}>{dayOrders.length} order{dayOrders.length === 1 ? "" : "s"}</div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none">{fmtYards(yards)}</div>
-                            <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
-                          </div>
+          {/* main columns — fill the screen; each scrolls inside so the page doesn't */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
+              <FleetMap trucks={trucks} />
+            </Panel>
+            <Panel title="Today's orders" icon={List} count={todayOrders.length} fill>
+              {todayOrders.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No orders scheduled for today.</div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3 rounded-lg px-3 py-2" style={{ background: NAVY }}>
+                    <Package size={15} color={ORANGE} />
+                    <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(todayYards)} CY scheduled today</span>
+                    <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
+                  </div>
+                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                </>
+              )}
+            </Panel>
+            <Panel title="Upcoming orders" icon={CalendarPlus} count={upcomingOrders.length} fill>
+              {upcomingOrders.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>Nothing scheduled ahead.</div>
+              ) : (
+                upcomingDays.map((day) => {
+                  const dayOrders = upcomingByDay[day];
+                  const yards = dayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
+                  return (
+                    <div key={day} className="mb-5">
+                      <div className="flex items-end justify-between mb-2.5 pb-2" style={{ borderBottom: "2px solid rgba(255,255,255,0.08)" }}>
+                        <div>
+                          <div style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-none">{formatOrderDateLong(day)}</div>
+                          <div className="text-white/40 text-xs mt-1" style={{ fontFamily: C.body }}>{dayOrders.length} order{dayOrders.length === 1 ? "" : "s"}</div>
                         </div>
-                        {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                        <div className="text-right shrink-0">
+                          <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none">{fmtYards(yards)}</div>
+                          <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
+                        </div>
                       </div>
-                    );
-                  })
-                )}
-              </Panel>
-            </div>
-
-            <div className="lg:col-span-1 flex flex-col gap-4">
-              <CustomerLogins />
-            </div>
+                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                    </div>
+                  );
+                })
+              )}
+            </Panel>
           </div>
         </div>
       </div>
