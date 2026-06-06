@@ -1439,6 +1439,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const [trucks, setTrucks] = useState([]);
   const [label, setLabel] = useState("");
   const [device, setDevice] = useState("");
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
@@ -1450,9 +1451,9 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const add = async () => {
     setBusy(true); setMsg(null);
     try {
-      const r = await addTruck(label.trim(), device.trim());
+      const r = await addTruck(label.trim(), device.trim(), notes.trim());
       setMsg({ ok: true, text: `Truck ${r.action}: ${r.label}` });
-      setLabel(""); setDevice("");
+      setLabel(""); setDevice(""); setNotes("");
       await load(); onChanged && onChanged();
     } catch (e) { setMsg({ ok: false, text: e.message }); }
     finally { setBusy(false); }
@@ -1468,6 +1469,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
 
   const inCls = "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
   const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const existing = trucks.find((t) => t.label.trim().toLowerCase() === label.trim().toLowerCase());
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
@@ -1478,17 +1480,18 @@ function ManageTrucksModal({ onClose, onChanged }) {
         </div>
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
           {/* current fleet */}
-          <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Your fleet ({trucks.length})</div>
+          <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Your fleet ({trucks.length}) — tap a truck to edit</div>
           {trucks.length === 0 ? (
             <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ background: NAVY, borderRadius: 12 }}>No trucks yet — add your first below.</div>
           ) : (
             <div className="mb-4">
               {trucks.map((t) => (
-                <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <div className="min-w-0">
+                <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: `1px solid ${existing && existing.label === t.label ? ORANGE : "rgba(255,255,255,0.06)"}` }}>
+                  <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setNotes(t.notes || ""); }} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
-                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device (add later for live tracking)"}</div>
-                  </div>
+                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}</div>
+                    {t.notes && <div className="text-white/55 text-xs truncate mt-0.5 flex items-center gap-1"><FileText size={11} /> {t.notes}</div>}
+                  </button>
                   <button onClick={() => remove(t.label)} disabled={busy} title="Remove truck" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
                     <Trash2 size={15} color="#ff8a85" />
                   </button>
@@ -1497,14 +1500,15 @@ function ManageTrucksModal({ onClose, onChanged }) {
             </div>
           )}
 
-          {/* add form */}
+          {/* add / edit form */}
           <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
-            <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Add a truck</div>
+            <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>{existing ? `Edit ${existing.label}` : "Add a truck"}</div>
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Truck name (e.g. RTS 4554)" className={inCls + " mb-2"} style={inSt} />
-            <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-1"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">Leave the GPS ID blank for now — you can add it later to turn on live tracking.</p>
+            <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-2"} style={inSt} />
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (driver, capacity, maintenance…)" className={inCls + " mb-1 resize-none"} style={inSt} />
+            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID optional — add it later to turn on live tracking.</p>
             <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
-              {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Add truck
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {existing ? "Update truck" : "Add truck"}
             </button>
           </div>
 
@@ -1915,10 +1919,13 @@ function DispatchApp({ email, onLogout }) {
                   const s = truckStatus(t);
                   return (
                     <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <span className="flex items-center gap-2 min-w-0">
-                        <Truck size={14} color={ORANGE} />
-                        <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
-                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Truck size={14} color={ORANGE} />
+                          <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
+                        </div>
+                        {t.notes && <div className="text-white/40 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{t.notes}</div>}
+                      </div>
                       <span className="flex items-center gap-2 shrink-0">
                         {s.order && <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>{s.order}</span>}
                         <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
