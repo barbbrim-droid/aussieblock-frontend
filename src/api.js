@@ -98,6 +98,20 @@ export function requestPlusLoad(ref, note = '') {
 export function getPlusLoads() {
   return request('/dispatch/plus-loads')
 }
+
+// Customer logins (staff only). getCustomers() lists every customer with whether
+// they already have a login; setCustomerLogin() creates or resets the email +
+// password a customer signs in with. Both 403 for non-staff.
+export function getCustomers() {
+  return request('/customers')
+}
+export function setCustomerLogin(customerId, email, password) {
+  return request(`/customers/${customerId}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+}
 export function handlePlusLoad(requestId) {
   return request(`/dispatch/plus-loads/${requestId}/handle`, { method: 'POST' })
 }

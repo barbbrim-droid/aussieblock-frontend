@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -668,6 +668,125 @@ function Panel({ title, icon: Icon, count, children }) {
   );
 }
 
+// Staff tool: create or reset the login a customer uses to see their own
+// orders & billing. Lives in the dispatch board's right column.
+function CustomerLogins() {
+  const [customers, setCustomers] = useState([]);
+  const [filter, setFilter] = useState("");
+  const [sel, setSel] = useState(null);        // selected customer id
+  const [emailVal, setEmailVal] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);        // { ok, text }
+
+  const load = async () => {
+    try { setCustomers(await getCustomers()); }
+    catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const pick = (c) => {
+    setSel(c.id);
+    setEmailVal(c.login_email || "");
+    setPw("");
+    setMsg(null);
+  };
+
+  const submit = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await setCustomerLogin(sel, emailVal.trim(), pw);
+      setMsg({ ok: true, text: `Login ${r.action} — ${r.email} can now sign in.` });
+      setPw("");
+      await load();   // refresh the "has login" badges
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const f = filter.trim().toLowerCase();
+  const shown = (f ? customers.filter((c) => c.name.toLowerCase().includes(f)) : customers).slice(0, 60);
+  const selCust = customers.find((c) => c.id === sel);
+  const withLogins = customers.filter((c) => c.login_email).length;
+
+  return (
+    <Panel title="Customer logins" icon={KeyRound} count={`${withLogins}/${customers.length}`}>
+      {/* search */}
+      <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+        <Search size={14} className="text-white/40" />
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Search customers…"
+          className="bg-transparent outline-none text-sm text-white w-full placeholder:text-white/30"
+          style={{ fontFamily: C.body }}
+        />
+      </div>
+
+      {/* customer list */}
+      <div className="max-h-48 overflow-y-auto pr-1 -mr-1">
+        {shown.length === 0 ? (
+          <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No customers match.</div>
+        ) : shown.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => pick(c)}
+            className="w-full text-left rounded-lg px-3 py-2 mb-1 flex items-center justify-between active:scale-[0.99] transition-transform"
+            style={{ background: sel === c.id ? ORANGE + "22" : NAVY, border: `1px solid ${sel === c.id ? ORANGE : "rgba(255,255,255,0.06)"}` }}
+          >
+            <span className="text-white text-sm truncate" style={{ fontFamily: C.body }}>{c.name}</span>
+            {c.login_email
+              ? <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: GREEN + "22", color: GREEN }}><CheckCircle2 size={10} /> Login</span>
+              : <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}>No login</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* create / reset form */}
+      {selCust && (
+        <div className="rounded-xl p-3 mt-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>
+            {selCust.login_email ? "Reset login for " : "Create login for "}{selCust.name}
+          </div>
+          <input
+            value={emailVal}
+            onChange={(e) => setEmailVal(e.target.value)}
+            placeholder="customer email"
+            autoComplete="off"
+            className="w-full rounded-lg px-3 py-2 mb-2 text-sm text-white outline-none placeholder:text-white/30"
+            style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
+          />
+          <input
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            placeholder="password (min 6 characters)"
+            autoComplete="new-password"
+            className="w-full rounded-lg px-3 py-2 mb-2 text-sm text-white outline-none placeholder:text-white/30"
+            style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
+          />
+          <button
+            onClick={submit}
+            disabled={busy || !emailVal.trim() || pw.length < 6}
+            className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50"
+            style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}
+          >
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
+            {selCust.login_email ? "Reset password" : "Create login"}
+          </button>
+        </div>
+      )}
+
+      {msg && (
+        <div className="rounded-lg px-3 py-2 mt-2 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85", fontFamily: C.body }}>
+          {msg.text}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function DispatchApp({ email, onLogout }) {
   const [orders, setOrders] = useState([]);
   const [trucks, setTrucks] = useState([]);
@@ -787,7 +906,7 @@ function DispatchApp({ email, onLogout }) {
               </Panel>
             </div>
 
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 flex flex-col gap-4">
               <Panel title="Plus-load requests" icon={Inbox} count={requests.length}>
                 {requests.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -799,6 +918,7 @@ function DispatchApp({ email, onLogout }) {
                   requests.map((r) => <PlusLoadCard key={r.id} r={r} onHandle={markHandled} busy={busyId === r.id} />)
                 )}
               </Panel>
+              <CustomerLogins />
             </div>
           </div>
         </div>
