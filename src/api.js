@@ -84,6 +84,27 @@ export function createOrder(order) {
 export function deleteOrder(ref) {
   return request(`/orders/${encodeURIComponent(ref)}`, { method: 'DELETE' })
 }
+// COD: mark a customer pay-before-delivery on/off (staff only).
+export function setCustomerCod(customerId, cod) {
+  return request(`/customers/${customerId}/cod`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cod }),
+  })
+}
+// Create a QuickBooks invoice + pay link for a COD load (staff only). Returns
+// { amount, link, doc_number }.
+export function chargeOrder(ref, amount) {
+  return request(`/orders/${encodeURIComponent(ref)}/charge`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+  })
+}
+// COD payment status for an order (staff, or the owning customer). Returns
+// { prepay_required, prepaid, amount, charged, link, balance }.
+export function getOrderPaymentStatus(ref) {
+  return request(`/orders/${encodeURIComponent(ref)}/payment-status`)
+}
+
 // A customer places a concrete order from their app. It lands as "requested" for
 // staff to confirm. Pass { site, mix, qty, scheduled_for, time, notes }.
 export function requestOrder(order) {

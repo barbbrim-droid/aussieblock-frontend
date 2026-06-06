@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -177,6 +177,18 @@ function Timeline({ stageIdx }) {
 
 function TrackScreen({ order, onBack }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
+  const [payErr, setPayErr] = useState("");
+
+  // COD: open the QuickBooks pay link for this order (fetched live).
+  const payCod = async () => {
+    const w = window.open("", "_blank");
+    setPayErr("");
+    try {
+      const r = await getOrderPaymentStatus(order.id);
+      if (r.link) { if (w) w.location = r.link; else window.location.href = r.link; }
+      else { if (w) w.close(); setPayErr(r.prepaid ? "This order is already paid." : "Payment link isn't ready yet — Aussieblock is setting it up."); }
+    } catch (e) { if (w) w.close(); setPayErr(e.message); }
+  };
 
   // LIVE: poll the backend for this order's real progress every few seconds.
   // The backend's GPS poller advances it (mock movement now, real One Step GPS
@@ -242,6 +254,18 @@ ${row("Notes", order.notes)}
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.site}</h2>
       <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
       {orderExtras(order) && <p className="text-white/40 text-xs mt-0.5">{orderExtras(order)}</p>}
+
+      {order.prepay_required && !order.prepaid && (
+        <div className="rounded-2xl p-4 mt-3" style={{ background: "rgba(231,115,42,0.12)", border: `1px solid ${ORANGE}` }}>
+          <div className="text-white font-bold text-sm" style={{ fontFamily: C.cond }}>Payment required before delivery</div>
+          <div className="text-white/55 text-xs mt-0.5" style={{ fontFamily: C.body }}>This is a COD order — pay now to get your delivery scheduled.</div>
+          <button onClick={payCod} className="w-full mt-2.5 rounded-xl py-2.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98]" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><CreditCard size={16} /> Pay now</button>
+          {payErr && <div className="text-xs mt-1.5" style={{ color: "#ff8a85", fontFamily: C.body }}>{payErr}</div>}
+        </div>
+      )}
+      {order.prepay_required && order.prepaid && (
+        <div className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={14} /> Payment received — your delivery is confirmed</div>
+      )}
 
       {isLive ? (
         <>
@@ -791,6 +815,53 @@ function isStale(updatedAt) {
   return (Date.now() - t) / 1000 > 45;
 }
 
+// COD controls shown on a prepay-required order row: set the load total, create
+// the QuickBooks pay link, send it, and check whether it's been paid.
+function CodControls({ o }) {
+  const [amount, setAmount] = useState(o.prepay_amount ? String(o.prepay_amount) : "");
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [paid, setPaid] = useState(!!o.prepaid);
+
+  if (paid) return <div className="mt-2 text-xs font-semibold flex items-center gap-1" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={13} /> Prepaid — cleared for dispatch</div>;
+
+  const charge = async () => {
+    setBusy(true); setMsg("");
+    try { const r = await chargeOrder(o.ref, parseFloat(amount)); setLink(r.link); setMsg("Pay link ready — send it to the customer."); }
+    catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+  const check = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await getOrderPaymentStatus(o.ref);
+      if (r.prepaid) setPaid(true);
+      else { setMsg(`Not paid yet${r.balance != null ? ` — balance ${usd(r.balance)}` : ""}.`); if (r.link) setLink(r.link); }
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="mt-2 rounded-lg p-2.5" style={{ background: "rgba(106,169,255,0.1)", border: "1px solid rgba(106,169,255,0.4)" }}>
+      <div className="text-xs font-semibold mb-1.5" style={{ color: "#6aa9ff", fontFamily: C.body }}>COD — payment required before dispatch</div>
+      <div className="flex gap-2">
+        <div className="flex items-center rounded-lg flex-1" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
+          <span className="pl-2 text-white/50 text-sm">$</span>
+          <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="load total" className="w-full bg-transparent px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ fontFamily: C.body }} />
+        </div>
+        <button onClick={charge} disabled={busy || !amount} className="rounded-lg px-3 text-sm font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{o.prepay_amount ? "Update" : "Create"} link</button>
+      </div>
+      {link && (
+        <div className="flex gap-2 mt-2">
+          <a href={link} target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg py-1.5 text-xs font-semibold" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>Open pay link</a>
+          <button onClick={() => { navigator.clipboard?.writeText(link); setMsg("Link copied."); }} className="flex-1 rounded-lg py-1.5 text-xs font-semibold text-white active:scale-95" style={{ border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>Copy link</button>
+        </div>
+      )}
+      <button onClick={check} disabled={busy} className="w-full mt-2 text-xs font-semibold py-1 active:opacity-70" style={{ color: "#6aa9ff", fontFamily: C.body }}>{busy ? "…" : "Check if paid"}</button>
+      {msg && <div className="text-[11px] mt-1 text-white/60" style={{ fontFamily: C.body }}>{msg}</div>}
+    </div>
+  );
+}
+
 function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
@@ -873,6 +944,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           </select>
         </label>
       </div>
+      {o.prepay_required && <CodControls o={o} />}
       {err && (
         <div className="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>
           {err}
@@ -1005,6 +1077,19 @@ function CustomerLogins() {
     }
   };
 
+  const toggleCod = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await setCustomerCod(sel, !selCust.cod);
+      await load();
+      setMsg({ ok: true, text: `COD ${r.cod ? "ON" : "off"} for ${r.customer}.` });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const f = filter.trim().toLowerCase();
   const shown = (f ? customers.filter((c) => c.name.toLowerCase().includes(f)) : customers).slice(0, 60);
   const selCust = customers.find((c) => c.id === sel);
@@ -1049,6 +1134,9 @@ function CustomerLogins() {
           <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>
             {selCust.login_email ? "Reset login for " : "Create login for "}{selCust.name}
           </div>
+          <button onClick={toggleCod} disabled={busy} className="w-full mb-2 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.98] disabled:opacity-50" style={{ background: selCust.cod ? "#6aa9ff22" : NAVY_DEEP, border: `1px solid ${selCust.cod ? "#6aa9ff" : "rgba(255,255,255,0.12)"}`, color: selCust.cod ? "#6aa9ff" : "#fff", fontFamily: C.body }}>
+            {selCust.cod ? <CheckCircle2 size={15} /> : <Circle size={15} className="text-white/30" />} COD — pay before delivery
+          </button>
           <input
             value={emailVal}
             onChange={(e) => setEmailVal(e.target.value)}
