@@ -314,6 +314,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [time, setTime] = useState("");
   const [site, setSite] = useState("");
   const [notes, setNotes] = useState("");
+  const [acceptShort, setAcceptShort] = useState(false);   // $200 short-load fee acceptance
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
@@ -324,7 +325,8 @@ function OrderConcreteModal({ onClose, onPlaced }) {
     if (cur.includes(a)) return cur.filter((x) => x !== a);
     return [...cur.filter((x) => x !== OPPOSITE[a]), a];
   });
-  const canSubmit = mix && qty.trim() && date && site.trim() && !busy;
+  const shortLoad = parseFloat(qty) > 0 && parseFloat(qty) < 5;   // under 5 yd³ → $200 fee
+  const canSubmit = mix && qty.trim() && date && site.trim() && !busy && (!shortLoad || acceptShort);
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
@@ -336,7 +338,9 @@ function OrderConcreteModal({ onClose, onPlaced }) {
         if (a === "Fiber") { const x = parseFloat(fiberExtra); return x > 0 ? `Fiber: ${3 + x} lbs/yd` : "Fiber: 3 lbs/yd"; }
         return a;
       });
-      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures });
+      let finalNotes = notes.trim();
+      if (shortLoad) finalNotes = (finalNotes ? finalNotes + " — " : "") + "Short load fee $200 (accepted)";
+      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: finalNotes, slump, admixtures });
       setDone(true);
       onPlaced && onPlaced();
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -383,6 +387,13 @@ function OrderConcreteModal({ onClose, onPlaced }) {
                 </select>
               </div>
             </div>
+
+            {shortLoad && (
+              <label className="flex items-start gap-2 rounded-lg p-2.5 mb-3 cursor-pointer" style={{ background: "rgba(231,115,42,0.12)", border: `1px solid ${ORANGE}` }}>
+                <input type="checkbox" checked={acceptShort} onChange={(e) => setAcceptShort(e.target.checked)} className="mt-0.5" />
+                <span className="text-xs text-white" style={{ fontFamily: C.body }}>Orders under 5 yd³ carry a <b>$200 short load fee</b>. I accept this fee.</span>
+              </label>
+            )}
 
             <label className={lbl}>Admixtures (optional)</label>
             <div className="grid grid-cols-2 gap-2 mb-3">
@@ -828,8 +839,11 @@ function CodControls({ o }) {
 
   const charge = async () => {
     setBusy(true); setMsg("");
-    try { const r = await chargeOrder(o.ref, parseFloat(amount)); setLink(r.link); setMsg("Pay link ready — send it to the customer."); }
-    catch (e) { setMsg(e.message); } finally { setBusy(false); }
+    try {
+      const r = await chargeOrder(o.ref, parseFloat(amount));
+      if (r.link) { setLink(r.link); setMsg("Pay link ready — send it to the customer."); }
+      else { setMsg(`Invoice #${r.doc_number} created in QuickBooks (no email on file for a link). Collect payment there — unlocks when paid.`); }
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
   };
   const check = async () => {
     setBusy(true); setMsg("");
