@@ -1223,6 +1223,7 @@ function CustomerLogins() {
   const [smsAuto, setSmsAuto] = useState(false);   // app can send texts itself (Twilio)
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [codOnly, setCodOnly] = useState(false);   // filter list to COD customers
 
   const load = async () => {
     try { setCustomers(await getCustomers()); }
@@ -1302,12 +1303,15 @@ function CustomerLogins() {
   };
 
   const f = filter.trim().toLowerCase();
-  const shown = (f ? customers.filter((c) => c.name.toLowerCase().includes(f)) : customers).slice(0, 60);
+  const codCount = customers.filter((c) => c.cod).length;
+  const shown = customers
+    .filter((c) => (f ? c.name.toLowerCase().includes(f) : true))
+    .filter((c) => (codOnly ? c.cod : true))
+    .slice(0, 60);
   const selCust = customers.find((c) => c.id === sel);
-  const withLogins = customers.filter((c) => c.login_email).length;
 
   return (
-    <Panel title="Customer logins" icon={KeyRound} count={`${withLogins}/${customers.length}`}>
+    <Panel title="Customers" icon={KeyRound} count={`${codCount} COD`}>
       {/* search */}
       <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
         <Search size={14} className="text-white/40" />
@@ -1318,6 +1322,11 @@ function CustomerLogins() {
           className="bg-transparent outline-none text-sm text-white w-full placeholder:text-white/30"
           style={{ fontFamily: C.body }}
         />
+      </div>
+      {/* COD filter */}
+      <div className="flex items-center gap-2 mb-2">
+        <button onClick={() => setCodOnly(false)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: codOnly ? NAVY : "#6aa9ff22", color: codOnly ? "rgba(255,255,255,0.5)" : "#6aa9ff", border: `1px solid ${codOnly ? "rgba(255,255,255,0.12)" : "#6aa9ff"}`, fontFamily: C.body }}>All</button>
+        <button onClick={() => setCodOnly(true)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: codOnly ? "#6aa9ff22" : NAVY, color: codOnly ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${codOnly ? "#6aa9ff" : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>COD only ({codCount})</button>
       </div>
 
       {/* customer list */}
@@ -1332,9 +1341,12 @@ function CustomerLogins() {
             style={{ background: sel === c.id ? ORANGE + "22" : NAVY, border: `1px solid ${sel === c.id ? ORANGE : "rgba(255,255,255,0.06)"}` }}
           >
             <span className="text-white text-sm truncate" style={{ fontFamily: C.body }}>{c.name}</span>
-            {c.login_email
-              ? <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: GREEN + "22", color: GREEN }}><CheckCircle2 size={10} /> Login</span>
-              : <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}>No login</span>}
+            <span className="flex items-center gap-1 shrink-0">
+              {c.cod && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#6aa9ff22", color: "#6aa9ff" }}>COD</span>}
+              {c.login_email
+                ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: GREEN + "22", color: GREEN }}><CheckCircle2 size={10} /> Login</span>
+                : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}>No login</span>}
+            </span>
           </button>
         ))}
       </div>
@@ -1858,7 +1870,7 @@ function DispatchApp({ email, onLogout }) {
             <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight shrink-0">Dispatch board</h1>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <KeyRound size={16} color={ORANGE} /> Logins
+                <KeyRound size={16} color={ORANGE} /> Customers
               </button>
               <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <CalendarDays size={16} color={ORANGE} /> Calendar
