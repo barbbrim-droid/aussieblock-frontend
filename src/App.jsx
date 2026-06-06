@@ -568,7 +568,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.ref}</span>
             <span className="text-white/30 text-xs">·</span>
-            <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[o.when, o.time].filter(Boolean).join(" · ")}</span>
+            <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span>
           </div>
@@ -1072,6 +1072,19 @@ function orderDay(when, today) {
   if (s === "tomorrow") return "upcoming";
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s > today ? "upcoming" : "today";
   return "today";
+}
+// Human-readable scheduled date: "2026-06-08" -> "Mon, Jun 8" (adds the year only
+// if it's not the current year). Legacy "today"/"tomorrow" are just capitalized.
+function formatOrderDate(when) {
+  const s = (when || "").trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) {
+    const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const opts = { weekday: "short", month: "short", day: "numeric" };
+    if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return dt.toLocaleDateString(undefined, opts);
+  }
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
 
 function DispatchApp({ email, onLogout }) {
