@@ -1086,6 +1086,26 @@ function formatOrderDate(when) {
   }
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
+// Longer, prominent form for day headers: "Monday, June 8".
+function formatOrderDateLong(when) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((when || "").trim());
+  if (m) {
+    const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const opts = { weekday: "long", month: "long", day: "numeric" };
+    if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return dt.toLocaleDateString(undefined, opts);
+  }
+  return formatOrderDate(when);
+}
+// Pull the yard number out of a quantity string ("10 CY" -> 10), for daily totals.
+function parseYards(qty) {
+  const m = /([\d.]+)/.exec(qty || "");
+  return m ? parseFloat(m[1]) : 0;
+}
+// Tidy a yard total: 42 -> "42", 10.5 -> "10.5".
+function fmtYards(n) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
 
 function DispatchApp({ email, onLogout }) {
   const [orders, setOrders] = useState([]);
@@ -1136,6 +1156,12 @@ function DispatchApp({ email, onLogout }) {
   const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today");
   const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
+
+  // Yard totals for planning: today's total, and upcoming grouped by day.
+  const todayYards = todayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
+  const upcomingByDay = {};
+  for (const o of upcomingOrders) (upcomingByDay[o.when || "—"] ||= []).push(o);
+  const upcomingDays = Object.keys(upcomingByDay).sort();
 
   if (loading) return <Splash label="Loading dispatch…" />;
 
@@ -1213,14 +1239,40 @@ function DispatchApp({ email, onLogout }) {
                 {todayOrders.length === 0 ? (
                   <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No orders scheduled for today.</div>
                 ) : (
-                  todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)
+                  <>
+                    <div className="flex items-center gap-2 mb-3 rounded-lg px-3 py-2" style={{ background: NAVY }}>
+                      <Package size={15} color={ORANGE} />
+                      <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(todayYards)} CY scheduled today</span>
+                      <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
+                    </div>
+                    {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                  </>
                 )}
               </Panel>
               <Panel title="Upcoming orders" icon={CalendarPlus} count={upcomingOrders.length}>
                 {upcomingOrders.length === 0 ? (
                   <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>Nothing scheduled ahead.</div>
                 ) : (
-                  upcomingOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)
+                  upcomingDays.map((day) => {
+                    const dayOrders = upcomingByDay[day];
+                    const yards = dayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
+                    return (
+                      <div key={day} className="mb-5">
+                        {/* big date header + daily yard total for planning */}
+                        <div className="flex items-end justify-between mb-2.5 pb-2" style={{ borderBottom: "2px solid rgba(255,255,255,0.08)" }}>
+                          <div>
+                            <div style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-none">{formatOrderDateLong(day)}</div>
+                            <div className="text-white/40 text-xs mt-1" style={{ fontFamily: C.body }}>{dayOrders.length} order{dayOrders.length === 1 ? "" : "s"}</div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none">{fmtYards(yards)}</div>
+                            <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
+                          </div>
+                        </div>
+                        {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                      </div>
+                    );
+                  })
                 )}
               </Panel>
             </div>
