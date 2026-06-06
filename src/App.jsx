@@ -62,6 +62,9 @@ const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Other"];
+// When set (build-time), the job-site field uses Google Places for accurate
+// addresses; otherwise it falls back to the free OpenStreetMap source.
+const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
 
 const INV_STATUS = {
   paid: { label: "Paid", color: GREEN },
@@ -323,10 +326,26 @@ function AddressInput({ value, onChange, placeholder, inCls, inSt, wrapClass = "
     if (q.length < 4) { setSugs([]); return; }
     const t = setTimeout(async () => {
       try {
-        // Bias to the plant + restrict to a ~150-mile box around San Angelo.
-        const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=31.4421&lon=-100.4503&bbox=-103.0,29.27,-97.91,33.61`);
-        const d = await r.json();
-        const out = [...new Set((d.features || []).map((f) => addrString(f.properties)).filter(Boolean))];
+        let out = [];
+        if (GOOGLE_PLACES_KEY) {
+          // Google Places (New) autocomplete, restricted to a ~150-mile box.
+          const resp = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY },
+            body: JSON.stringify({
+              input: q,
+              includedRegionCodes: ["us"],
+              locationRestriction: { rectangle: { low: { latitude: 29.27, longitude: -103.0 }, high: { latitude: 33.61, longitude: -97.91 } } },
+            }),
+          });
+          const d = await resp.json();
+          out = (d.suggestions || []).map((s) => s.placePrediction?.text?.text).filter(Boolean);
+        } else {
+          // Free fallback: OpenStreetMap (Photon), biased + boxed to the area.
+          const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=31.4421&lon=-100.4503&bbox=-103.0,29.27,-97.91,33.61`);
+          const d = await r.json();
+          out = [...new Set((d.features || []).map((f) => addrString(f.properties)).filter(Boolean))];
+        }
         setSugs(out); setOpen(true);
       } catch { setSugs([]); }
     }, 300);
