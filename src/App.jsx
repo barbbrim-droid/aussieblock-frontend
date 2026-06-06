@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
 
@@ -302,6 +302,53 @@ ${row("Notes", order.notes)}
   );
 }
 
+// Build a readable address from a Photon (OpenStreetMap) result.
+function addrString(p) {
+  const line1 = [p.housenumber, p.street || p.name].filter(Boolean).join(" ");
+  const line2 = [p.city || p.county, p.state, p.postcode].filter(Boolean).join(", ");
+  return [line1, line2].filter(Boolean).join(", ");
+}
+
+// Job-site input with as-you-type address suggestions (free, no API key — Photon /
+// OpenStreetMap, biased to the San Angelo plant). Click a suggestion to fill it in.
+function AddressInput({ value, onChange, placeholder, inCls, inSt, wrapClass = "" }) {
+  const [sugs, setSugs] = useState([]);
+  const [open, setOpen] = useState(false);
+  const skip = useRef(false);
+
+  useEffect(() => {
+    if (skip.current) { skip.current = false; return; }
+    const q = (value || "").trim();
+    if (q.length < 4) { setSugs([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lat=31.4421&lon=-100.4503`);
+        const d = await r.json();
+        const out = [...new Set((d.features || []).map((f) => addrString(f.properties)).filter(Boolean))];
+        setSugs(out); setOpen(true);
+      } catch { setSugs([]); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  const pick = (s) => { skip.current = true; onChange(s); setSugs([]); setOpen(false); };
+
+  return (
+    <div className={"relative " + wrapClass}>
+      <input value={value} onChange={(e) => { onChange(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={placeholder} autoComplete="off" className={inCls} style={inSt} />
+      {open && sugs.length > 0 && (
+        <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg overflow-hidden max-h-44 overflow-y-auto shadow-xl" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)" }}>
+          {sugs.map((s, i) => (
+            <button key={i} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(s)} className="w-full text-left px-3 py-2 text-sm text-white border-b border-white/5 active:bg-white/10 flex items-start gap-2" style={{ fontFamily: C.body }}>
+              <MapPin size={13} className="mt-0.5 shrink-0 text-white/40" /> {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Customer-facing: place a concrete order from the app. Lands as "requested" for
 // staff to confirm.
 function OrderConcreteModal({ onClose, onPlaced }) {
@@ -441,7 +488,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
             )}
 
             <label className={lbl}>Job site</label>
-            <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="Delivery address / site" className={inCls + " mb-3"} style={inSt} />
+            <AddressInput value={site} onChange={setSite} placeholder="Start typing the delivery address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
@@ -1485,7 +1532,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
           )}
 
           <label className={lbl}>Job site</label>
-          <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. 1200 Knickerbocker Rd" className={inCls + " mb-3"} style={inSt} />
+          <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div><label className={lbl}>Mix</label><input value={mix} onChange={(e) => setMix(e.target.value)} placeholder="e.g. 4000 PSI" className={inCls} style={inSt} /></div>
