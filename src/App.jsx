@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2 } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, addTruck, deleteTruck, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -812,6 +812,90 @@ function CustomerLogins() {
   );
 }
 
+// Staff modal: add/remove the trucks in the fleet. The GPS device id is optional
+// (fill it in later, paired with a One Step GPS API key, to enable live tracking).
+function ManageTrucksModal({ onClose, onChanged }) {
+  const [trucks, setTrucks] = useState([]);
+  const [label, setLabel] = useState("");
+  const [device, setDevice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const load = async () => {
+    try { setTrucks(await getTrucks()); } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const add = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await addTruck(label.trim(), device.trim());
+      setMsg({ ok: true, text: `Truck ${r.action}: ${r.label}` });
+      setLabel(""); setDevice("");
+      await load(); onChanged && onChanged();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (lbl) => {
+    if (!window.confirm(`Remove ${lbl}? It will be taken off any orders it's on.`)) return;
+    setBusy(true); setMsg(null);
+    try { await deleteTruck(lbl); await load(); onChanged && onChanged(); }
+    catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const inCls = "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Truck size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Manage trucks</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {/* current fleet */}
+          <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Your fleet ({trucks.length})</div>
+          {trucks.length === 0 ? (
+            <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ background: NAVY, borderRadius: 12 }}>No trucks yet — add your first below.</div>
+          ) : (
+            <div className="mb-4">
+              {trucks.map((t) => (
+                <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="min-w-0">
+                    <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
+                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device (add later for live tracking)"}</div>
+                  </div>
+                  <button onClick={() => remove(t.label)} disabled={busy} title="Remove truck" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
+                    <Trash2 size={15} color="#ff8a85" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* add form */}
+          <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Add a truck</div>
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Truck name (e.g. RTS 4554)" className={inCls + " mb-2"} style={inSt} />
+            <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-1"} style={inSt} />
+            <p className="text-white/35 text-xs mb-2">Leave the GPS ID blank for now — you can add it later to turn on live tracking.</p>
+            <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Add truck
+            </button>
+          </div>
+
+          {msg && (
+            <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Staff modal: schedule a new order for a customer. Truck is optional — orders
 // start 'scheduled' and a truck can be assigned later from the board.
 function NewOrderModal({ trucks, onClose, onCreated }) {
@@ -918,6 +1002,7 @@ function DispatchApp({ email, onLogout }) {
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [showNew, setShowNew] = useState(false);   // "New order" modal
+  const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
 
   // Pull all three feeds at once, reusing the existing endpoints.
@@ -972,6 +1057,9 @@ function DispatchApp({ email, onLogout }) {
   return (
     <div className="min-h-screen w-full flex items-start justify-center p-4 sm:p-6" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
+      {showTrucks && (
+        <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
+      )}
       {showNew && (
         <NewOrderModal
           trucks={trucks}
@@ -1005,6 +1093,9 @@ function DispatchApp({ email, onLogout }) {
               <p className="text-white/45 text-sm" style={{ fontFamily: C.body }}>Signed in as {email}</p>
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={() => setShowTrucks(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <Truck size={16} color={ORANGE} /> Trucks
+              </button>
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
                 <CalendarPlus size={16} /> New order
               </button>

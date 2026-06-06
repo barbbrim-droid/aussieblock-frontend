@@ -86,6 +86,18 @@ export function getOrder(ref) {
 export function getTrucks() {
   return request('/trucks')
 }
+// Add a truck (or update its GPS device id if the name already exists) — staff
+// only. gps_device_id is optional; fill it in later to enable live tracking.
+export function addTruck(label, gps_device_id) {
+  return request('/trucks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label, gps_device_id: gps_device_id || null }),
+  })
+}
+export function deleteTruck(label) {
+  return request(`/trucks/${encodeURIComponent(label)}`, { method: 'DELETE' })
+}
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)
 }
