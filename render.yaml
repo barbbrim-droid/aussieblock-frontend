@@ -1,0 +1,18 @@
+# Render Blueprint for the Aussieblock frontend (React/Vite static site).
+# In the Render dashboard: New + > Blueprint > pick this repo. After the BACKEND
+# is deployed, set VITE_API_BASE (below) to the backend's URL and redeploy — it's
+# baked in at build time. Hosting a static site on Render is free.
+services:
+  - type: web
+    name: aussieblock-app
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    # Single-page app: serve index.html for any path so refresh/deep links work.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE
+        sync: false               # set to the backend URL, e.g. https://aussieblock-api.onrender.com
