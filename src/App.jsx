@@ -260,7 +260,11 @@ ${row("Notes", order.notes)}
         </div>
       )}
       <div className="mt-3">
-        <button onClick={openTicket} className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
+        {isLive ? (
+          <button onClick={openTicket} className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
+        ) : (
+          <div className="text-center text-white/35 text-xs py-2" style={{ fontFamily: C.body }}>Delivery ticket will be available once the load is batched.</div>
+        )}
       </div>
     </div>
   );
@@ -273,7 +277,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [slump, setSlump] = useState("5\"");
   const [admix, setAdmix] = useState([]);   // selected admixtures
   const [colorDetail, setColorDetail] = useState("");   // shown when "Color" is picked
-  const [setTime, setSetTime] = useState("1 hr");       // shown when "Set Control" is picked
+  const [extraSet, setExtraSet] = useState("1 hr");     // additional set time, when "Set Control" picked
   const [qty, setQty] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -292,7 +296,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
       // "Set Control: +2 hr".
       const admixtures = admix.map((a) => {
         if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
-        if (a === "Set Control" && setTime) return `Set Control: +${setTime}`;
+        if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
         return a;
       });
       await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures });
@@ -358,7 +362,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
             {admix.includes("Set Control") && (
               <div className="mb-3">
                 <label className={lbl}>Additional set time</label>
-                <select value={setTime} onChange={(e) => setSetTime(e.target.value)} className={inCls} style={inSt}>
+                <select value={extraSet} onChange={(e) => setExtraSet(e.target.value)} className={inCls} style={inSt}>
                   {SET_TIMES.map((t) => <option key={t} value={t}>+{t}</option>)}
                 </select>
               </div>
