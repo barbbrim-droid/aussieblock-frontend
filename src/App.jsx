@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2 } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -701,14 +701,30 @@ function CustomerLogins() {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);        // { ok, text }
-  const [invite, setInvite] = useState(null);  // { name, phone, sms, text } after create
+  const [invite, setInvite] = useState(null);  // { id, name, phone, sms, text } after create
   const [copied, setCopied] = useState(false);
+  const [smsAuto, setSmsAuto] = useState(false);   // app can send texts itself (Twilio)
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const load = async () => {
     try { setCustomers(await getCustomers()); }
     catch (e) { setMsg({ ok: false, text: e.message }); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); getSmsEnabled().then((r) => setSmsAuto(!!r.enabled)).catch(() => {}); }, []);
+
+  const sendText = async () => {
+    setSending(true);
+    try {
+      const r = await textInvite(invite.id, invite.text);
+      setSent(true);
+      setMsg({ ok: true, text: `Text sent to ${r.customer} (${r.to}).` });
+    } catch (e) {
+      setMsg({ ok: false, text: `Couldn't send: ${e.message}` });
+    } finally {
+      setSending(false);
+    }
+  };
 
   const pick = (c) => {
     setSel(c.id);
@@ -717,6 +733,7 @@ function CustomerLogins() {
     setMsg(null);
     setInvite(null);
     setCopied(false);
+    setSent(false);
   };
 
   const submit = async () => {
@@ -727,7 +744,8 @@ function CustomerLogins() {
       const r = await setCustomerLogin(sel, emailVal.trim(), password);
       const appUrl = window.location.origin;
       const text = `Hi ${cust.name}, Aussieblock now has an app to track your concrete deliveries and pay invoices online. Open ${appUrl} and sign in — email: ${r.email}, password: ${password}. Questions? Call 325-213-5315.`;
-      setInvite({ name: cust.name, phone: cust.contact, sms: toSmsNumber(cust.contact), text });
+      setInvite({ id: cust.id, name: cust.name, phone: cust.contact, sms: toSmsNumber(cust.contact), text });
+      setSent(false);
       setMsg({ ok: true, text: `Login ${r.action} for ${cust.name}. Send the invite below 👇` });
       setPw("");
       await load();   // refresh the "has login" badges
@@ -846,18 +864,30 @@ function CustomerLogins() {
           <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Send the invite to {invite.name}</div>
           <div className="text-white/45 text-xs mb-2" style={{ fontFamily: C.body }}>Phone on file: {invite.phone || "none"}</div>
           <div className="flex gap-2">
-            {invite.sms ? (
-              <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
-                <Send size={14} /> Text invite
-              </a>
+            {smsAuto ? (
+              // App sends it itself (Twilio configured).
+              invite.sms ? (
+                <button onClick={sendText} disabled={sending || sent} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-60" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                  {sending ? <Loader2 size={14} className="animate-spin" /> : sent ? <CheckCircle2 size={14} /> : <Send size={14} />} {sent ? "Sent" : sending ? "Sending…" : "Send text"}
+                </button>
+              ) : (
+                <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
+              )
             ) : (
-              <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
+              // Fallback: open the staff phone's messaging app.
+              invite.sms ? (
+                <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                  <Send size={14} /> Text invite
+                </a>
+              ) : (
+                <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
+              )
             )}
             <button onClick={() => { navigator.clipboard?.writeText(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
               {copied ? <CheckCircle2 size={14} color={GREEN} /> : <Download size={14} />} {copied ? "Copied" : "Copy text"}
             </button>
           </div>
-          <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>"Text invite" opens your phone's messaging app with the message ready — just hit send.</div>
+          <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts the customer automatically from your business number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
         </div>
       )}
     </Panel>

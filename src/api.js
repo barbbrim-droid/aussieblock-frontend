@@ -141,6 +141,19 @@ export function setCustomerLogin(customerId, email, password) {
 export function removeCustomerLogin(customerId) {
   return request(`/customers/${customerId}/login`, { method: 'DELETE' })
 }
+// Whether the app can send texts itself (Twilio configured). When false, the
+// board opens the staff phone's messaging app instead (sms: link).
+export function getSmsEnabled() {
+  return request('/sms/enabled')
+}
+// Send a customer their invite text via the texting service (staff only).
+export function textInvite(customerId, message) {
+  return request(`/customers/${customerId}/text-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  })
+}
 export function handlePlusLoad(requestId) {
   return request(`/dispatch/plus-loads/${requestId}/handle`, { method: 'POST' })
 }
