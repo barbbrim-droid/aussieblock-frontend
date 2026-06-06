@@ -80,6 +80,10 @@ export function createOrder(order) {
     body: JSON.stringify(order),
   })
 }
+// Cancel (delete) an order by its ref (staff only).
+export function deleteOrder(ref) {
+  return request(`/orders/${encodeURIComponent(ref)}`, { method: 'DELETE' })
+}
 export function getOrder(ref) {
   return request(`/orders/${ref}`)
 }

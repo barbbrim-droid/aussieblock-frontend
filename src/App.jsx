@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2 } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, addTruck, deleteTruck, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -559,7 +559,7 @@ function isStale(updatedAt) {
   return (Date.now() - t) / 1000 > 45;
 }
 
-function OrderRow({ o, trucks, onStatus, onAssign }) {
+function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
@@ -575,6 +575,13 @@ function OrderRow({ o, trucks, onStatus, onAssign }) {
     try { await fn(o.ref, value); }
     catch (e) { setErr(e.message || "Change rejected"); }
     finally { setBusy(false); }
+  };
+
+  const cancel = async () => {
+    if (!window.confirm(`Cancel order ${o.ref} for ${o.customer}? This removes it from the board.`)) return;
+    setBusy(true); setErr("");
+    try { await onCancel(o.ref); }   // parent drops the row on success
+    catch (e) { setErr(e.message || "Could not cancel"); setBusy(false); }
   };
 
   return (
@@ -637,6 +644,11 @@ function OrderRow({ o, trucks, onStatus, onAssign }) {
           {err}
         </div>
       )}
+      <div className="mt-2 flex justify-end">
+        <button onClick={cancel} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#ff8a85", background: "rgba(239,83,80,0.1)", fontFamily: C.body }}>
+          <X size={12} /> Cancel order
+        </button>
+      </div>
     </div>
   );
 }
@@ -1048,6 +1060,10 @@ function DispatchApp({ email, onLogout }) {
     setOrders((os) => os.map((o) => (o.ref === updated.ref ? updated : o)));
   const changeStatus = async (ref, status) => applyOrder(await setOrderStatus(ref, status));
   const assign = async (ref, truck) => applyOrder(await assignTruck(ref, truck));
+  const cancelOrder = async (ref) => {
+    await deleteOrder(ref);                                  // throws on failure -> row shows it
+    setOrders((os) => os.filter((o) => o.ref !== ref));      // drop it from the board
+  };
 
   const activeOrders = orders.filter((o) => o.status !== "complete");
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
@@ -1128,7 +1144,7 @@ function DispatchApp({ email, onLogout }) {
                 {activeOrders.length === 0 ? (
                   <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No active orders.</div>
                 ) : (
-                  activeOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} />)
+                  activeOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)
                 )}
               </Panel>
             </div>
