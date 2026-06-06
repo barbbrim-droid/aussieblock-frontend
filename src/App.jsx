@@ -680,8 +680,19 @@ function Panel({ title, icon: Icon, count, children }) {
   );
 }
 
-// Staff tool: create or reset the login a customer uses to see their own
-// orders & billing. Lives in the dispatch board's right column.
+// Turn a free-form contact string into a textable number, or null if it has no
+// usable phone (e.g. it's an email). US-centric: 10 digits -> +1, 11 with a
+// leading 1 -> +1.
+function toSmsNumber(contact) {
+  const d = (contact || "").replace(/\D/g, "");
+  if (d.length === 10) return "+1" + d;
+  if (d.length === 11 && d[0] === "1") return "+" + d;
+  if (d.length >= 7) return "+" + d;
+  return null;
+}
+
+// Staff tool: create or reset the login a customer uses to see their own orders
+// & billing, then text them an invite. Lives in the dispatch board's right column.
 function CustomerLogins() {
   const [customers, setCustomers] = useState([]);
   const [filter, setFilter] = useState("");
@@ -690,6 +701,8 @@ function CustomerLogins() {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);        // { ok, text }
+  const [invite, setInvite] = useState(null);  // { name, phone, sms, text } after create
+  const [copied, setCopied] = useState(false);
 
   const load = async () => {
     try { setCustomers(await getCustomers()); }
@@ -702,13 +715,20 @@ function CustomerLogins() {
     setEmailVal(c.login_email || "");
     setPw("");
     setMsg(null);
+    setInvite(null);
+    setCopied(false);
   };
 
   const submit = async () => {
+    const cust = customers.find((c) => c.id === sel);
+    const password = pw;
     setBusy(true); setMsg(null);
     try {
-      const r = await setCustomerLogin(sel, emailVal.trim(), pw);
-      setMsg({ ok: true, text: `Login ${r.action} — ${r.email} can now sign in.` });
+      const r = await setCustomerLogin(sel, emailVal.trim(), password);
+      const appUrl = window.location.origin;
+      const text = `Hi ${cust.name}, Aussieblock now has an app to track your concrete deliveries and pay invoices online. Open ${appUrl} and sign in — email: ${r.email}, password: ${password}. Questions? Call 325-213-5315.`;
+      setInvite({ name: cust.name, phone: cust.contact, sms: toSmsNumber(cust.contact), text });
+      setMsg({ ok: true, text: `Login ${r.action} for ${cust.name}. Send the invite below 👇` });
       setPw("");
       await load();   // refresh the "has login" badges
     } catch (e) {
@@ -818,6 +838,26 @@ function CustomerLogins() {
       {msg && (
         <div className="rounded-lg px-3 py-2 mt-2 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85", fontFamily: C.body }}>
           {msg.text}
+        </div>
+      )}
+
+      {invite && (
+        <div className="rounded-xl p-3 mt-2" style={{ background: NAVY, border: `1px solid ${ORANGE}` }}>
+          <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Send the invite to {invite.name}</div>
+          <div className="text-white/45 text-xs mb-2" style={{ fontFamily: C.body }}>Phone on file: {invite.phone || "none"}</div>
+          <div className="flex gap-2">
+            {invite.sms ? (
+              <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                <Send size={14} /> Text invite
+              </a>
+            ) : (
+              <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
+            )}
+            <button onClick={() => { navigator.clipboard?.writeText(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+              {copied ? <CheckCircle2 size={14} color={GREEN} /> : <Download size={14} />} {copied ? "Copied" : "Copy text"}
+            </button>
+          </div>
+          <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>"Text invite" opens your phone's messaging app with the message ready — just hit send.</div>
         </div>
       )}
     </Panel>
