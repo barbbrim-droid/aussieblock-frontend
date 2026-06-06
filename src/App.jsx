@@ -339,30 +339,24 @@ function AddressInput({ value, onChange, placeholder, inCls, inSt, wrapClass = "
   useEffect(() => {
     if (skip.current) { skip.current = false; return; }
     const q = (value || "").trim();
-    if (q.length < 4) { setSugs([]); return; }
+    // Suggestions only when Google Places is configured. The free OpenStreetMap
+    // source returned inaccurate addresses, so without a key this is a plain text
+    // field (no wrong suggestions) until the Google key is added.
+    if (!GOOGLE_PLACES_KEY || q.length < 4) { setSugs([]); return; }
     const t = setTimeout(async () => {
       try {
-        let out = [];
-        if (GOOGLE_PLACES_KEY) {
-          // Google Places (New) autocomplete, restricted to a ~150-mile box.
-          const resp = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY },
-            body: JSON.stringify({
-              input: q,
-              includedRegionCodes: ["us"],
-              locationRestriction: { rectangle: { low: { latitude: 29.27, longitude: -103.0 }, high: { latitude: 33.61, longitude: -97.91 } } },
-            }),
-          });
-          const d = await resp.json();
-          out = (d.suggestions || []).map((s) => s.placePrediction?.text?.text).filter(Boolean);
-        } else {
-          // Free fallback: OpenStreetMap (Photon), biased + boxed to the area.
-          const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=31.4421&lon=-100.4503&bbox=-103.0,29.27,-97.91,33.61`);
-          const d = await r.json();
-          out = [...new Set((d.features || []).map((f) => addrString(f.properties)).filter(Boolean))];
-        }
-        setSugs(out); setOpen(true);
+        const resp = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY },
+          body: JSON.stringify({
+            input: q,
+            includedRegionCodes: ["us"],
+            locationRestriction: { rectangle: { low: { latitude: 29.27, longitude: -103.0 }, high: { latitude: 33.61, longitude: -97.91 } } },
+          }),
+        });
+        const d = await resp.json();
+        setSugs((d.suggestions || []).map((s) => s.placePrediction?.text?.text).filter(Boolean));
+        setOpen(true);
       } catch { setSugs([]); }
     }, 300);
     return () => clearTimeout(t);
