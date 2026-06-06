@@ -1808,6 +1808,16 @@ function DispatchApp({ email, onLogout }) {
   const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
 
+  // Each truck's status, derived from the order it's assigned to. (Later, GPS
+  // geofences for the yard / job site will drive At yard vs On site automatically.)
+  const truckStatus = (t) => {
+    const o = activeOrders.find((x) => x.truck === t.label && ["batched", "enroute", "onsite"].includes(x.status));
+    if (!o) return { label: "At yard", color: "#7c8794" };
+    if (o.status === "onsite") return { label: "On site", color: GREEN, order: o.ref };
+    if (o.status === "enroute") return { label: "En route", color: ORANGE_HOT, order: o.ref };
+    return { label: "Loading", color: ORANGE, order: o.ref };   // batched
+  };
+
   // Yard totals for planning: today's total, and upcoming grouped by day.
   const todayYards = todayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
   const upcomingByDay = {};
@@ -1898,6 +1908,25 @@ function DispatchApp({ email, onLogout }) {
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <FleetMap trucks={trucks} />
+              <div className="mt-3 flex flex-col gap-1.5">
+                {trucks.length === 0 ? (
+                  <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
+                ) : trucks.map((t) => {
+                  const s = truckStatus(t);
+                  return (
+                    <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <Truck size={14} color={ORANGE} />
+                        <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        {s.order && <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>{s.order}</span>}
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </Panel>
             <Panel title="Today's orders" icon={List} count={todayOrders.length} fill>
               {todayOrders.length === 0 ? (
