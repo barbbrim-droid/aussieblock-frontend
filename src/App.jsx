@@ -52,7 +52,8 @@ const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite"
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
 const SLUMPS = ["3\"", "4\"", "5\"", "6\"", "7\""];
-const ADMIXTURES = ["Set control", "Accelerant", "Fiber", "Color"];
+const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
+const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 
 const INV_STATUS = {
   paid: { label: "Paid", color: GREEN },
@@ -272,6 +273,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [slump, setSlump] = useState("5\"");
   const [admix, setAdmix] = useState([]);   // selected admixtures
   const [colorDetail, setColorDetail] = useState("");   // shown when "Color" is picked
+  const [setTime, setSetTime] = useState("1 hr");       // shown when "Set Control" is picked
   const [qty, setQty] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -286,8 +288,13 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
-      // Fold the specific color into the "Color" admixture, e.g. "Color: Davis Tan".
-      const admixtures = admix.map((a) => (a === "Color" && colorDetail.trim() ? `Color: ${colorDetail.trim()}` : a));
+      // Fold the specifics into their admixtures, e.g. "Color: Davis Tan",
+      // "Set Control: +2 hr".
+      const admixtures = admix.map((a) => {
+        if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
+        if (a === "Set Control" && setTime) return `Set Control: +${setTime}`;
+        return a;
+      });
       await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures });
       setDone(true);
       onPlaced && onPlaced();
@@ -348,6 +355,14 @@ function OrderConcreteModal({ onClose, onPlaced }) {
                 );
               })}
             </div>
+            {admix.includes("Set Control") && (
+              <div className="mb-3">
+                <label className={lbl}>Additional set time</label>
+                <select value={setTime} onChange={(e) => setSetTime(e.target.value)} className={inCls} style={inSt}>
+                  {SET_TIMES.map((t) => <option key={t} value={t}>+{t}</option>)}
+                </select>
+              </div>
+            )}
             {admix.includes("Color") && (
               <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
             )}
