@@ -591,7 +591,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.ref}</span>
             <span className="text-white/30 text-xs">·</span>
-            <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {o.time}</span>
+            <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[o.when, o.time].filter(Boolean).join(" · ")}</span>
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span>
           </div>
@@ -1005,7 +1005,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
     try {
       const o = await createOrder({
         customer_id: customerId, site: site.trim(), mix: mix.trim(),
-        qty: qty.trim(), scheduled_for: date, time, truck: truck || null,
+        qty: qty.trim() ? `${qty.trim()} CY` : "", scheduled_for: date, time, truck: truck || null,
       });
       onCreated(o);
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -1050,7 +1050,13 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div><label className={lbl}>Mix</label><input value={mix} onChange={(e) => setMix(e.target.value)} placeholder="e.g. 4000 PSI" className={inCls} style={inSt} /></div>
-            <div><label className={lbl}>Quantity</label><input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 32 CY" className={inCls} style={inSt} /></div>
+            <div>
+              <label className={lbl}>Quantity</label>
+              <div className="flex items-center rounded-lg" style={inSt}>
+                <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2 text-sm text-white outline-none placeholder:text-white/30" style={{ fontFamily: C.body }} />
+                <span className="px-2.5 text-white/55 text-sm" style={{ fontFamily: C.body }}>CY</span>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1074,6 +1080,21 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
       </div>
     </div>
   );
+}
+
+// Local YYYY-MM-DD for "today" (the office's own timezone).
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+// Classify an order by its scheduled date: "today" (today or overdue) vs
+// "upcoming" (a future date). Handles legacy "today"/"tomorrow"; unknown → today
+// so nothing ever disappears.
+function orderDay(when, today) {
+  const s = (when || "").trim().toLowerCase();
+  if (s === "tomorrow") return "upcoming";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s > today ? "upcoming" : "today";
+  return "today";
 }
 
 function DispatchApp({ email, onLogout }) {
@@ -1136,6 +1157,9 @@ function DispatchApp({ email, onLogout }) {
   };
 
   const activeOrders = orders.filter((o) => o.status !== "complete");
+  const today = localToday();
+  const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today");
+  const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
 
   if (loading) return <Splash label="Loading dispatch…" />;
@@ -1199,7 +1223,7 @@ function DispatchApp({ email, onLogout }) {
 
           {/* stat tiles */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
-            <StatTile icon={Package} label="Active orders" value={activeOrders.length} accent={ORANGE} />
+            <StatTile icon={Package} label="Today's orders" value={todayOrders.length} accent={ORANGE} />
             <StatTile icon={Navigation} label="Trucks moving" value={`${movingTrucks}/${trucks.length}`} accent={ORANGE_HOT} />
             <StatTile icon={Activity} label="Open plus-loads" value={requests.length} accent={GREEN} />
           </div>
@@ -1210,11 +1234,18 @@ function DispatchApp({ email, onLogout }) {
               <Panel title="Fleet" icon={MapPin} count={trucks.length}>
                 <FleetMap trucks={trucks} />
               </Panel>
-              <Panel title="Active orders" icon={List} count={activeOrders.length}>
-                {activeOrders.length === 0 ? (
-                  <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No active orders.</div>
+              <Panel title="Today's orders" icon={List} count={todayOrders.length}>
+                {todayOrders.length === 0 ? (
+                  <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No orders scheduled for today.</div>
                 ) : (
-                  activeOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)
+                  todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)
+                )}
+              </Panel>
+              <Panel title="Upcoming orders" icon={CalendarPlus} count={upcomingOrders.length}>
+                {upcomingOrders.length === 0 ? (
+                  <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>Nothing scheduled ahead.</div>
+                ) : (
+                  upcomingOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)
                 )}
               </Panel>
             </div>
