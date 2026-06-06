@@ -57,6 +57,7 @@ const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite"
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
 const RECOMMENDED_MIX = "3500 PSI";
+const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
@@ -421,7 +422,12 @@ function OrderConcreteModal({ onClose, onPlaced }) {
           <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
             <label className={lbl}>Mix</label>
             <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
-              {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
+              <optgroup label="Strength (PSI)">
+                {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
+              </optgroup>
+              <optgroup label="TxDOT mix design">
+                {TXDOT_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </optgroup>
             </select>
 
             <label className={lbl}>What's it for?</label>
