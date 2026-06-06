@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, requestPlusLoad, getTrucks, getPlusLoads, handlePlusLoad, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -812,6 +812,104 @@ function CustomerLogins() {
   );
 }
 
+// Staff modal: schedule a new order for a customer. Truck is optional — orders
+// start 'scheduled' and a truck can be assigned later from the board.
+function NewOrderModal({ trucks, onClose, onCreated }) {
+  const [customers, setCustomers] = useState([]);
+  const [custFilter, setCustFilter] = useState("");
+  const [customerId, setCustomerId] = useState(null);
+  const [site, setSite] = useState("");
+  const [mix, setMix] = useState("");
+  const [qty, setQty] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [truck, setTruck] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => { getCustomers().then(setCustomers).catch((e) => setErr(e.message)); }, []);
+
+  const selCust = customers.find((c) => c.id === customerId);
+  const f = custFilter.trim().toLowerCase();
+  const shown = f ? customers.filter((c) => c.name.toLowerCase().includes(f)).slice(0, 25) : [];
+  const canSubmit = customerId && site.trim() && mix.trim() && qty.trim() && date && !busy;
+
+  const submit = async () => {
+    setErr(""); setBusy(true);
+    try {
+      const o = await createOrder({
+        customer_id: customerId, site: site.trim(), mix: mix.trim(),
+        qty: qty.trim(), scheduled_for: date, time, truck: truck || null,
+      });
+      onCreated(o);
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  const inCls = "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><CalendarPlus size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">New order</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          <label className={lbl}>Customer</label>
+          {selCust ? (
+            <div className="flex items-center justify-between rounded-lg px-3 py-2 mb-3" style={{ background: NAVY, border: `1px solid ${ORANGE}` }}>
+              <span className="text-white text-sm truncate">{selCust.name}</span>
+              <button onClick={() => { setCustomerId(null); setCustFilter(""); }} className="text-xs shrink-0 ml-2" style={{ color: ORANGE }}>change</button>
+            </div>
+          ) : (
+            <div className="mb-3">
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>
+                <Search size={14} className="text-white/40" />
+                <input value={custFilter} onChange={(e) => setCustFilter(e.target.value)} placeholder="Search customer…" className="bg-transparent outline-none text-sm text-white w-full placeholder:text-white/30" autoFocus />
+              </div>
+              {shown.length > 0 && (
+                <div className="max-h-40 overflow-y-auto mt-1 rounded-lg" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {shown.map((c) => (
+                    <button key={c.id} onClick={() => setCustomerId(c.id)} className="w-full text-left px-3 py-2 text-sm text-white border-b border-white/5 active:bg-white/10">{c.name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <label className={lbl}>Job site</label>
+          <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. 1200 Knickerbocker Rd" className={inCls + " mb-3"} style={inSt} />
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div><label className={lbl}>Mix</label><input value={mix} onChange={(e) => setMix(e.target.value)} placeholder="e.g. 4000 PSI" className={inCls} style={inSt} /></div>
+            <div><label className={lbl}>Quantity</label><input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 32 CY" className={inCls} style={inSt} /></div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+            <div><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+          </div>
+
+          <label className={lbl}>Truck (optional)</label>
+          <select value={truck} onChange={(e) => setTruck(e.target.value)} className={inCls} style={inSt}>
+            <option value="">Unassigned</option>
+            {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+          </select>
+          <p className="text-white/35 text-xs mt-1 mb-3">Assign a truck now or later from the board.</p>
+
+          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+
+          <button onClick={submit} disabled={!canSubmit} className="w-full rounded-xl py-2.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <CalendarPlus size={16} />} Schedule order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DispatchApp({ email, onLogout }) {
   const [orders, setOrders] = useState([]);
   const [trucks, setTrucks] = useState([]);
@@ -819,6 +917,7 @@ function DispatchApp({ email, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
 
   // Pull all three feeds at once, reusing the existing endpoints.
@@ -873,6 +972,13 @@ function DispatchApp({ email, onLogout }) {
   return (
     <div className="min-h-screen w-full flex items-start justify-center p-4 sm:p-6" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
+      {showNew && (
+        <NewOrderModal
+          trucks={trucks}
+          onClose={() => setShowNew(false)}
+          onCreated={(o) => { setOrders((os) => [o, ...os.filter((x) => x.ref !== o.ref)]); setShowNew(false); }}
+        />
+      )}
       <div className="w-full max-w-6xl rounded-[1.6rem] overflow-hidden shadow-2xl" style={{ background: NAVY_DEEP, fontFamily: C.body, border: "1px solid rgba(255,255,255,0.08)" }}>
         {/* brand header */}
         <div className="px-5 sm:px-6 pt-3.5 pb-3.5" style={{ background: ORANGE }}>
@@ -898,9 +1004,14 @@ function DispatchApp({ email, onLogout }) {
               <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">Dispatch board</h1>
               <p className="text-white/45 text-sm" style={{ fontFamily: C.body }}>Signed in as {email}</p>
             </div>
-            <button onClick={refresh} title="Refresh now" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
-              <RefreshCw size={16} color={ORANGE} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+                <CalendarPlus size={16} /> New order
+              </button>
+              <button onClick={refresh} title="Refresh now" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+                <RefreshCw size={16} color={ORANGE} />
+              </button>
+            </div>
           </div>
 
           {err && (

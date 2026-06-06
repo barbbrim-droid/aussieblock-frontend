@@ -70,6 +70,16 @@ export function getMe() {
 export function getOrders() {
   return request('/orders')
 }
+// Schedule a new order (staff only). Pass { customer_id, site, mix, qty,
+// scheduled_for, time, truck }. Returns the new order in the same shape as
+// getOrders(), so the board can drop it straight into the list.
+export function createOrder(order) {
+  return request('/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order),
+  })
+}
 export function getOrder(ref) {
   return request(`/orders/${ref}`)
 }
