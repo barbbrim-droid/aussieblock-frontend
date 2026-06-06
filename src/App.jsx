@@ -49,9 +49,10 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
-// Concrete mixes customers can pick from when ordering. (Edit to match your real
-// mixes.) Used by the customer order form.
-const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI", "Liquid Limestone", "Flowable Fill"];
+// Options for the customer order form. Edit to match what you sell.
+const MIXES = ["3500 PSI", "4000 PSI", "4500 PSI"];
+const SLUMPS = ["4\"", "5\"", "6\"", "7\""];
+const ADMIXTURES = ["Set control", "Accelerant", "Fiber", "Color"];
 
 const INV_STATUS = {
   paid: { label: "Paid", color: GREEN },
@@ -108,6 +109,7 @@ function OrderCard({ o, onOpen, showCustomer }) {
           </div>
           <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.site}</div>
           <div className="text-white/50 text-sm mt-0.5">{showCustomer ? o.customer + " · " : ""}{o.mix}</div>
+          {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
         </div>
         <div className="text-right shrink-0">
           <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none">{o.qty}</div>
@@ -196,6 +198,7 @@ function TrackScreen({ order, onBack }) {
       </div>
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.site}</h2>
       <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
+      {orderExtras(order) && <p className="text-white/40 text-xs mt-0.5">{orderExtras(order)}</p>}
       <div className="mt-4"><TrackMap progress={progress} /></div>
       {progress > 0.92 && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck entered site geofence — proof of delivery logged</div>}
       <div className="grid grid-cols-2 gap-3 mt-3">
@@ -214,6 +217,8 @@ function TrackScreen({ order, onBack }) {
 // staff to confirm.
 function OrderConcreteModal({ onClose, onPlaced }) {
   const [mix, setMix] = useState(MIXES[0]);
+  const [slump, setSlump] = useState("5\"");
+  const [admix, setAdmix] = useState([]);   // selected admixtures
   const [qty, setQty] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -223,11 +228,12 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
 
+  const toggleAdmix = (a) => setAdmix((cur) => cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]);
   const canSubmit = mix && qty.trim() && date && site.trim() && !busy;
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
-      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim() });
+      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures: admix });
       setDone(true);
       onPlaced && onPlaced();
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -259,10 +265,33 @@ function OrderConcreteModal({ onClose, onPlaced }) {
               {MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
 
-            <label className={lbl}>Quantity</label>
-            <div className="flex items-center rounded-lg mb-3" style={inSt}>
-              <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
-              <span className="px-3 text-white/55 text-sm">CY</span>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className={lbl}>Quantity</label>
+                <div className="flex items-center rounded-lg" style={inSt}>
+                  <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+                  <span className="px-3 text-white/55 text-sm">CY</span>
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Slump</label>
+                <select value={slump} onChange={(e) => setSlump(e.target.value)} className={inCls} style={inSt}>
+                  {SLUMPS.map((sl) => <option key={sl} value={sl}>{sl}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <label className={lbl}>Admixtures (optional)</label>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {ADMIXTURES.map((a) => {
+                const on = admix.includes(a);
+                return (
+                  <button key={a} type="button" onClick={() => toggleAdmix(a)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm active:scale-[0.98] transition-transform"
+                    style={{ background: on ? ORANGE + "22" : NAVY_DEEP, border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.12)"}`, color: "#fff", fontFamily: C.body }}>
+                    {on ? <CheckCircle2 size={15} color={ORANGE} /> : <Circle size={15} className="text-white/30" />} {a}
+                  </button>
+                );
+              })}
             </div>
 
             <label className={lbl}>Job site</label>
@@ -671,6 +700,8 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           </div>
           <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.site}</div>
           <div className="text-white/50 text-sm mt-0.5 truncate">{o.customer} · {o.mix}</div>
+          {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
+          {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
         </div>
         <div className="text-right shrink-0">
           <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none">{o.qty}</div>
@@ -1292,6 +1323,10 @@ function parseYards(qty) {
 // Tidy a yard total: 42 -> "42", 10.5 -> "10.5".
 function fmtYards(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+// Slump + admixtures as one line: '5" slump · Fiber, Color' (empty if neither set).
+function orderExtras(o) {
+  return [o.slump ? `${o.slump} slump` : "", o.admixtures].filter(Boolean).join(" · ");
 }
 
 function DispatchApp({ email, onLogout }) {
