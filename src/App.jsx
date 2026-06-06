@@ -50,8 +50,8 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 // ORDER_STATUSES in the backend — keep the two in sync.
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
-const MIXES = ["3500 PSI", "4000 PSI", "4500 PSI"];
-const SLUMPS = ["4\"", "5\"", "6\"", "7\""];
+const MIXES = ["3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
+const SLUMPS = ["3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set control", "Accelerant", "Fiber", "Color"];
 
 const INV_STATUS = {
