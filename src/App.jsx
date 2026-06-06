@@ -50,8 +50,9 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 // ORDER_STATUSES in the backend — keep the two in sync.
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
-const MIXES = ["3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const SLUMPS = ["3\"", "4\"", "5\"", "6\"", "7\""];
+const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
+const RECOMMENDED_MIX = "3500 PSI";
+const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 
@@ -273,11 +274,12 @@ ${row("Notes", order.notes)}
 // Customer-facing: place a concrete order from the app. Lands as "requested" for
 // staff to confirm.
 function OrderConcreteModal({ onClose, onPlaced }) {
-  const [mix, setMix] = useState(MIXES[0]);
+  const [mix, setMix] = useState(RECOMMENDED_MIX);
   const [slump, setSlump] = useState("5\"");
   const [admix, setAdmix] = useState([]);   // selected admixtures
   const [colorDetail, setColorDetail] = useState("");   // shown when "Color" is picked
   const [extraSet, setExtraSet] = useState("1 hr");     // additional set time, when "Set Control" picked
+  const [fiberExtra, setFiberExtra] = useState("");     // additional fiber lbs/yd beyond the standard 3
   const [qty, setQty] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -297,6 +299,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
       const admixtures = admix.map((a) => {
         if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
         if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
+        if (a === "Fiber") { const x = parseFloat(fiberExtra); return x > 0 ? `Fiber: ${3 + x} lbs/yd` : "Fiber: 3 lbs/yd"; }
         return a;
       });
       await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures });
@@ -328,7 +331,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
           <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
             <label className={lbl}>Mix</label>
             <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
-              {MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
+              {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
             </select>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -365,6 +368,15 @@ function OrderConcreteModal({ onClose, onPlaced }) {
                 <select value={extraSet} onChange={(e) => setExtraSet(e.target.value)} className={inCls} style={inSt}>
                   {SET_TIMES.map((t) => <option key={t} value={t}>+{t}</option>)}
                 </select>
+              </div>
+            )}
+            {admix.includes("Fiber") && (
+              <div className="mb-3">
+                <label className={lbl}>Fiber — extra lbs/yd (standard is 3)</label>
+                <div className="flex items-center rounded-lg" style={inSt}>
+                  <input type="number" min="0" step="0.5" value={fiberExtra} onChange={(e) => setFiberExtra(e.target.value)} placeholder="0 (just the standard 3)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+                  <span className="px-3 text-white/55 text-sm">lbs/yd</span>
+                </div>
               </div>
             )}
             {admix.includes("Color") && (
