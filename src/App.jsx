@@ -401,6 +401,36 @@ function AccountScreen({ account, customerId }) {
     }
   };
 
+  // Open a clean, printable account statement in a new tab (customer can save as
+  // PDF or print). Built from the same balance + invoice data shown on screen.
+  const openStatement = () => {
+    const w = window.open("", "_blank");
+    if (!w) { setPayErr("Allow pop-ups to open your statement."); return; }
+    const stDate = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    const total = invoices.reduce((s, i) => s + (i.amount || 0), 0);
+    const rows = invoices.map((i) => {
+      const lbl = (INV_STATUS[i.status] || INV_STATUS.due).label;
+      return `<tr><td>${i.id}</td><td>${i.date || ""}</td><td>${i.order || ""}</td><td>${lbl}</td><td class="r">${usd(i.amount)}</td></tr>`;
+    }).join("");
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Statement — ${account.company}</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:24px;}h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
+.muted{color:#667;font-size:13px;}.sum{display:flex;gap:30px;background:#f6f7f9;border-radius:10px;padding:14px 16px;margin-top:18px;}
+.lab{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.big{font-size:20px;font-weight:bold;margin-top:2px;}
+table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px;}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #e2e6ea;}
+th{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.r{text-align:right;}.pastdue{color:#c62828;}
+button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:22px;}@media print{button{display:none;}}</style></head>
+<body><h1>AUSSIEBLOCK READY MIX</h1><div class="muted">Account Statement &middot; ${stDate}</div>
+<div style="margin-top:14px;"><strong>${account.company}</strong><div class="muted">Account ${account.acctNo || ""} &middot; Terms ${account.terms || ""}</div></div>
+<div class="sum"><div><div class="lab">Current balance</div><div class="big">${usd(account.balance)}</div></div>
+${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class="big pastdue">${usd(account.pastDue)}</div></div>` : ""}</div>
+<table><thead><tr><th>Invoice</th><th>Date</th><th>Order</th><th>Status</th><th class="r">Amount</th></tr></thead>
+<tbody>${rows || `<tr><td colspan="5" class="muted">No invoices on file.</td></tr>`}</tbody>
+<tfoot><tr><td colspan="4" class="r"><strong>Total</strong></td><td class="r"><strong>${usd(total)}</strong></td></tr></tfoot></table>
+<button onclick="window.print()">Print / Save as PDF</button>
+<div class="muted" style="margin-top:22px;">Questions? Aussieblock office &middot; 325-213-5315</div></body></html>`);
+    w.document.close();
+  };
+
   return (
     <div className="px-4 pb-24 pt-2">
       <h1 style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mb-4">Account</h1>
@@ -461,7 +491,7 @@ function AccountScreen({ account, customerId }) {
       {/* invoices */}
       <div className="flex items-center justify-between mt-5 mb-2">
         <span className="text-white/50 text-xs font-semibold uppercase tracking-widest">Invoices</span>
-        <button className="flex items-center gap-1 text-xs" style={{ color: ORANGE, fontFamily: C.body }}><Download size={12} /> Statement</button>
+        <button onClick={openStatement} className="flex items-center gap-1 text-xs active:opacity-60" style={{ color: ORANGE, fontFamily: C.body }}><Download size={12} /> Statement</button>
       </div>
       {invoices.map((inv) => {
         const m = INV_STATUS[inv.status] || INV_STATUS.due;
