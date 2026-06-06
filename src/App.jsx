@@ -11,11 +11,11 @@ const GREEN = "#27c08a";
 
 const FONT = `
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap');
-/* Render native date/time pickers in dark mode so the calendar/clock icons are
-   light and legible on the dark fields. */
+/* Render native date/time pickers in dark mode so the calendar/clock icons show
+   up light on the dark fields. (No invert filter — it would cancel this out.) */
 input[type="date"], input[type="time"] { color-scheme: dark; }
 input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(1.6); opacity: 0.9; cursor: pointer; }
+input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
