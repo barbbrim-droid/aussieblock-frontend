@@ -370,50 +370,142 @@ function AddressInput({ value, onChange, placeholder, inCls, inSt, wrapClass = "
   );
 }
 
+// Shared concrete-spec fields (mix, use, qty, slump, admixtures + the detail
+// inputs and short-load fee). Used by BOTH the customer order form and the staff
+// "New order" form so they stay identical. Returns the fields JSX plus helpers.
+function useConcreteSpec() {
+  const [mix, setMix] = useState(RECOMMENDED_MIX);
+  const [useFor, setUseFor] = useState("");
+  const [useOther, setUseOther] = useState("");
+  const [qty, setQty] = useState("");
+  const [slump, setSlump] = useState("5\"");
+  const [admix, setAdmix] = useState([]);
+  const [extraSet, setExtraSet] = useState("1 hr");
+  const [fiberExtra, setFiberExtra] = useState("");
+  const [colorDetail, setColorDetail] = useState("");
+  const [acceptShort, setAcceptShort] = useState(false);
+
+  const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
+  const toggleAdmix = (a) => setAdmix((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur.filter((x) => x !== OPPOSITE[a]), a]));
+  const shortLoad = parseFloat(qty) > 0 && parseFloat(qty) < 5;
+  const valid = !!(mix && qty.trim() && (!shortLoad || acceptShort));
+  const shortNote = shortLoad ? "Short load fee $200 (accepted)" : "";
+  const build = () => ({
+    mix,
+    qty: qty.trim() ? `${qty.trim()} CY` : "",
+    slump,
+    use_for: useFor === "Other" ? useOther.trim() : useFor,
+    admixtures: admix.map((a) => {
+      if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
+      if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
+      if (a === "Fiber") { const x = parseFloat(fiberExtra); return x > 0 ? `Fiber: ${3 + x} lbs/yd` : "Fiber: 3 lbs/yd"; }
+      return a;
+    }),
+  });
+
+  const inCls = "w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
+
+  const fields = (
+    <>
+      <label className={lbl}>Mix</label>
+      <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
+        <optgroup label="Strength (PSI)">
+          {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
+        </optgroup>
+        <optgroup label="TxDOT mix design">
+          {TXDOT_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
+        </optgroup>
+      </select>
+
+      <label className={lbl}>What's it for?</label>
+      <select value={useFor} onChange={(e) => setUseFor(e.target.value)} className={inCls + (useFor === "Other" ? "" : " mb-3")} style={inSt}>
+        <option value="">Select… (optional)</option>
+        {USES.map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      {useFor === "Other" && <input value={useOther} onChange={(e) => setUseOther(e.target.value)} placeholder="Describe what it's for" className={inCls + " mt-2 mb-3"} style={inSt} />}
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className={lbl}>Quantity</label>
+          <div className="flex items-center rounded-lg" style={inSt}>
+            <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <span className="px-3 text-white/55 text-sm">CY</span>
+          </div>
+        </div>
+        <div>
+          <label className={lbl}>Slump</label>
+          <select value={slump} onChange={(e) => setSlump(e.target.value)} className={inCls} style={inSt}>
+            {SLUMPS.map((sl) => <option key={sl} value={sl}>{sl}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {shortLoad && (
+        <label className="flex items-start gap-2 rounded-lg p-2.5 mb-3 cursor-pointer" style={{ background: "rgba(231,115,42,0.12)", border: `1px solid ${ORANGE}` }}>
+          <input type="checkbox" checked={acceptShort} onChange={(e) => setAcceptShort(e.target.checked)} className="mt-0.5" />
+          <span className="text-xs text-white" style={{ fontFamily: C.body }}>Orders under 5 yd³ carry a <b>$200 short load fee</b>. Accepted.</span>
+        </label>
+      )}
+
+      <label className={lbl}>Admixtures (optional)</label>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {ADMIXTURES.map((a) => {
+          const on = admix.includes(a);
+          return (
+            <button key={a} type="button" onClick={() => toggleAdmix(a)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm active:scale-[0.98] transition-transform"
+              style={{ background: on ? ORANGE + "22" : NAVY_DEEP, border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.12)"}`, color: "#fff", fontFamily: C.body }}>
+              {on ? <CheckCircle2 size={15} color={ORANGE} /> : <Circle size={15} className="text-white/30" />} {a}
+            </button>
+          );
+        })}
+      </div>
+      {admix.includes("Set Control") && (
+        <div className="mb-3">
+          <label className={lbl}>Additional set time</label>
+          <select value={extraSet} onChange={(e) => setExtraSet(e.target.value)} className={inCls} style={inSt}>
+            {SET_TIMES.map((t) => <option key={t} value={t}>+{t}</option>)}
+          </select>
+        </div>
+      )}
+      {admix.includes("Fiber") && (
+        <div className="mb-3">
+          <label className={lbl}>Fiber — extra lbs/yd (standard is 3)</label>
+          <div className="flex items-center rounded-lg" style={inSt}>
+            <input type="number" min="0" step="0.5" value={fiberExtra} onChange={(e) => setFiberExtra(e.target.value)} placeholder="0 (just the standard 3)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <span className="px-3 text-white/55 text-sm">lbs/yd</span>
+          </div>
+        </div>
+      )}
+      {admix.includes("Color") && (
+        <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
+      )}
+    </>
+  );
+
+  return { fields, valid, shortNote, build };
+}
+
 // Customer-facing: place a concrete order from the app. Lands as "requested" for
 // staff to confirm.
 function OrderConcreteModal({ onClose, onPlaced }) {
-  const [mix, setMix] = useState(RECOMMENDED_MIX);
-  const [slump, setSlump] = useState("5\"");
-  const [admix, setAdmix] = useState([]);   // selected admixtures
-  const [useFor, setUseFor] = useState("");             // what the concrete is for
-  const [useOther, setUseOther] = useState("");         // shown when "Other" is picked
-  const [colorDetail, setColorDetail] = useState("");   // shown when "Color" is picked
-  const [extraSet, setExtraSet] = useState("1 hr");     // additional set time, when "Set Control" picked
-  const [fiberExtra, setFiberExtra] = useState("");     // additional fiber lbs/yd beyond the standard 3
-  const [qty, setQty] = useState("");
+  const spec = useConcreteSpec();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [site, setSite] = useState("");
   const [notes, setNotes] = useState("");
-  const [acceptShort, setAcceptShort] = useState(false);   // $200 short-load fee acceptance
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
 
-  // Accelerant and Set Control are opposites — selecting one clears the other.
-  const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
-  const toggleAdmix = (a) => setAdmix((cur) => {
-    if (cur.includes(a)) return cur.filter((x) => x !== a);
-    return [...cur.filter((x) => x !== OPPOSITE[a]), a];
-  });
-  const shortLoad = parseFloat(qty) > 0 && parseFloat(qty) < 5;   // under 5 yd³ → $200 fee
-  const canSubmit = mix && qty.trim() && date && site.trim() && !busy && (!shortLoad || acceptShort);
+  const canSubmit = spec.valid && date && site.trim() && !busy;
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
-      // Fold the specifics into their admixtures, e.g. "Color: Davis Tan",
-      // "Set Control: +2 hr".
-      const admixtures = admix.map((a) => {
-        if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
-        if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
-        if (a === "Fiber") { const x = parseFloat(fiberExtra); return x > 0 ? `Fiber: ${3 + x} lbs/yd` : "Fiber: 3 lbs/yd"; }
-        return a;
-      });
       let finalNotes = notes.trim();
-      if (shortLoad) finalNotes = (finalNotes ? finalNotes + " — " : "") + "Short load fee $200 (accepted)";
-      const use_for = useFor === "Other" ? useOther.trim() : useFor;
-      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: finalNotes, slump, admixtures, use_for });
+      if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
+      await requestOrder({ site: site.trim(), scheduled_for: date, time, notes: finalNotes, ...spec.build() });
       setDone(true);
       onPlaced && onPlaced();
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -440,78 +532,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
           </div>
         ) : (
           <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
-            <label className={lbl}>Mix</label>
-            <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
-              <optgroup label="Strength (PSI)">
-                {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
-              </optgroup>
-              <optgroup label="TxDOT mix design">
-                {TXDOT_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
-              </optgroup>
-            </select>
-
-            <label className={lbl}>What's it for?</label>
-            <select value={useFor} onChange={(e) => setUseFor(e.target.value)} className={inCls + (useFor === "Other" ? "" : " mb-3")} style={inSt}>
-              <option value="">Select… (optional)</option>
-              {USES.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
-            {useFor === "Other" && <input value={useOther} onChange={(e) => setUseOther(e.target.value)} placeholder="Describe what it's for" className={inCls + " mt-2 mb-3"} style={inSt} />}
-
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className={lbl}>Quantity</label>
-                <div className="flex items-center rounded-lg" style={inSt}>
-                  <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
-                  <span className="px-3 text-white/55 text-sm">CY</span>
-                </div>
-              </div>
-              <div>
-                <label className={lbl}>Slump</label>
-                <select value={slump} onChange={(e) => setSlump(e.target.value)} className={inCls} style={inSt}>
-                  {SLUMPS.map((sl) => <option key={sl} value={sl}>{sl}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {shortLoad && (
-              <label className="flex items-start gap-2 rounded-lg p-2.5 mb-3 cursor-pointer" style={{ background: "rgba(231,115,42,0.12)", border: `1px solid ${ORANGE}` }}>
-                <input type="checkbox" checked={acceptShort} onChange={(e) => setAcceptShort(e.target.checked)} className="mt-0.5" />
-                <span className="text-xs text-white" style={{ fontFamily: C.body }}>Orders under 5 yd³ carry a <b>$200 short load fee</b>. I accept this fee.</span>
-              </label>
-            )}
-
-            <label className={lbl}>Admixtures (optional)</label>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {ADMIXTURES.map((a) => {
-                const on = admix.includes(a);
-                return (
-                  <button key={a} type="button" onClick={() => toggleAdmix(a)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm active:scale-[0.98] transition-transform"
-                    style={{ background: on ? ORANGE + "22" : NAVY_DEEP, border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.12)"}`, color: "#fff", fontFamily: C.body }}>
-                    {on ? <CheckCircle2 size={15} color={ORANGE} /> : <Circle size={15} className="text-white/30" />} {a}
-                  </button>
-                );
-              })}
-            </div>
-            {admix.includes("Set Control") && (
-              <div className="mb-3">
-                <label className={lbl}>Additional set time</label>
-                <select value={extraSet} onChange={(e) => setExtraSet(e.target.value)} className={inCls} style={inSt}>
-                  {SET_TIMES.map((t) => <option key={t} value={t}>+{t}</option>)}
-                </select>
-              </div>
-            )}
-            {admix.includes("Fiber") && (
-              <div className="mb-3">
-                <label className={lbl}>Fiber — extra lbs/yd (standard is 3)</label>
-                <div className="flex items-center rounded-lg" style={inSt}>
-                  <input type="number" min="0" step="0.5" value={fiberExtra} onChange={(e) => setFiberExtra(e.target.value)} placeholder="0 (just the standard 3)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
-                  <span className="px-3 text-white/55 text-sm">lbs/yd</span>
-                </div>
-              </div>
-            )}
-            {admix.includes("Color") && (
-              <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
-            )}
+            {spec.fields}
 
             <label className={lbl}>Job site</label>
             <AddressInput value={site} onChange={setSite} placeholder="Start typing the delivery address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
@@ -1493,15 +1514,15 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onClose }
 // Staff modal: schedule a new order for a customer. Truck is optional — orders
 // start 'scheduled' and a truck can be assigned later from the board.
 function NewOrderModal({ trucks, onClose, onCreated }) {
+  const spec = useConcreteSpec();
   const [customers, setCustomers] = useState([]);
   const [custFilter, setCustFilter] = useState("");
   const [customerId, setCustomerId] = useState(null);
   const [site, setSite] = useState("");
-  const [mix, setMix] = useState("");
-  const [qty, setQty] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [truck, setTruck] = useState("");
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -1510,20 +1531,19 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
   const selCust = customers.find((c) => c.id === customerId);
   const f = custFilter.trim().toLowerCase();
   const shown = f ? customers.filter((c) => c.name.toLowerCase().includes(f)).slice(0, 25) : [];
-  const canSubmit = customerId && site.trim() && mix.trim() && qty.trim() && date && !busy;
+  const canSubmit = customerId && site.trim() && spec.valid && date && !busy;
 
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
-      const o = await createOrder({
-        customer_id: customerId, site: site.trim(), mix: mix.trim(),
-        qty: qty.trim() ? `${qty.trim()} CY` : "", scheduled_for: date, time, truck: truck || null,
-      });
+      let finalNotes = notes.trim();
+      if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
+      const o = await createOrder({ customer_id: customerId, site: site.trim(), scheduled_for: date, time, truck: truck || null, notes: finalNotes, ...spec.build() });
       onCreated(o);
     } catch (e) { setErr(e.message); setBusy(false); }
   };
 
-  const inCls = "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inCls = "w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30";
   const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
   const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
 
@@ -1560,16 +1580,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
           <label className={lbl}>Job site</label>
           <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div><label className={lbl}>Mix</label><input value={mix} onChange={(e) => setMix(e.target.value)} placeholder="e.g. 4000 PSI" className={inCls} style={inSt} /></div>
-            <div>
-              <label className={lbl}>Quantity</label>
-              <div className="flex items-center rounded-lg" style={inSt}>
-                <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2 text-sm text-white outline-none placeholder:text-white/30" style={{ fontFamily: C.body }} />
-                <span className="px-2.5 text-white/55 text-sm" style={{ fontFamily: C.body }}>CY</span>
-              </div>
-            </div>
-          </div>
+          {spec.fields}
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
@@ -1582,6 +1593,9 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
             {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
           <p className="text-white/35 text-xs mt-1 mb-3">Assign a truck now or later from the board.</p>
+
+          <label className={lbl}>Notes (optional)</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
 
           {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
 
