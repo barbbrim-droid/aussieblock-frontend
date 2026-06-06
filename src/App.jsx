@@ -323,7 +323,8 @@ function AddressInput({ value, onChange, placeholder, inCls, inSt, wrapClass = "
     if (q.length < 4) { setSugs([]); return; }
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lat=31.4421&lon=-100.4503`);
+        // Bias to the plant + restrict to a ~150-mile box around San Angelo.
+        const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=31.4421&lon=-100.4503&bbox=-103.0,29.27,-97.91,33.61`);
         const d = await r.json();
         const out = [...new Set((d.features || []).map((f) => addrString(f.properties)).filter(Boolean))];
         setSugs(out); setOpen(true);
