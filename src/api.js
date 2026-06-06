@@ -80,9 +80,18 @@ export function createOrder(order) {
     body: JSON.stringify(order),
   })
 }
-// Cancel (delete) an order by its ref (staff only).
+// Cancel (delete) an order by its ref. Staff any; a customer their own while it's
+// still requested/scheduled.
 export function deleteOrder(ref) {
   return request(`/orders/${encodeURIComponent(ref)}`, { method: 'DELETE' })
+}
+// Modify an order (staff or owning customer, while requested/scheduled).
+export function editOrder(ref, order) {
+  return request(`/orders/${encodeURIComponent(ref)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order),
+  })
 }
 // COD: mark a customer pay-before-delivery on/off (staff only).
 export function setCustomerCod(customerId, cod) {

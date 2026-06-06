@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -180,9 +180,16 @@ function Timeline({ stageIdx }) {
   );
 }
 
-function TrackScreen({ order, onBack }) {
+function TrackScreen({ order, onBack, onChanged }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
   const [payErr, setPayErr] = useState("");
+  const [showEdit, setShowEdit] = useState(false);
+  const editable = ["requested", "scheduled"].includes(order.status);
+  const cancelOrder = async () => {
+    if (!window.confirm(`Cancel order ${order.id}? This can't be undone.`)) return;
+    try { await deleteOrder(order.id); onChanged && onChanged(); onBack(); }
+    catch (e) { alert(e.message); }
+  };
 
   // COD: open the QuickBooks pay link for this order (fetched live).
   const payCod = async () => {
@@ -295,6 +302,13 @@ ${row("Notes", order.notes)}
           <div className="text-white/40 text-xs mt-2" style={{ fontFamily: C.body }}>Live truck tracking appears here once your delivery is on its way.</div>
         </div>
       )}
+      {editable && (
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <button onClick={() => setShowEdit(true)} className="rounded-2xl py-3 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={16} /> Modify</button>
+          <button onClick={cancelOrder} className="rounded-2xl py-3 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}><X size={16} /> Cancel</button>
+        </div>
+      )}
+
       <div className="mt-3">
         {isLive ? (
           <button onClick={openTicket} className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
@@ -302,6 +316,8 @@ ${row("Notes", order.notes)}
           <div className="text-center text-white/35 text-xs py-2" style={{ fontFamily: C.body }}>Delivery ticket will be available once the load is batched.</div>
         )}
       </div>
+
+      {showEdit && <EditOrderModal order={order} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); onChanged && onChanged(); onBack(); }} />}
     </div>
   );
 }
@@ -373,17 +389,36 @@ function AddressInput({ value, onChange, placeholder, inCls, inSt, wrapClass = "
 // Shared concrete-spec fields (mix, use, qty, slump, admixtures + the detail
 // inputs and short-load fee). Used by BOTH the customer order form and the staff
 // "New order" form so they stay identical. Returns the fields JSX plus helpers.
-function useConcreteSpec() {
-  const [mix, setMix] = useState(RECOMMENDED_MIX);
-  const [useFor, setUseFor] = useState("");
-  const [useOther, setUseOther] = useState("");
-  const [qty, setQty] = useState("");
-  const [slump, setSlump] = useState("5\"");
-  const [admix, setAdmix] = useState([]);
-  const [extraSet, setExtraSet] = useState("1 hr");
-  const [fiberExtra, setFiberExtra] = useState("");
-  const [colorDetail, setColorDetail] = useState("");
-  const [acceptShort, setAcceptShort] = useState(false);
+// Reconstruct spec state from an existing order (for the edit form), or defaults.
+function parseSpec(o = {}) {
+  const mix = o.mix || RECOMMENDED_MIX;
+  const qty = String(o.qty || "").replace(/[^\d.]/g, "");
+  const slump = o.slump || "5\"";
+  const uf = o.use_for || "";
+  const useFor = !uf ? "" : (USES.includes(uf) ? uf : "Other");
+  const useOther = useFor === "Other" ? uf : "";
+  const admix = []; let extraSet = "1 hr", fiberExtra = "", colorDetail = "";
+  String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
+    if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
+    else if (p.startsWith("Fiber")) { admix.push("Fiber"); const m = p.match(/([\d.]+)\s*lbs/); if (m) { const t = parseFloat(m[1]); if (t > 3) fiberExtra = String(t - 3); } }
+    else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
+    else if (p === "Accelerant") admix.push("Accelerant");
+  });
+  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberExtra, colorDetail };
+}
+
+function useConcreteSpec(initial) {
+  const p = parseSpec(initial);
+  const [mix, setMix] = useState(p.mix);
+  const [useFor, setUseFor] = useState(p.useFor);
+  const [useOther, setUseOther] = useState(p.useOther);
+  const [qty, setQty] = useState(p.qty);
+  const [slump, setSlump] = useState(p.slump);
+  const [admix, setAdmix] = useState(p.admix);
+  const [extraSet, setExtraSet] = useState(p.extraSet);
+  const [fiberExtra, setFiberExtra] = useState(p.fiberExtra);
+  const [colorDetail, setColorDetail] = useState(p.colorDetail);
+  const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
 
   const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
   const toggleAdmix = (a) => setAdmix((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur.filter((x) => x !== OPPOSITE[a]), a]));
@@ -553,6 +588,59 @@ function OrderConcreteModal({ onClose, onPlaced }) {
             <div className="text-white/35 text-[11px] mt-2 text-center">Aussieblock confirms every order before it's scheduled.</div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Modify an existing order (customer or staff), reusing the shared spec fields
+// pre-filled from the order. Saves via PATCH.
+function EditOrderModal({ order, onClose, onSaved }) {
+  const spec = useConcreteSpec(order);
+  const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(order.when || "") ? order.when : "");
+  const [time, setTime] = useState(/^\d{2}:\d{2}/.test(order.time || "") ? order.time : "");
+  const [site, setSite] = useState(order.site || "");
+  const [notes, setNotes] = useState(String(order.notes || "").replace(/\s*—?\s*Short load fee \$200 \(accepted\)\s*/i, "").trim());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const inCls = "w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
+
+  const canSubmit = spec.valid && date && site.trim() && !busy;
+  const submit = async () => {
+    setErr(""); setBusy(true);
+    try {
+      let finalNotes = notes.trim();
+      if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
+      const o = await editOrder(order.id, { site: site.trim(), scheduled_for: date, time, notes: finalNotes, ...spec.build() });
+      onSaved(o);
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><FileText size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Modify order {order.id}</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {spec.fields}
+          <label className={lbl}>Job site</label>
+          <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+            <div><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+          </div>
+          <label className={lbl}>Notes (optional)</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
+          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          <button onClick={submit} disabled={!canSubmit} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Save changes
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1940,7 +2028,7 @@ export default function App() {
         )}
 
         <div className="min-h-[600px]">
-          {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} />
+          {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} />
             : screen === "account" ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} />}
         </div>
