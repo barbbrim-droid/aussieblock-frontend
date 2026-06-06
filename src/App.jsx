@@ -188,7 +188,11 @@ function TrackScreen({ order, onBack }) {
   }, [order.id]);
 
   const etaMin = Math.max(0, Math.round((1 - progress) * 22));
-  const stageIdx = progress >= 1 ? 2 : progress > 0.02 ? 1 : 0;
+  // Drive the status pill + timeline from the order's REAL status, so a scheduled
+  // or requested order doesn't look like it's already en route.
+  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, complete: 4 };
+  const isLive = ["batched", "enroute", "onsite", "complete"].includes(order.status);
+  const stageIdx = STATUS_STAGE[order.status] ?? -1;
 
   // Open a printable delivery ticket for this order in a new tab.
   const openTicket = () => {
@@ -226,18 +230,34 @@ ${row("Notes", order.notes)}
       <button onClick={onBack} className="flex items-center gap-1 text-white/60 text-sm mb-3 active:opacity-60"><ChevronLeft size={18} /> Back</button>
       <div className="flex items-baseline justify-between">
         <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{order.id}</span>
-        <StatusPill status={progress >= 1 ? "onsite" : "enroute"} />
+        <StatusPill status={order.status} />
       </div>
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.site}</h2>
       <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
       {orderExtras(order) && <p className="text-white/40 text-xs mt-0.5">{orderExtras(order)}</p>}
-      <div className="mt-4"><TrackMap progress={progress} /></div>
-      {progress > 0.92 && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck entered site geofence — proof of delivery logged</div>}
-      <div className="grid grid-cols-2 gap-3 mt-3">
-        <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{progress >= 1 ? "Arrived" : `${etaMin} min`}</div></div>
-        <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div></div>
-      </div>
-      <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
+
+      {isLive ? (
+        <>
+          <div className="mt-4"><TrackMap progress={progress} /></div>
+          {progress > 0.92 && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck entered site geofence — proof of delivery logged</div>}
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{progress >= 1 ? "Arrived" : `${etaMin} min`}</div></div>
+            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div></div>
+          </div>
+          <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
+        </>
+      ) : (
+        <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
+          <Clock size={30} color={ORANGE} className="mx-auto mb-2" />
+          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{order.status === "requested" ? "Awaiting confirmation" : "Scheduled"}</div>
+          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>
+            {order.status === "requested"
+              ? "Aussieblock will confirm this delivery shortly."
+              : `Scheduled for ${[formatOrderDate(order.when), order.time].filter(Boolean).join(" · ") || "a date to be confirmed"}.`}
+          </div>
+          <div className="text-white/40 text-xs mt-2" style={{ fontFamily: C.body }}>Live truck tracking appears here once your delivery is on its way.</div>
+        </div>
+      )}
       <div className="mt-3">
         <button onClick={openTicket} className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
       </div>
