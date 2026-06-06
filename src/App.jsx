@@ -219,6 +219,7 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const [mix, setMix] = useState(MIXES[0]);
   const [slump, setSlump] = useState("5\"");
   const [admix, setAdmix] = useState([]);   // selected admixtures
+  const [colorDetail, setColorDetail] = useState("");   // shown when "Color" is picked
   const [qty, setQty] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -233,7 +234,9 @@ function OrderConcreteModal({ onClose, onPlaced }) {
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
-      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures: admix });
+      // Fold the specific color into the "Color" admixture, e.g. "Color: Davis Tan".
+      const admixtures = admix.map((a) => (a === "Color" && colorDetail.trim() ? `Color: ${colorDetail.trim()}` : a));
+      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim(), slump, admixtures });
       setDone(true);
       onPlaced && onPlaced();
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -293,6 +296,9 @@ function OrderConcreteModal({ onClose, onPlaced }) {
                 );
               })}
             </div>
+            {admix.includes("Color") && (
+              <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
+            )}
 
             <label className={lbl}>Job site</label>
             <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="Delivery address / site" className={inCls + " mb-3"} style={inSt} />
