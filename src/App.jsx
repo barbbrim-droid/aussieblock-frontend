@@ -1626,6 +1626,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [created, setCreated] = useState(null);   // COD order awaiting payment box
 
   useEffect(() => { getCustomers().then(setCustomers).catch((e) => setErr(e.message)); }, []);
 
@@ -1640,7 +1641,8 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
       let finalNotes = notes.trim();
       if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
       const o = await createOrder({ customer_id: customerId, site: site.trim(), scheduled_for: date, time, truck: truck || null, notes: finalNotes, ...spec.build() });
-      onCreated(o);
+      if (o.prepay_required) { setCreated(o); setBusy(false); }   // COD → show payment box
+      else onCreated(o);
     } catch (e) { setErr(e.message); setBusy(false); }
   };
 
@@ -1655,6 +1657,16 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
           <div className="flex items-center gap-2"><CalendarPlus size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">New order</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
+        {created ? (
+          <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "#6aa9ff22" }}><CreditCard size={26} color="#6aa9ff" /></div>
+            <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>Order {created.ref} created</div>
+            <div className="text-xs font-semibold mb-3" style={{ color: "#6aa9ff" }}>{created.customer} is COD — collect payment before this order can be dispatched.</div>
+            <CodControls o={created} />
+            <button onClick={() => onCreated(created)} className="w-full mt-4 rounded-xl py-2.5 font-bold active:scale-[0.98]" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>Done</button>
+            <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>You can also do this later from the order on the board.</div>
+          </div>
+        ) : (
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
           <label className={lbl}>Customer</label>
           {selCust ? (
@@ -1713,6 +1725,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
             {busy ? <Loader2 size={16} className="animate-spin" /> : <CalendarPlus size={16} />} Schedule order
           </button>
         </div>
+        )}
       </div>
     </div>
   );
