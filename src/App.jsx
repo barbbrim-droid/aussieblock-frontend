@@ -1834,7 +1834,7 @@ function DispatchApp({ email, onLogout }) {
           onCreated={(o) => { setOrders((os) => [o, ...os.filter((x) => x.ref !== o.ref)]); setShowNew(false); }}
         />
       )}
-      <div className="w-full max-w-[1500px] h-full flex flex-col rounded-[1.6rem] overflow-hidden shadow-2xl" style={{ background: NAVY_DEEP, fontFamily: C.body, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="w-full h-full flex flex-col rounded-2xl overflow-hidden shadow-2xl" style={{ background: NAVY_DEEP, fontFamily: C.body, border: "1px solid rgba(255,255,255,0.08)" }}>
         {/* brand header */}
         <div className="px-5 sm:px-6 py-2.5 shrink-0" style={{ background: ORANGE }}>
           <div className="flex items-center justify-between">
