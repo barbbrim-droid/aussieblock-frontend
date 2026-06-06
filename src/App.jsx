@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -38,6 +38,7 @@ function Roo({ size = 32, variant = "tile" }) {
 
 // ── Display config (labels / colors / helpers — not data) ────────────
 const STATUS_META = {
+  requested: { label: "Requested", color: "#6aa9ff" },   // customer-placed, awaiting confirm
   scheduled: { label: "Scheduled", color: "#7c8794" },
   batched: { label: "Batched", color: ORANGE },
   enroute: { label: "En route", color: ORANGE_HOT },
@@ -47,7 +48,10 @@ const STATUS_META = {
 const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
-const ORDER_STATUSES = ["scheduled", "batched", "enroute", "onsite", "complete"];
+const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
+// Concrete mixes customers can pick from when ordering. (Edit to match your real
+// mixes.) Used by the customer order form.
+const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI", "Liquid Limestone", "Flowable Fill"];
 
 const INV_STATUS = {
   paid: { label: "Paid", color: GREEN },
@@ -100,7 +104,7 @@ function OrderCard({ o, onOpen, showCustomer }) {
           <div className="flex items-center gap-2">
             <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.id}</span>
             <span className="text-white/40 text-xs">·</span>
-            <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {o.time}</span>
+            <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
           </div>
           <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.site}</div>
           <div className="text-white/50 text-sm mt-0.5">{showCustomer ? o.customer + " · " : ""}{o.mix}</div>
@@ -206,11 +210,94 @@ function TrackScreen({ order, onBack }) {
   );
 }
 
-function OrdersScreen({ orders, account, onOpen }) {
-  const today = orders.filter((o) => o.when === "today");
-  const tomorrow = orders.filter((o) => o.when === "tomorrow");
-  const other = orders.filter((o) => o.when !== "today" && o.when !== "tomorrow");
+// Customer-facing: place a concrete order from the app. Lands as "requested" for
+// staff to confirm.
+function OrderConcreteModal({ onClose, onPlaced }) {
+  const [mix, setMix] = useState(MIXES[0]);
+  const [qty, setQty] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [site, setSite] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+
+  const canSubmit = mix && qty.trim() && date && site.trim() && !busy;
+  const submit = async () => {
+    setErr(""); setBusy(true);
+    try {
+      await requestOrder({ site: site.trim(), mix, qty: `${qty.trim()} CY`, scheduled_for: date, time, notes: notes.trim() });
+      setDone(true);
+      onPlaced && onPlaced();
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  const inCls = "w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Plus size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Order concrete</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+
+        {done ? (
+          <div className="p-6 text-center" style={{ fontFamily: C.body }}>
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: GREEN + "22" }}><CheckCircle2 size={30} color={GREEN} /></div>
+            <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>Order requested</div>
+            <div className="text-white/55 text-sm mt-1">Aussieblock will confirm your delivery and you'll see it update here.</div>
+            <button onClick={onClose} className="mt-5 w-full rounded-xl py-2.5 font-bold" style={{ background: ORANGE, color: NAVY_DEEP }}>Done</button>
+          </div>
+        ) : (
+          <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+            <label className={lbl}>Mix</label>
+            <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
+              {MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+
+            <label className={lbl}>Quantity</label>
+            <div className="flex items-center rounded-lg mb-3" style={inSt}>
+              <input type="number" min="0" step="0.5" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 10" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+              <span className="px-3 text-white/55 text-sm">CY</span>
+            </div>
+
+            <label className={lbl}>Job site</label>
+            <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="Delivery address / site" className={inCls + " mb-3"} style={inSt} />
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+              <div><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+            </div>
+
+            <label className={lbl}>Notes (optional)</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
+
+            {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+
+            <button onClick={submit} disabled={!canSubmit} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Request delivery
+            </button>
+            <div className="text-white/35 text-[11px] mt-2 text-center">Aussieblock confirms every order before it's scheduled.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrdersScreen({ orders, account, onOpen, onPlaced }) {
+  const [showOrder, setShowOrder] = useState(false);
+  const todayKey = localToday();
+  const requested = orders.filter((o) => o.status === "requested");
+  const confirmed = orders.filter((o) => o.status !== "requested");
+  const todayO = confirmed.filter((o) => orderDay(o.when, todayKey) === "today");
+  const upcomingO = confirmed.filter((o) => orderDay(o.when, todayKey) === "upcoming");
   const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const hdr = "text-white/50 text-xs font-semibold uppercase tracking-widest mb-2";
   return (
     <div className="px-4 pb-24 pt-2">
       <div className="flex items-start justify-between mb-4">
@@ -221,14 +308,24 @@ function OrdersScreen({ orders, account, onOpen }) {
         </div>
         <Bell size={20} className="text-white/60 mt-1" />
       </div>
+
+      <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+        <Plus size={18} /> Order concrete
+      </button>
+
       <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold mb-2">My Orders</h2>
-      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet.</div>}
-      {today.length > 0 && <div className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-2">Today</div>}
-      {today.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
-      {tomorrow.length > 0 && <div className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-2 mt-5">Tomorrow</div>}
-      {tomorrow.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
-      {other.length > 0 && <div className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-2 mt-5">Upcoming</div>}
-      {other.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet. Tap “Order concrete” to request a delivery.</div>}
+
+      {requested.length > 0 && <div className={hdr} style={{ color: "#6aa9ff" }}>Pending confirmation</div>}
+      {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+
+      {todayO.length > 0 && <div className={hdr + " mt-5"}>Today</div>}
+      {todayO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+
+      {upcomingO.length > 0 && <div className={hdr + " mt-5"}>Upcoming</div>}
+      {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+
+      {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
     </div>
   );
 }
@@ -1428,6 +1525,14 @@ export default function App() {
     return () => { alive = false; };
   }, [me]);
 
+  // Re-fetch this customer's orders (e.g. right after they place a new one).
+  const reloadOrders = async () => {
+    try {
+      const os = await getOrders();
+      setOrders(os.map((o) => ({ ...o, id: o.ref })));
+    } catch { /* keep current list on transient error */ }
+  };
+
   const open = (o) => { setActive(o); setScreen("track"); };
   const handleLogout = () => {
     logout();
@@ -1471,7 +1576,7 @@ export default function App() {
         <div className="min-h-[600px]">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} />
             : screen === "account" ? <AccountScreen account={account} customerId={me.customer_id} />
-            : <OrdersScreen orders={orders} account={account} onOpen={open} />}
+            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} />}
         </div>
 
         {/* bottom nav */}

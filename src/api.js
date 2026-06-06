@@ -84,6 +84,15 @@ export function createOrder(order) {
 export function deleteOrder(ref) {
   return request(`/orders/${encodeURIComponent(ref)}`, { method: 'DELETE' })
 }
+// A customer places a concrete order from their app. It lands as "requested" for
+// staff to confirm. Pass { site, mix, qty, scheduled_for, time, notes }.
+export function requestOrder(order) {
+  return request('/orders/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order),
+  })
+}
 export function getOrder(ref) {
   return request(`/orders/${ref}`)
 }
