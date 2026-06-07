@@ -1091,7 +1091,7 @@ function GoogleFleetMap({ trucks }) {
   }, [trucks]);
 
   if (failed || !GOOGLE_PLACES_KEY) return <FleetMap trucks={trucks} />;
-  return <div ref={elRef} className="w-full rounded-2xl" style={{ height: 300, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
+  return <div ref={elRef} className="w-full h-full rounded-2xl" style={{ minHeight: 340, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
 }
 
 // COD controls shown on a prepay-required order row: set the load total, create
@@ -2029,8 +2029,9 @@ function DispatchApp({ email, onLogout }) {
           {/* main columns — fill the screen; each scrolls inside so the page doesn't */}
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
-              <GoogleFleetMap trucks={trucks} />
-              <div className="mt-3 flex flex-col gap-1.5">
+              <div className="h-full flex flex-col">
+                <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
+                <div className="shrink-0 overflow-y-auto flex flex-col gap-1.5 mt-3" style={{ maxHeight: "40%" }}>
                 {trucks.length === 0 ? (
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
                 ) : trucks.map((t) => {
@@ -2051,6 +2052,7 @@ function DispatchApp({ email, onLogout }) {
                     </div>
                   );
                 })}
+                </div>
               </div>
             </Panel>
             <Panel title="Today's orders" icon={List} count={todayOrders.length} fill>
