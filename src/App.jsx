@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v28";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v29";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -2544,7 +2544,7 @@ function DispatchApp({ email, onLogout }) {
       )}
       <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {/* brand header */}
-        <div className="px-5 sm:px-6 py-2.5 shrink-0" style={{ background: ORANGE }}>
+        <div className="px-5 sm:px-6 pb-2.5 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.625rem)" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <Roo size={34} />
@@ -2811,7 +2811,7 @@ export default function App() {
       <style>{FONT}</style>
       <div className="w-full sm:max-w-sm h-full sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden rounded-none sm:rounded-[2.2rem] sm:shadow-2xl sm:border sm:border-white/10" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {/* brand header */}
-        <div className="px-4 pt-3 pb-3 shrink-0" style={{ background: ORANGE }}>
+        <div className="px-4 pb-3 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <Roo size={34} />
