@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v31";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v32";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -266,39 +266,6 @@ function TrackScreen({ order, onBack, onChanged }) {
   const isLive = ["batched", "enroute", "onsite", "complete"].includes(order.status);
   const stageIdx = STATUS_STAGE[order.status] ?? -1;
 
-  // Open a printable delivery ticket for this order in a new tab.
-  const openTicket = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    const dateLine = [formatOrderDate(order.when), order.time].filter(Boolean).join(" · ");
-    const statusLbl = (STATUS_META[order.status] || STATUS_META.scheduled).label;
-    const row = (l, v) => (v ? `<div class="row"><span class="lab">${l}</span><span class="val">${v}</span></div>` : "");
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Delivery Ticket ${order.id}</title>
-<style>body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:24px;}h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
-.muted{color:#667;font-size:13px;}.tk{font-size:20px;font-weight:bold;margin-top:4px;}
-.grid{margin-top:18px;border-top:2px solid #161d27;}.row{display:flex;justify-content:space-between;gap:16px;padding:10px 2px;border-bottom:1px solid #e2e6ea;}
-.lab{color:#667;font-size:12px;text-transform:uppercase;letter-spacing:.05em;}.val{font-weight:600;text-align:right;}
-button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:22px;}@media print{button{display:none;}}</style></head>
-<body><h1>AUSSIEBLOCK READY MIX</h1><div class="muted">Delivery Ticket</div><div class="tk">${order.id}</div>
-<div class="grid">
-${row("Status", statusLbl)}
-${row("Scheduled", dateLine || "—")}
-${row("Customer", order.customer)}
-${row("Project", order.project)}
-${row("Job site", order.site)}
-${row("For", order.use_for)}
-${row("Product", order.mix)}
-${row("Slump", order.slump)}
-${row("Admixtures", order.admixtures)}
-${row("Quantity", order.qty)}
-${row("Truck", order.truck && order.truck !== "—" ? order.truck : "")}
-${row("Notes", order.notes)}
-</div>
-<button onclick="window.print()">Print / Save as PDF</button>
-<div class="muted" style="margin-top:22px;">Aussieblock office &middot; 325-213-5315</div></body></html>`);
-    w.document.close();
-  };
-
   return (
     <div className="px-4 pb-6 pt-2">
       <button onClick={onBack} className="flex items-center gap-1 text-white/60 text-sm mb-3 active:opacity-60"><ChevronLeft size={18} /> Back</button>
@@ -354,17 +321,11 @@ ${row("Notes", order.notes)}
 
       <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>
 
-      <div className="mt-3">
-        {isLive ? (
-          <button onClick={openTicket} className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
-        ) : (
-          <div className="text-center text-white/35 text-xs py-2" style={{ fontFamily: C.body }}>Delivery ticket will be available once the load is batched.</div>
-        )}
-      </div>
-
-      {order.has_batch_ticket && (
+      {order.has_batch_ticket ? (
         <button onClick={() => openBatchTicket(order.id).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
-      )}
+      ) : isLive ? (
+        <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch ticket will appear here once it's uploaded.</div>
+      ) : null}
 
       {showEdit && <EditOrderModal order={order} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); onChanged && onChanged(); onBack(); }} />}
       {showReorder && <OrderConcreteModal initial={order} onClose={() => setShowReorder(false)} onPlaced={() => { setShowReorder(false); onChanged && onChanged(); onBack(); }} />}
