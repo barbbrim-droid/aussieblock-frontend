@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v23";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v24";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -202,6 +202,7 @@ function TrackScreen({ order, onBack, onChanged }) {
   const [pos, setPos] = useState(order.truck_position || null);   // live truck position for the map
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
+  const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
   const editable = ["requested", "scheduled"].includes(order.status);
   const cancelOrder = async () => {
     if (!window.confirm(`Cancel order ${order.id}? This can't be undone.`)) return;
@@ -330,6 +331,8 @@ ${row("Notes", order.notes)}
         </div>
       )}
 
+      <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>
+
       <div className="mt-3">
         {isLive ? (
           <button onClick={openTicket} className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Ticket</button>
@@ -339,6 +342,7 @@ ${row("Notes", order.notes)}
       </div>
 
       {showEdit && <EditOrderModal order={order} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); onChanged && onChanged(); onBack(); }} />}
+      {showReorder && <OrderConcreteModal initial={order} onClose={() => setShowReorder(false)} onPlaced={() => { setShowReorder(false); onChanged && onChanged(); onBack(); }} />}
     </div>
   );
 }
@@ -549,10 +553,13 @@ function useConcreteSpec(initial) {
 // staff to confirm.
 function OrderConcreteModal({ onClose, onPlaced, initial }) {
   const spec = useConcreteSpec(initial);
+  // Date is always left for the customer to choose; everything else can be
+  // pre-filled from a past order ("Order again"). The estimator passes only
+  // { qty } as `initial`, so site/time/notes just stay empty there.
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [site, setSite] = useState("");
-  const [notes, setNotes] = useState("");
+  const [time, setTime] = useState(/^\d{2}:\d{2}/.test(initial?.time || "") ? initial.time : "");
+  const [site, setSite] = useState(initial?.site || "");
+  const [notes, setNotes] = useState(String(initial?.notes || "").replace(/\s*—?\s*Short load fee \$200 \(accepted\)\s*/i, "").trim());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
@@ -1445,7 +1452,7 @@ function CodControls({ o }) {
   );
 }
 
-function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
+function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated }) {
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
@@ -1453,6 +1460,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);   // staff "Edit order" modal
+  const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
 
   // The selects are *controlled* by o.status / o.truck (server truth). On a
   // rejected change the parent state never updates, so the select snaps back to
@@ -1538,6 +1546,9 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
         </div>
       )}
       <div className="mt-2 flex justify-end gap-2">
+        <button onClick={() => setShowReorder(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
+          <Plus size={12} /> Order again
+        </button>
         <button onClick={() => setShowEdit(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
           <FileText size={12} /> Edit order
         </button>
@@ -1550,6 +1561,14 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
           order={{ ...o, id: o.ref }}
           onClose={() => setShowEdit(false)}
           onSaved={(u) => { setShowEdit(false); onEdited && onEdited(u); }}
+        />
+      )}
+      {showReorder && (
+        <NewOrderModal
+          trucks={trucks}
+          initial={o}
+          onClose={() => setShowReorder(false)}
+          onCreated={(no) => { setShowReorder(false); onCreated && onCreated(no); }}
         />
       )}
     </div>
@@ -1947,7 +1966,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
 
 // Staff modal: month calendar for delivery planning. Each day cell shows the
 // total yards scheduled; clicking a day lists that day's orders (with controls).
-function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onClose }) {
+function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onClose }) {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const todayKey = localToday();
@@ -2026,7 +2045,7 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
             {selOrders.length === 0 ? (
               <div className="text-white/40 text-sm py-4 text-center">No orders this day.</div>
             ) : (
-              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} />)
+              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} />)
             )}
           </div>
         </div>
@@ -2037,21 +2056,28 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
 
 // Staff modal: schedule a new order for a customer. Truck is optional — orders
 // start 'scheduled' and a truck can be assigned later from the board.
-function NewOrderModal({ trucks, onClose, onCreated }) {
-  const spec = useConcreteSpec();
+function NewOrderModal({ trucks, onClose, onCreated, initial }) {
+  // `initial` (from "Order again") pre-fills spec/site/notes/time and the
+  // customer (matched by name once the roster loads). Date is always re-picked.
+  const spec = useConcreteSpec(initial);
   const [customers, setCustomers] = useState([]);
   const [custFilter, setCustFilter] = useState("");
   const [customerId, setCustomerId] = useState(null);
-  const [site, setSite] = useState("");
+  const [site, setSite] = useState(initial?.site || "");
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [time, setTime] = useState(/^\d{2}:\d{2}/.test(initial?.time || "") ? initial.time : "");
   const [truck, setTruck] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(String(initial?.notes || "").replace(/\s*—?\s*Short load fee \$200 \(accepted\)\s*/i, "").trim());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [created, setCreated] = useState(null);   // COD order awaiting payment box
 
-  useEffect(() => { getCustomers().then(setCustomers).catch((e) => setErr(e.message)); }, []);
+  useEffect(() => {
+    getCustomers().then((cs) => {
+      setCustomers(cs);
+      if (initial?.customer) { const m = cs.find((c) => c.name === initial.customer); if (m) setCustomerId(m.id); }
+    }).catch((e) => setErr(e.message));
+  }, []);
 
   const selCust = customers.find((c) => c.id === customerId);
   const f = custFilter.trim().toLowerCase();
@@ -2371,6 +2397,8 @@ function DispatchApp({ email, onLogout }) {
   // next 5s poll. Both throw on a rejected change — OrderRow catches and shows it.
   const applyOrder = (updated) =>
     setOrders((os) => os.map((o) => (o.ref === updated.ref ? updated : o)));
+  const addOrder = (created) =>   // drop a newly-created order ("Order again") onto the board
+    setOrders((os) => [created, ...os.filter((x) => x.ref !== created.ref)]);
   const changeStatus = async (ref, status) => applyOrder(await setOrderStatus(ref, status));
   const assign = async (ref, truck) => applyOrder(await assignTruck(ref, truck));
   const cancelOrder = async (ref) => {
@@ -2406,7 +2434,7 @@ function DispatchApp({ email, onLogout }) {
     <div className="h-screen w-full" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
-        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onClose={() => setShowCal(false)} />
+        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onClose={() => setShowCal(false)} />
       )}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
@@ -2549,7 +2577,7 @@ function DispatchApp({ email, onLogout }) {
                     <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(todayYards)} CY scheduled today</span>
                     <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
                   </div>
-                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} />)}
+                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} />)}
                 </>
               )}
             </Panel>
@@ -2572,7 +2600,7 @@ function DispatchApp({ email, onLogout }) {
                           <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
                         </div>
                       </div>
-                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} />)}
+                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} />)}
                     </div>
                   );
                 })
