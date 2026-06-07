@@ -16,6 +16,10 @@ const FONT = `
 input[type="date"], input[type="time"] { color-scheme: dark; }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
+/* Lock the page to the viewport so only inner areas scroll — no full-page
+   rubber-band/bounce on phones. */
+html, body, #root { height: 100%; }
+body { margin: 0; overflow: hidden; overscroll-behavior: none; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
@@ -2240,7 +2244,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} />
             : screen === "account" ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} />}
