@@ -54,15 +54,16 @@ const STATUS_META = {
   batched: { label: "Batched", color: ORANGE },
   enroute: { label: "En route", color: ORANGE_HOT },
   onsite: { label: "On site", color: GREEN },
+  pouring: { label: "Pouring", color: GREEN },
   complete: { label: "Complete", color: GREEN },
 };
 const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
-const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
+const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v39";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v40";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -262,8 +263,8 @@ function TrackScreen({ order, onBack, onChanged }) {
   const etaMin = Math.max(0, Math.round((1 - progress) * 22));
   // Drive the status pill + timeline from the order's REAL status, so a scheduled
   // or requested order doesn't look like it's already en route.
-  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, complete: 4 };
-  const isLive = ["batched", "enroute", "onsite", "complete"].includes(order.status);
+  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, complete: 4 };
+  const isLive = ["batched", "enroute", "onsite", "pouring", "complete"].includes(order.status);
   const stageIdx = STATUS_STAGE[order.status] ?? -1;
 
   return (
@@ -773,8 +774,8 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
   const notifs = [];
   orders.filter((o) => o.prepay_required && !o.prepaid).forEach((o) =>
     notifs.push({ key: "pay-" + o.id, Icon: CreditCard, color: ORANGE, title: `Payment due — ${o.id}`, sub: `${o.mix} · ${o.qty} — tap to pay`, order: o }));
-  orders.filter((o) => o.status === "enroute" || o.status === "onsite").forEach((o) =>
-    notifs.push({ key: "live-" + o.id, Icon: Truck, color: ORANGE_HOT, title: `${o.status === "onsite" ? "On site" : "On the way"} — ${o.id}`, sub: o.project || o.site, order: o }));
+  orders.filter((o) => ["enroute", "onsite", "pouring"].includes(o.status)).forEach((o) =>
+    notifs.push({ key: "live-" + o.id, Icon: Truck, color: ORANGE_HOT, title: `${(STATUS_META[o.status] || {}).label || "On the way"} — ${o.id}`, sub: o.project || o.site, order: o }));
   orders.filter((o) => o.status === "requested").forEach((o) =>
     notifs.push({ key: "req-" + o.id, Icon: Clock, color: "#6aa9ff", title: `Awaiting confirmation — ${o.id}`, sub: `${o.mix} · ${o.qty}`, order: o }));
   (account?.invoices || []).filter((i) => i.status === "overdue" || i.status === "due").forEach((i) =>
@@ -1523,7 +1524,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
 
   // Batch ticket (PDF) upload — allowed once the order is batched+.
   const fileRef = useRef(null);
-  const batchable = ["batched", "enroute", "onsite", "complete"].includes(o.status);
+  const batchable = ["batched", "enroute", "onsite", "pouring", "complete"].includes(o.status);
   const onPickTicket = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";   // let them re-pick the same file later
@@ -2563,8 +2564,9 @@ function DispatchApp({ email, onLogout }) {
   // Each truck's status, derived from the order it's assigned to. (Later, GPS
   // geofences for the yard / job site will drive At yard vs On site automatically.)
   const truckStatus = (t) => {
-    const o = activeOrders.find((x) => x.truck === t.label && ["batched", "enroute", "onsite"].includes(x.status));
+    const o = activeOrders.find((x) => x.truck === t.label && ["batched", "enroute", "onsite", "pouring"].includes(x.status));
     if (!o) return { label: "At yard", color: "#7c8794" };
+    if (o.status === "pouring") return { label: "Pouring", color: GREEN, order: o.ref };
     if (o.status === "onsite") return { label: "On site", color: GREEN, order: o.ref };
     if (o.status === "enroute") return { label: "En route", color: ORANGE_HOT, order: o.ref };
     return { label: "Loading", color: ORANGE, order: o.ref };   // batched
