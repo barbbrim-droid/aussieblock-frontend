@@ -2219,9 +2219,9 @@ export default function App() {
   if (loading) return <Splash label="Loading your orders…" />;
 
   return (
-    <div className="w-full min-h-[100dvh] flex justify-center sm:items-center sm:p-4" style={{ background: "#0c1117" }}>
+    <div className="w-full h-full flex justify-center sm:items-center sm:p-4" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
-      <div className="w-full sm:max-w-sm h-[100dvh] sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden rounded-none sm:rounded-[2.2rem] sm:shadow-2xl sm:border sm:border-white/10" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
+      <div className="w-full sm:max-w-sm h-full sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden rounded-none sm:rounded-[2.2rem] sm:shadow-2xl sm:border sm:border-white/10" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {/* brand header */}
         <div className="px-4 pt-3 pb-3 shrink-0" style={{ background: ORANGE }}>
           <div className="flex items-center justify-between">
