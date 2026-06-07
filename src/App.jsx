@@ -1570,6 +1570,174 @@ function CodControls({ o }) {
   );
 }
 
+// ── Batch Ticket panel ───────────────────────────────────────────────────────
+// A complete digital copy of the paper batch ticket, grouped like the form.
+// Core identity fields (customer/job/mix/qty/slump/truck/driver) already live on
+// the order and are echoed read-only up top; everything else is saved as the
+// order's batch_data (JSON) via PUT /orders/{ref}/batch-data.
+const BATCH_BLANK = {
+  date: "", cash_charge: "", customer_phone: "", product_name: "",
+  plant: "", air: "", load: "", ordered: "", delivered: "",
+  water_reducer: "", retarder: "",
+  times: { left_plant: "", a_train_pr: "", left_job: "", return_plant: "" },
+  inspector: "", received_by: "",
+  mix_design: {
+    rock: { design: "", target: "", actual: "" },
+    sand: { design: "", target: "", actual: "" },
+    cement: { design: "", target: "", actual: "" },
+    air: { design: "", target: "", actual: "" },
+    water: { design: "", target: "", actual: "" },
+  },
+  pricing: { unit_price: "", extended: "", subtotal: "", tax1: "", tax2: "", total: "", job_running_total: "" },
+};
+
+const getAt = (obj, path) => path.split(".").reduce((x, k) => (x == null ? x : x[k]), obj);
+
+function mergeBatch(saved) {
+  // deep-merge a (possibly partial/older) saved record onto the blank template
+  const b = JSON.parse(JSON.stringify(BATCH_BLANK));
+  if (!saved || typeof saved !== "object") return b;
+  for (const k of Object.keys(b)) {
+    if (saved[k] == null) continue;
+    if (b[k] && typeof b[k] === "object") {
+      for (const k2 of Object.keys(b[k])) {
+        if (saved[k][k2] == null) continue;
+        if (b[k][k2] && typeof b[k][k2] === "object") Object.assign(b[k][k2], saved[k][k2]);
+        else b[k][k2] = saved[k][k2];
+      }
+    } else b[k] = saved[k];
+  }
+  return b;
+}
+
+function BatchTicketForm({ o, onEdited }) {
+  const [d, setD] = useState(() => mergeBatch(o.batch_data));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [savedOk, setSavedOk] = useState(false);
+
+  const set = (path, val) => {
+    setSavedOk(false);
+    setD((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const parts = path.split("."); let t = next;
+      for (let i = 0; i < parts.length - 1; i++) t = t[parts[i]];
+      t[parts[parts.length - 1]] = val;
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setBusy(true); setErr("");
+    try { onEdited && onEdited(await saveBatchData(o.ref, d)); setSavedOk(true); }
+    catch (e) { setErr(e.message || "Could not save"); }
+    finally { setBusy(false); }
+  };
+
+  // plain render helper (NOT a component) so inputs keep focus while typing
+  const field = (label, path, cls = "") => (
+    <label className={`flex flex-col gap-1 ${cls}`}>
+      <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>{label}</span>
+      <input value={getAt(d, path) || ""} onChange={(e) => set(path, e.target.value)}
+        className="rounded-lg px-2 py-1.5 text-sm outline-none"
+        style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+    </label>
+  );
+  const groupHead = (txt) => (
+    <div className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1 pb-1" style={{ color: ORANGE, borderBottom: "1px solid rgba(255,255,255,0.08)", fontFamily: C.body }}>{txt}</div>
+  );
+  const ro = (label, val) => (
+    <div className="flex flex-col gap-1">
+      <span className="text-white/30 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>{label}</span>
+      <span className="text-white/80 text-sm truncate" style={{ fontFamily: C.body }}>{val || "—"}</span>
+    </div>
+  );
+
+  return (
+    <div className="mt-2 rounded-xl p-3" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.08)" }}>
+      {/* identity — already on the order, shown for context */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2">
+        {ro("Customer", o.customer)}
+        {ro("Job", o.site)}
+        {ro("Mix", o.mix)}
+        {ro("Quantity", o.qty)}
+        {ro("Slump", o.slump)}
+        {ro("Truck", o.truck)}
+        {ro("Driver", o.driver)}
+      </div>
+
+      {groupHead("Order")}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {field("Date", "date")}
+        {field("Cash / Charge", "cash_charge")}
+        {field("Customer Phone", "customer_phone")}
+        {field("Product Name", "product_name")}
+        {field("Ordered", "ordered")}
+        {field("Delivered", "delivered")}
+      </div>
+
+      {groupHead("Load / Delivery")}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {field("Plant", "plant")}
+        {field("Load #", "load")}
+        {field("Air", "air")}
+        {field("Water Reducer", "water_reducer")}
+        {field("Retarder", "retarder")}
+        {field("Inspector", "inspector")}
+      </div>
+
+      {groupHead("Times")}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {field("Left Plant", "times.left_plant")}
+        {field("A-Train PR", "times.a_train_pr")}
+        {field("Left Job", "times.left_job")}
+        {field("Return Plant", "times.return_plant")}
+      </div>
+
+      {groupHead("Mix Design (Design / Target / Actual)")}
+      <div className="flex flex-col gap-1.5">
+        <div className="grid gap-2 text-white/35 text-[10px] uppercase tracking-wide" style={{ gridTemplateColumns: "70px 1fr 1fr 1fr", fontFamily: C.body }}>
+          <span></span><span>Design</span><span>Target</span><span>Actual</span>
+        </div>
+        {["rock", "sand", "cement", "air", "water"].map((row) => (
+          <div key={row} className="grid gap-2 items-center" style={{ gridTemplateColumns: "70px 1fr 1fr 1fr" }}>
+            <span className="text-white/70 text-xs capitalize" style={{ fontFamily: C.body }}>{row}</span>
+            {["design", "target", "actual"].map((col) => (
+              <input key={col} value={getAt(d, `mix_design.${row}.${col}`) || ""} onChange={(e) => set(`mix_design.${row}.${col}`, e.target.value)}
+                className="rounded-lg px-2 py-1.5 text-sm outline-none w-full"
+                style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {groupHead("Pricing")}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {field("Unit Price", "pricing.unit_price")}
+        {field("Extended", "pricing.extended")}
+        {field("Subtotal", "pricing.subtotal")}
+        {field("Tax 1", "pricing.tax1")}
+        {field("Tax 2", "pricing.tax2")}
+        {field("Total", "pricing.total")}
+        {field("Job Running Total", "pricing.job_running_total", "sm:col-span-2")}
+      </div>
+
+      {groupHead("Signature")}
+      <div className="grid grid-cols-2 gap-2">
+        {field("Received By", "received_by")}
+      </div>
+
+      {err && <div className="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
+      <div className="mt-3 flex items-center gap-2">
+        <button onClick={save} disabled={busy} className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: GREEN, fontFamily: C.body }}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save ticket
+        </button>
+        {savedOk && <span className="text-xs flex items-center gap-1" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={13} /> Saved</span>}
+      </div>
+    </div>
+  );
+}
+
 function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver }) {
   const canFinance = useContext(FinanceContext);   // workers don't see COD/payment bits
   const pct = Math.round((o.progress || 0) * 100);
@@ -1580,6 +1748,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   const [err, setErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);   // staff "Edit order" modal
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
+  const [showBatch, setShowBatch] = useState(false);       // "Ticket details" — full batch-ticket form panel
 
   // The selects are *controlled* by o.status / o.truck (server truth). On a
   // rejected change the parent state never updates, so the select snaps back to
@@ -1723,6 +1892,9 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
         <button onClick={() => setShowReorder(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
           <Plus size={12} /> Order again
         </button>
+        <button onClick={() => setShowBatch((v) => !v)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: showBatch ? NAVY_DEEP : "#fff", background: showBatch ? GREEN : NAVY_DEEP, border: showBatch ? "none" : "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
+          <ClipboardList size={12} /> Ticket details
+        </button>
         <button onClick={() => setShowEdit(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
           <FileText size={12} /> Edit order
         </button>
@@ -1730,6 +1902,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           <X size={12} /> Cancel order
         </button>
       </div>
+      {showBatch && <BatchTicketForm o={o} onEdited={onEdited} />}
       {showEdit && (
         <EditOrderModal
           order={{ ...o, id: o.ref }}
@@ -2382,25 +2555,65 @@ function ManageStaffModal({ onClose }) {
 // a full OrderRow so staff can review and one-tap "Order again".
 function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver, onClose }) {
   const [showArchived, setShowArchived] = useState(false);
-  const list = showArchived ? archived : orders;
+  const [q, setQ] = useState("");
+  const [openCust, setOpenCust] = useState(null);   // which customer group is expanded
+  const base = showArchived ? archived : orders;
+
+  const needle = q.trim().toLowerCase();
+  const filtered = base.filter((o) => !needle ||
+    [o.customer, o.ref, o.site, o.project, o.mix].some((v) => String(v || "").toLowerCase().includes(needle)));
+
+  // group by customer; customers with the most past orders first
+  const groups = {};
+  filtered.forEach((o) => { (groups[o.customer || "—"] = groups[o.customer || "—"] || []).push(o); });
+  const custNames = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
+  const autoOpen = needle && custNames.length <= 4;   // expand results when the search narrows it down
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><Inbox size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">{showArchived ? "Archived" : "Past orders"} ({list.length})</span></div>
+          <div className="flex items-center gap-2"><Inbox size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">{showArchived ? "Archived" : "Past orders"} · {filtered.length}</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
-        <div className="px-4 pt-3">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowArchived(false)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: showArchived ? NAVY : ORANGE + "22", color: showArchived ? "rgba(255,255,255,0.5)" : ORANGE, border: `1px solid ${showArchived ? "rgba(255,255,255,0.12)" : ORANGE}`, fontFamily: C.body }}>Past orders ({orders.length})</button>
-            <button onClick={() => setShowArchived(true)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: showArchived ? ORANGE + "22" : NAVY, color: showArchived ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${showArchived ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>Archived ({archived.length})</button>
+        <div className="px-4 pt-3 pb-1 shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <button onClick={() => { setShowArchived(false); setOpenCust(null); }} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: showArchived ? NAVY : ORANGE + "22", color: showArchived ? "rgba(255,255,255,0.5)" : ORANGE, border: `1px solid ${showArchived ? "rgba(255,255,255,0.12)" : ORANGE}`, fontFamily: C.body }}>Past orders ({orders.length})</button>
+            <button onClick={() => { setShowArchived(true); setOpenCust(null); }} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: showArchived ? ORANGE + "22" : NAVY, color: showArchived ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${showArchived ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>Archived ({archived.length})</button>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>
+            <Search size={15} className="text-white/40 shrink-0" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customer, ticket #, job, mix…" className="bg-transparent outline-none text-sm text-white w-full" style={{ fontFamily: C.body }} />
+            {q && <button onClick={() => setQ("")} className="text-white/40 active:scale-90 shrink-0"><X size={14} /></button>}
           </div>
         </div>
-        <div className="p-4 overflow-y-auto" style={{ fontFamily: C.body }}>
-          {list.length === 0 ? (
-            <div className="text-white/40 text-sm py-8 text-center">{showArchived ? "No archived orders." : "No completed orders yet."}</div>
+        <div className="p-4 pt-2 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {custNames.length === 0 ? (
+            <div className="text-white/40 text-sm py-8 text-center">{needle ? "No matches." : (showArchived ? "No archived orders." : "No completed orders yet.")}</div>
           ) : (
-            list.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} onArchived={onArchived} onDriver={onDriver} />)
+            custNames.map((name) => {
+              const list = groups[name];
+              const open = openCust === name || autoOpen;
+              return (
+                <div key={name} className="mb-2">
+                  <button onClick={() => setOpenCust(open && openCust === name ? null : name)} className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />
+                      <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{name}</span>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: ORANGE + "22", color: ORANGE }}>{list.length}</span>
+                      <ChevronRight size={16} className="text-white/40" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+                    </span>
+                  </button>
+                  {open && (
+                    <div className="mt-2">
+                      {list.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} onArchived={onArchived} onDriver={onDriver} />)}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
