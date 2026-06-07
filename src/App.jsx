@@ -959,6 +959,8 @@ function PlusLoadCard({ r, onHandle, busy }) {
 // below is schematic (a fixed window around the plant), not a street map; swap
 // in a real basemap once the One Step GPS key is live and positions are real.
 const PLANT = { lat: 31.523310, lng: -100.394094 };   // yard: 2951 E FM 2105, San Angelo, TX (exact pin)
+const MAP_CENTER = { lat: 31.4638, lng: -100.4370 };   // San Angelo — initial map center
+const MAP_RADIUS_MI = 30;                              // initial view ~30-mile radius
 const MAP_SPAN = 0.025;   // degrees shown each way from the plant (~2.7 km)
 
 // Project a lat/lng into the SVG viewBox (W×H) with padding. Longitude → x
@@ -1070,11 +1072,18 @@ function GoogleFleetMap({ trucks }) {
     loadGoogleMaps().then((maps) => {
       if (cancelled || !elRef.current || mapRef.current) return;
       mapRef.current = new maps.Map(elRef.current, {
-        center: { lat: PLANT.lat, lng: PLANT.lng }, zoom: 14,
+        center: MAP_CENTER,
         mapTypeId: maps.MapTypeId.HYBRID,   // satellite imagery + road/labels
         disableDefaultUI: true, zoomControl: true, mapTypeControl: true,
         styles: MAP_DARK_STYLE,
       });
+      // Frame a ~30-mile radius around San Angelo.
+      const dLat = MAP_RADIUS_MI / 69;
+      const dLng = MAP_RADIUS_MI / (69 * Math.cos(MAP_CENTER.lat * Math.PI / 180));
+      mapRef.current.fitBounds(new maps.LatLngBounds(
+        { lat: MAP_CENTER.lat - dLat, lng: MAP_CENTER.lng - dLng },
+        { lat: MAP_CENTER.lat + dLat, lng: MAP_CENTER.lng + dLng },
+      ));
       new maps.Marker({
         position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Yard — 2951 E FM 2105, San Angelo",
         icon: { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: ORANGE, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
