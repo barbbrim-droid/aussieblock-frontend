@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v57";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v58";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -2403,15 +2403,17 @@ function ManageStaffModal({ onClose }) {
   };
 
   const submit = async () => {
-    if (role === "worker" && !companyId) { setMsg({ ok: false, text: "Pick the company this worker belongs to." }); return; }
+    if (role !== "staff" && !companyId) { setMsg({ ok: false, text: "Pick the company this person belongs to." }); return; }
     setBusy(true); setMsg(null);
     try {
-      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), role === "worker" ? Number(companyId) : null, project.trim());
+      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), role !== "staff" ? Number(companyId) : null, project.trim());
       if (pw) {
         // A password was set (new login or a reset) — offer the invite to send.
         const appUrl = window.location.origin;
         const text = role === "staff"
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
+          : role === "customer"
+          ? `Hi — Aussieblock has an app for ordering and tracking concrete deliveries and managing your account. You can place orders, track the trucks live, and view invoices for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : `Hi — Aussieblock has an app for ordering and tracking concrete deliveries. You can place orders, see the schedule, and track the trucks live for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`;
         setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
         setSent(false); setCopied(false);
@@ -2480,7 +2482,7 @@ function ManageStaffModal({ onClose }) {
                   <button onClick={() => pick(u)} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate flex items-center gap-2" style={{ fontFamily: C.cond }}>
                       {u.email}
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "ADMIN" : "WORKER"}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : u.role === "customer" ? { background: GREEN + "22", color: GREEN } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "OPERATOR" : u.role === "customer" ? "ADMIN" : "WORKER"}</span>
                     </div>
                     {(u.company || u.project) && (
                       <div className="text-white/55 text-xs truncate flex items-center gap-1" style={{ fontFamily: C.body }}><Building2 size={11} color={ORANGE} /> {[u.company, u.project].filter(Boolean).join(" · ")}</div>
@@ -2501,23 +2503,29 @@ function ManageStaffModal({ onClose }) {
               <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{editing ? `Reset ${email}` : "Add a login"}</div>
               {editing && <button onClick={reset} className="text-xs font-semibold" style={{ color: ORANGE, fontFamily: C.body }}>+ New</button>}
             </div>
-            {/* role toggle */}
-            <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — one company</button>
-              <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Admin — full access</button>
-            </div>
+            {/* role toggle — both Worker and Admin are tied to one company; an
+                Admin also sees that company's billing. Existing full operators
+                (staff) are shown read-only so they aren't downgraded by accident. */}
+            {editing && role === "staff" ? (
+              <div className="mb-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}`, fontFamily: C.body }}>Operator — full office access (all companies + billing)</div>
+            ) : (
+              <div className="flex items-center gap-2 mb-2">
+                <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — no billing</button>
+                <button onClick={() => setRole("customer")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "customer" ? GREEN + "22" : NAVY_DEEP, color: role === "customer" ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${role === "customer" ? GREEN : "rgba(255,255,255,0.12)"}` }}>Admin — + billing</button>
+              </div>
+            )}
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
             <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-2"} style={inSt} />
-            {role === "worker" && (
+            {role !== "staff" && (
               <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inCls + " mb-2"} style={inSt}>
-                <option value="">— company they work for (required) —</option>
+                <option value="">— company they belong to (required) —</option>
                 {companies.slice().sort((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
             <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">{role === "worker" ? "A worker sees only their company's orders + delivery tracking — no billing, no other companies, no dispatch board." : "An admin has full access — the dispatch board, all jobs, and billing/account info. For your office only."}</p>
-            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6) || (role === "worker" && !companyId)} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+            <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
+            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6) || (role !== "staff" && !companyId)} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Save changes" : "Create login"}
             </button>
           </div>
