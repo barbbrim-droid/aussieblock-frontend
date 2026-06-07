@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v37";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v38";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -2830,7 +2830,7 @@ export default function App() {
 
   // Once logged in, load this customer's orders + billing — and KEEP THEM FRESH.
   // The list/account used to load only once, so customers had to manually refresh
-  // to see status changes or new invoices. Now we poll every 20s (silently, no
+  // to see status changes or new invoices. Now we poll every 7s (silently, no
   // spinner) and also refresh the instant the app regains focus (phone unlocked /
   // tab refocused), so updates show up on their own.
   // Staff don't have a customer account — they get the dispatch console instead.
@@ -2854,7 +2854,7 @@ export default function App() {
       }
     };
     loadData(false);
-    const poll = setInterval(() => { if (alive) loadData(true); }, 20000);
+    const poll = setInterval(() => { if (alive) loadData(true); }, 7000);
     const onVisible = () => { if (document.visibilityState === "visible" && alive) loadData(true); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { alive = false; clearInterval(poll); document.removeEventListener("visibilitychange", onVisible); };
