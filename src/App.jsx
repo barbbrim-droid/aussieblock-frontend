@@ -68,7 +68,9 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v47";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v48";   // bump on each deploy to verify clients aren't cached
+const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
+const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
@@ -333,6 +335,13 @@ function TrackScreen({ order, onBack, onChanged }) {
       ) : isLive ? (
         <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch ticket will appear here once it's uploaded.</div>
       ) : null}
+
+      {/* Reach dispatch about this delivery — one number, call or text */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <a href={`tel:${DISPATCH_TEL}`} className="rounded-2xl py-3 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><Phone size={16} color={ORANGE} /> Call dispatch</a>
+        <a href={`sms:${DISPATCH_TEL}`} className="rounded-2xl py-3 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><Send size={16} color={ORANGE} /> Text dispatch</a>
+      </div>
+      <div className="text-center text-white/35 text-xs mt-1.5" style={{ fontFamily: C.body }}>Dispatch · {DISPATCH_PHONE}</div>
 
       {showEdit && <EditOrderModal order={order} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); onChanged && onChanged(); onBack(); }} />}
       {showReorder && <OrderConcreteModal initial={order} onClose={() => setShowReorder(false)} onPlaced={() => { setShowReorder(false); onChanged && onChanged(); onBack(); }} />}
@@ -1025,6 +1034,21 @@ ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class=
         <div className="min-w-0">
           <div className="text-white/45 text-xs uppercase tracking-wide" style={{ fontFamily: C.body }}>Billing questions</div>
           <div className="text-white text-sm" style={{ fontFamily: C.body }}>Aussieblock office · 325-213-5315</div>
+        </div>
+      </div>
+
+      {/* dispatch — orders & deliveries; call or text the one line */}
+      <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}>
+        <div className="flex items-center gap-3 mb-3">
+          <Truck size={18} color={ORANGE} />
+          <div className="min-w-0">
+            <div className="text-white/45 text-xs uppercase tracking-wide" style={{ fontFamily: C.body }}>Dispatch — orders & deliveries</div>
+            <div className="text-white text-sm" style={{ fontFamily: C.body }}>{DISPATCH_PHONE}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <a href={`tel:${DISPATCH_TEL}`} className="rounded-xl py-2.5 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><Phone size={15} color={ORANGE} /> Call</a>
+          <a href={`sms:${DISPATCH_TEL}`} className="rounded-xl py-2.5 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><Send size={15} color={ORANGE} /> Text</a>
         </div>
       </div>
 
