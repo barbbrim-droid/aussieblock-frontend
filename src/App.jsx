@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v52";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v53";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -696,7 +696,7 @@ const CALC_SHAPES = [
 ];
 
 // Customer concrete estimator — enter dimensions, get cubic yards, then order it.
-function CalculatorScreen({ onPlaced }) {
+function CalculatorScreen({ onPlaced, canAct = true }) {
   const [shapeKey, setShapeKey] = useState("Slab");
   const [vals, setVals] = useState({});
   const [waste, setWaste] = useState(true);
@@ -763,9 +763,11 @@ function CalculatorScreen({ onPlaced }) {
         )}
       </div>
 
-      <button onClick={() => setShowOrder(true)} disabled={!valid} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-        <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this Concrete"}
-      </button>
+      {canAct && (
+        <button onClick={() => setShowOrder(true)} disabled={!valid} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+          <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this Concrete"}
+        </button>
+      )}
       <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>Estimate only — confirm coverage with your crew.</div>
 
       {showOrder && <OrderConcreteModal initial={{ qty: `${orderCy} CY` }} onClose={() => setShowOrder(false)} onPlaced={() => { setShowOrder(false); onPlaced && onPlaced(); }} />}
@@ -3428,11 +3430,12 @@ export default function App() {
     setMe(null); setOrders([]); setAccount(null); setActive(null); setScreen("home");
   };
 
-  // Workers are a customer's field people: orders + tracking only, no Estimate
-  // (that places orders) and no Account (billing). Customers get the full nav.
+  // Workers are a customer's field people: their company's orders + tracking, plus
+  // the Estimate calculator (not confidential). No Account (billing). Customers
+  // get the full nav including Account.
   const isWorker = me?.role === "worker";
   const nav = isWorker
-    ? [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }]
+    ? [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }]
     : [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "account", icon: User, label: "Account" }];
 
   if (!authChecked) return <Splash label="Starting…" />;
@@ -3469,7 +3472,7 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canAct={!isWorker} />
-            : screen === "calc" && !isWorker ? <CalculatorScreen onPlaced={reloadOrders} />
+            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} canAct={!isWorker} />
             : screen === "account" && !isWorker ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canAct={!isWorker} />}
         </div>
