@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v49";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v50";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 const RECOMMENDED_MIX = "3500 PSI";
@@ -2210,12 +2210,19 @@ function ManageStaffModal({ onClose }) {
     setBusy(true); setMsg(null);
     try {
       const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), company.trim(), project.trim());
-      const appUrl = window.location.origin;
-      const roleWord = role === "staff" ? "the office dispatch board" : "the Aussieblock dispatch board";
-      const text = `Hi, you've been set up on ${roleWord}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call 325-213-5315.`;
-      setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
-      setSent(false); setCopied(false);
-      setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
+      if (pw) {
+        // A password was set (new login or a reset) — offer the invite to send.
+        const appUrl = window.location.origin;
+        const roleWord = role === "staff" ? "the office dispatch board" : "the Aussieblock dispatch board";
+        const text = `Hi, you've been set up on ${roleWord}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call 325-213-5315.`;
+        setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
+        setSent(false); setCopied(false);
+        setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
+      } else {
+        // Details-only save (existing login, password left unchanged).
+        setInvite(null);
+        setMsg({ ok: true, text: `Saved ${r.email} (${r.role}). Password unchanged.` });
+      }
       setPw("");
       await load();
     } catch (e) {
@@ -2302,14 +2309,14 @@ function ManageStaffModal({ onClose }) {
               <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Full staff</button>
             </div>
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
-            <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="password (min 6 characters)" autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
+            <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-2"} style={inSt} />
             <input value={company} onChange={(e) => setCompany(e.target.value)} list="staff-company-options" placeholder="who they work for (pick a customer or type any)" className={inCls + " mb-2"} style={inSt} />
             <datalist id="staff-company-options">{companies.map((n) => <option key={n} value={n} />)}</datalist>
             <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />
             <p className="text-white/35 text-xs mb-2">Company & project are labels only — workers still see the whole board (no billing/account info). Add a cell to text them their login.</p>
-            <button onClick={submit} disabled={busy || !email.trim() || pw.length < 6} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
-              {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Reset password" : "Create login"}
+            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6)} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Save changes" : "Create login"}
             </button>
           </div>
 
