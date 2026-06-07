@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -63,7 +63,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v40";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v41";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -71,6 +71,7 @@ const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Other"];
+const DRIVERS = ["Rodney", "Brandon", "Henry"];   // current drivers (staff-assignable on an order)
 // When set (build-time), the job-site field uses Google Places for accurate
 // addresses; otherwise it falls back to the free OpenStreetMap source.
 const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
@@ -297,7 +298,7 @@ function TrackScreen({ order, onBack, onChanged }) {
           {progress > 0.92 && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck entered site geofence — proof of delivery logged</div>}
           <div className="grid grid-cols-2 gap-3 mt-3">
             <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{progress >= 1 ? "Arrived" : `${etaMin} min`}</div></div>
-            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div></div>
+            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div>{order.driver && order.driver !== "—" && <div className="text-white/55 text-xs mt-1 flex items-center gap-1" style={{ fontFamily: C.body }}><User size={12} /> {order.driver}</div>}</div>
           </div>
           <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
         </>
@@ -1495,7 +1496,7 @@ function CodControls({ o }) {
   );
 }
 
-function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived }) {
+function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver }) {
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
@@ -1546,6 +1547,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span>
+            {o.driver && o.driver !== "—" && (<><span className="text-white/30 text-xs">·</span><span className="text-white/60 text-xs flex items-center gap-1"><User size={12} /> {o.driver}</span></>)}
           </div>
           <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.project || o.site}</div>
           {o.project && <div className="text-white/45 text-xs mt-0.5 truncate flex items-center gap-1"><MapPin size={12} /> {o.site}</div>}
@@ -1594,6 +1596,20 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
         </label>
+        {onDriver && (
+          <label className="flex flex-col gap-1 col-span-2">
+            <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Driver</span>
+            <select
+              value={o.driver || "—"} disabled={busy}
+              onChange={(e) => run(onDriver, e.target.value)}
+              className="rounded-lg px-2 py-1.5 text-sm outline-none disabled:opacity-50 cursor-pointer"
+              style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
+            >
+              <option value="—">Unassigned</option>
+              {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </label>
+        )}
       </div>
       {o.prepay_required && <CodControls o={o} />}
       {batchable && (
@@ -2083,7 +2099,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
 // total yards scheduled; clicking a day lists that day's orders (with controls).
 // Staff "Past orders" history modal — completed orders, most recent first, each
 // a full OrderRow so staff can review and one-tap "Order again".
-function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onClose }) {
+function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver, onClose }) {
   const [showArchived, setShowArchived] = useState(false);
   const list = showArchived ? archived : orders;
   return (
@@ -2103,7 +2119,7 @@ function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCance
           {list.length === 0 ? (
             <div className="text-white/40 text-sm py-8 text-center">{showArchived ? "No archived orders." : "No completed orders yet."}</div>
           ) : (
-            list.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} onArchived={onArchived} />)
+            list.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} onArchived={onArchived} onDriver={onDriver} />)
           )}
         </div>
       </div>
@@ -2111,7 +2127,7 @@ function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCance
   );
 }
 
-function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onClose }) {
+function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onDriver, onClose }) {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const todayKey = localToday();
@@ -2190,7 +2206,7 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
             {selOrders.length === 0 ? (
               <div className="text-white/40 text-sm py-4 text-center">No orders this day.</div>
             ) : (
-              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} />)
+              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} onDriver={onDriver} />)
             )}
           </div>
         </div>
@@ -2212,6 +2228,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState(/^\d{2}:\d{2}/.test(initial?.time || "") ? initial.time : "");
   const [truck, setTruck] = useState("");
+  const [driver, setDriver] = useState("");
   const [notes, setNotes] = useState(String(initial?.notes || "").replace(/\s*—?\s*Short load fee \$200 \(accepted\)\s*/i, "").trim());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -2234,7 +2251,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
     try {
       let finalNotes = notes.trim();
       if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
-      const o = await createOrder({ customer_id: customerId, site: site.trim(), scheduled_for: date, time, truck: truck || null, notes: finalNotes, ...spec.build() });
+      const o = await createOrder({ customer_id: customerId, site: site.trim(), scheduled_for: date, time, truck: truck || null, driver, notes: finalNotes, ...spec.build() });
       if (o.prepay_required) { setCreated(o); setBusy(false); }   // COD → show payment box
       else onCreated(o);
     } catch (e) { setErr(e.message); setBusy(false); }
@@ -2309,6 +2326,12 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
             {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
           <p className="text-white/35 text-xs mt-1 mb-3">Assign a truck now or later from the board.</p>
+
+          <label className={lbl}>Driver (optional)</label>
+          <select value={driver} onChange={(e) => setDriver(e.target.value)} className={inCls + " mb-3"} style={inSt}>
+            <option value="">Unassigned</option>
+            {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
 
           <label className={lbl}>Notes (optional)</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
@@ -2547,6 +2570,7 @@ function DispatchApp({ email, onLogout }) {
     setOrders((os) => [created, ...os.filter((x) => x.ref !== created.ref)]);
   const changeStatus = async (ref, status) => applyOrder(await setOrderStatus(ref, status));
   const assign = async (ref, truck) => applyOrder(await assignTruck(ref, truck));
+  const setDriver = async (ref, driver) => applyOrder(await assignDriver(ref, driver));
   const cancelOrder = async (ref) => {
     await deleteOrder(ref);                                  // throws on failure -> row shows it
     setOrders((os) => os.filter((o) => o.ref !== ref));      // drop it from the board
@@ -2584,10 +2608,10 @@ function DispatchApp({ email, onLogout }) {
     <div className="h-screen w-full" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
-        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onClose={() => setShowCal(false)} />
+        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} onClose={() => setShowCal(false)} />
       )}
       {showPast && (
-        <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onClose={() => setShowPast(false)} />
+        <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} onClose={() => setShowPast(false)} />
       )}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
@@ -2733,7 +2757,7 @@ function DispatchApp({ email, onLogout }) {
                     <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(todayYards)} CY scheduled today</span>
                     <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
                   </div>
-                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} />)}
+                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} />)}
                 </>
               )}
             </Panel>
@@ -2742,7 +2766,7 @@ function DispatchApp({ email, onLogout }) {
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No completed orders. Set an order to “complete” and it lands here to review or archive.</div>
               ) : (
                 <>
-                  {completedOrders.slice(0, 50).map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} />)}
+                  {completedOrders.slice(0, 50).map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} />)}
                   {completedOrders.length > 50 && (
                     <div className="text-white/40 text-xs text-center py-2" style={{ fontFamily: C.body }}>+{completedOrders.length - 50} more — archive to clear, or open “Past orders”.</div>
                   )}
@@ -2768,7 +2792,7 @@ function DispatchApp({ email, onLogout }) {
                           <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
                         </div>
                       </div>
-                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} />)}
+                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} />)}
                     </div>
                   );
                 })

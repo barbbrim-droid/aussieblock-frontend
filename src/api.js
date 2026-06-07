@@ -252,3 +252,7 @@ export function setOrderStatus(ref, status) {
 export function assignTruck(ref, truck) {
   return request(`/orders/${ref}/assign?truck=${encodeURIComponent(truck)}`, { method: 'POST' })
 }
+// Set (or clear, with "—") the driver on an order (staff).
+export function assignDriver(ref, driver) {
+  return request(`/orders/${ref}/driver?driver=${encodeURIComponent(driver)}`, { method: 'POST' })
+}
