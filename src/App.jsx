@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v33";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v34";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -2690,7 +2690,7 @@ function DispatchApp({ email, onLogout }) {
 
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               Fleet (map) gets the most width; the two order columns are narrower. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.7fr_1fr_1fr] gap-3">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
@@ -2755,6 +2755,18 @@ function DispatchApp({ email, onLogout }) {
                     </div>
                   );
                 })
+              )}
+            </Panel>
+            <Panel title="Completed" icon={CheckCircle2} count={completedOrders.length} fill>
+              {completedOrders.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No completed orders. Set an order to “complete” and it lands here to review or archive.</div>
+              ) : (
+                <>
+                  {completedOrders.slice(0, 50).map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} />)}
+                  {completedOrders.length > 50 && (
+                    <div className="text-white/40 text-xs text-center py-2" style={{ fontFamily: C.body }}>+{completedOrders.length - 50} more — archive to clear, or open “Past orders”.</div>
+                  )}
+                </>
               )}
             </Panel>
           </div>
