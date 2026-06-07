@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v7";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v8";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -2128,6 +2128,7 @@ function DispatchApp({ email, onLogout }) {
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
+  const [soundOn, setSoundOn] = useState(false);   // audio armed (browser needs a click first)
 
   // Ask for desktop-notification permission once.
   useEffect(() => {
@@ -2136,7 +2137,7 @@ function DispatchApp({ email, onLogout }) {
 
   // Unlock audio on the first interaction so the new-order chime can play.
   useEffect(() => {
-    const unlock = () => unlockAudio();
+    const unlock = () => { unlockAudio(); setSoundOn(true); };
     window.addEventListener("pointerdown", unlock);
     window.addEventListener("keydown", unlock);
     return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
@@ -2264,6 +2265,12 @@ function DispatchApp({ email, onLogout }) {
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-5 py-3 gap-3">
+          {/* one-time: arm audio so new-order alerts can sound (browser blocks sound until a click) */}
+          {!soundOn && (
+            <button onClick={() => { unlockAudio(); orderChime(); setSoundOn(true); }} className="shrink-0 rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+              <Bell size={16} /> Tap to turn on new-order alert sounds
+            </button>
+          )}
           {/* new-order alert banner */}
           {alerts.length > 0 && (
             <div className="shrink-0 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3" style={{ background: "#6aa9ff1f", border: "1px solid #6aa9ff" }}>
