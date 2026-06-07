@@ -534,7 +534,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
 
-  const canSubmit = spec.valid && date && site.trim() && !busy;
+  const canSubmit = spec.valid && date >= localToday() && site.trim() && !busy;
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
@@ -573,7 +573,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
             <AddressInput value={site} onChange={setSite} placeholder="Start typing the delivery address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="min-w-0"><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+              <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
               <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
             </div>
 
@@ -608,7 +608,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
   const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
   const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
 
-  const canSubmit = spec.valid && date && site.trim() && !busy;
+  const canSubmit = spec.valid && date >= localToday() && site.trim() && !busy;
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
@@ -631,8 +631,8 @@ function EditOrderModal({ order, onClose, onSaved }) {
           <label className={lbl}>Job site</label>
           <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
-            <div><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
           <label className={lbl}>Notes (optional)</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
@@ -1990,8 +1990,8 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
           {spec.fields}
 
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
-            <div><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
 
           <label className={lbl}>Truck (optional)</label>
@@ -2086,17 +2086,21 @@ function orderChime() {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    const start = ctx.currentTime + 0.02;
-    [880, 1175, 1568].forEach((freq, i) => {   // ascending 3-tone alert
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination); o.type = "triangle"; o.frequency.value = freq;
-      const t = start + i * 0.16;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
-      o.start(t); o.stop(t + 0.16);
-    });
+    const play = () => {
+      const start = ctx.currentTime + 0.05;
+      [880, 1175, 1568].forEach((freq, i) => {   // ascending 3-tone alert
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination); o.type = "triangle"; o.frequency.value = freq;
+        const t = start + i * 0.16;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.5, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+        o.start(t); o.stop(t + 0.18);
+      });
+    };
+    // Schedule the tones only once the context is actually running, or they play silently.
+    if (ctx.state === "suspended") ctx.resume().then(play).catch(() => {});
+    else play();
   } catch { /* audio blocked — banner + notification still show */ }
 }
 function desktopNotify(o) {
