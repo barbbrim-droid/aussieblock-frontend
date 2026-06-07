@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v12";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v13";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -252,6 +252,7 @@ button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18p
 ${row("Status", statusLbl)}
 ${row("Scheduled", dateLine || "—")}
 ${row("Customer", order.customer)}
+${row("Project", order.project)}
 ${row("Job site", order.site)}
 ${row("For", order.use_for)}
 ${row("Product", order.mix)}
@@ -407,7 +408,7 @@ function parseSpec(o = {}) {
     else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
     else if (p === "Accelerant") admix.push("Accelerant");
   });
-  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberExtra, colorDetail };
+  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberExtra, colorDetail, project: o.project || "" };
 }
 
 function useConcreteSpec(initial) {
@@ -421,6 +422,7 @@ function useConcreteSpec(initial) {
   const [extraSet, setExtraSet] = useState(p.extraSet);
   const [fiberExtra, setFiberExtra] = useState(p.fiberExtra);
   const [colorDetail, setColorDetail] = useState(p.colorDetail);
+  const [project, setProject] = useState(p.project);
   const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
 
   const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
@@ -439,6 +441,7 @@ function useConcreteSpec(initial) {
       if (a === "Fiber") { const x = parseFloat(fiberExtra); return x > 0 ? `Fiber: ${3 + x} lbs/yd` : "Fiber: 3 lbs/yd"; }
       return a;
     }),
+    project: project.trim(),
   });
 
   const inCls = "w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30";
@@ -447,6 +450,9 @@ function useConcreteSpec(initial) {
 
   const fields = (
     <>
+      <label className={lbl}>Project (optional)</label>
+      <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="Project or job name / reference" className={inCls + " mb-3"} style={inSt} />
+
       <label className={lbl}>Mix</label>
       <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
         <optgroup label="Strength (PSI)">
@@ -1464,6 +1470,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           </div>
           <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.site}</div>
           <div className="text-white/50 text-sm mt-0.5 truncate">{o.customer} · {o.mix}</div>
+          {o.project && <div className="text-white/40 text-xs mt-0.5 truncate">Project: {o.project}</div>}
           {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
           {o.use_for && <div className="text-white/40 text-xs mt-0.5 truncate">For: {o.use_for}</div>}
           {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
