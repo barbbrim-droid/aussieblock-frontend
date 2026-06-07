@@ -1364,7 +1364,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
   };
 
   return (
-    <div className="rounded-2xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)", borderLeft: o.prepay_required ? "3px solid #6aa9ff" : undefined }}>
+    <div className="rounded-2xl p-4 mb-3" style={{ background: o.status === "requested" ? ORANGE + "1f" : NAVY, border: `1px solid ${o.status === "requested" ? ORANGE : "rgba(255,255,255,0.06)"}`, borderLeft: o.status === "requested" ? `4px solid ${ORANGE}` : (o.prepay_required ? "3px solid #6aa9ff" : undefined) }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
