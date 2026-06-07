@@ -68,14 +68,14 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v45";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v46";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
-const PRECAST_MIXES = ["Precast"];
+const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
-const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Other"];
+const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Block Fill", "Other"];
 const DRIVERS = ["Rodney", "Brandon", "Henry"];   // current drivers (staff-assignable on an order)
 // When set (build-time), the job-site field uses Google Places for accurate
 // addresses; otherwise it falls back to the free OpenStreetMap source.
@@ -469,7 +469,7 @@ function useConcreteSpec(initial) {
         <optgroup label="TxDOT mix design">
           {TXDOT_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
         </optgroup>
-        <optgroup label="Precast">
+        <optgroup label="Specialty">
           {PRECAST_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
         </optgroup>
       </select>
