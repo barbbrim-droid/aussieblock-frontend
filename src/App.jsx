@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v17";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v18";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -573,7 +573,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><Plus size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Order concrete</span></div>
+          <div className="flex items-center gap-2"><Plus size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Order Concrete</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
 
@@ -745,7 +745,7 @@ function CalculatorScreen({ onPlaced }) {
       </div>
 
       <button onClick={() => setShowOrder(true)} disabled={!valid} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-        <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this concrete"}
+        <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this Concrete"}
       </button>
       <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>Estimate only — confirm coverage with your crew.</div>
 
@@ -775,11 +775,11 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
       </div>
 
       <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-        <Plus size={18} /> Order concrete
+        <Plus size={18} /> Order Concrete
       </button>
 
       <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold mb-2">My Orders</h2>
-      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet. Tap “Order concrete” to request a delivery.</div>}
+      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet. Tap “Order Concrete” to request a delivery.</div>}
 
       {requested.length > 0 && <div className={hdr} style={{ color: "#6aa9ff" }}>Pending confirmation</div>}
       {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
