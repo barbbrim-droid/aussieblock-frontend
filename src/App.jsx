@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
@@ -1101,47 +1101,90 @@ function GoogleFleetMap({ trucks }) {
   return <div ref={elRef} className="w-full h-full rounded-2xl" style={{ minHeight: 340, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
 }
 
-// Current conditions + forecast for San Angelo (National Weather Service — free,
-// no key). A thin bar at the bottom of the dispatch board. Hides itself on error.
+// Pick a clean vector icon + accent color from a forecast's text.
+function wxIcon(text = "", day = true) {
+  const t = text.toLowerCase();
+  if (/thunder|tstorm|t-storm/.test(t)) return { Icon: CloudLightning, color: "#facc15" };
+  if (/snow|sleet|ice|flurr|wintry/.test(t)) return { Icon: CloudSnow, color: "#bae6fd" };
+  if (/rain|shower|drizzle/.test(t)) return { Icon: CloudRain, color: "#60a5fa" };
+  if (/fog|haze|mist|smoke/.test(t)) return { Icon: CloudFog, color: "#94a3b8" };
+  if (/wind|breez/.test(t)) return { Icon: Wind, color: "#94a3b8" };
+  if (/(sunny|clear)/.test(t) && !/partly|mostly cloudy/.test(t)) return day ? { Icon: Sun, color: "#fbbf24" } : { Icon: Moon, color: "#cbd5e1" };
+  if (/partly|mostly sunny|few|scattered/.test(t)) return day ? { Icon: CloudSun, color: "#fbbf24" } : { Icon: CloudMoon, color: "#cbd5e1" };
+  if (/cloud|overcast/.test(t)) return { Icon: Cloud, color: "#94a3b8" };
+  return { Icon: Cloud, color: "#94a3b8" };
+}
+
+// Current conditions + multi-day forecast for San Angelo (National Weather
+// Service — free, no key). Clean bar at the bottom of the dispatch board.
 function WeatherBar() {
-  const [periods, setPeriods] = useState(null);
+  const [wx, setWx] = useState(null);   // { tempF, text, day, days:[{name,hi,lo,text,day}] }
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
         const pt = await fetch(`https://api.weather.gov/points/${MAP_CENTER.lat},${MAP_CENTER.lng}`).then((r) => r.json());
-        const fc = await fetch(pt.properties.forecast).then((r) => r.json());
-        if (alive) setPeriods(fc.properties.periods || []);
+        const [fc, hourly] = await Promise.all([
+          fetch(pt.properties.forecast).then((r) => r.json()),
+          fetch(pt.properties.forecastHourly).then((r) => r.json()).catch(() => null),
+        ]);
+        const periods = fc.properties.periods || [];
+        const now = hourly?.properties?.periods?.[0];
+        // Build day cards: each daytime period + the following night for the low.
+        const days = [];
+        for (let i = 0; i < periods.length && days.length < 5; i++) {
+          const p = periods[i];
+          if (!p.isDaytime) continue;
+          const night = periods[i + 1] && !periods[i + 1].isDaytime ? periods[i + 1] : null;
+          days.push({ name: p.name, hi: p.temperature, lo: night ? night.temperature : null, text: p.shortForecast, day: true });
+        }
+        if (alive) setWx({
+          tempF: now ? now.temperature : periods[0]?.temperature,
+          text: now ? now.shortForecast : periods[0]?.shortForecast,
+          day: now ? now.isDaytime : (periods[0]?.isDaytime ?? true),
+          days,
+        });
       } catch { /* leave hidden */ }
     };
     load();
     const id = setInterval(load, 30 * 60 * 1000);   // refresh every 30 min
     return () => { alive = false; clearInterval(id); };
   }, []);
-  if (!periods || !periods.length) return null;
-  const cur = periods[0];
-  const rest = periods.slice(1, 6);
+  if (!wx) return null;
+  const cur = wxIcon(wx.text, wx.day);
+  const shortDay = (n) => (/^(today|tonight|this)/i.test(n) ? "Today" : n.split(" ")[0].slice(0, 3));
   return (
-    <div className="shrink-0 flex items-stretch gap-3 rounded-2xl p-2.5 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center gap-2.5 pr-3 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}>
-        <img src={cur.icon} alt="" className="w-11 h-11 rounded-lg object-cover" />
+    <div className="shrink-0 flex items-center rounded-2xl px-4 py-2.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+      {/* current */}
+      <div className="flex items-center gap-3 pr-5 mr-4 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+        <cur.Icon size={38} color={cur.color} strokeWidth={1.75} />
         <div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-white text-2xl font-bold leading-none" style={{ fontFamily: C.cond }}>{cur.temperature}°{cur.temperatureUnit}</span>
-            <span className="text-white/45 text-xs" style={{ fontFamily: C.body }}>San Angelo</span>
+          <div className="flex items-start gap-0.5">
+            <span className="text-white text-3xl font-bold leading-none" style={{ fontFamily: C.cond }}>{wx.tempF}</span>
+            <span className="text-white/50 text-sm font-semibold mt-0.5">°F</span>
           </div>
-          <div className="text-white/70 text-xs mt-0.5" style={{ fontFamily: C.body }}>{cur.shortForecast}</div>
-          {cur.windSpeed && <div className="text-white/40 text-[10px]" style={{ fontFamily: C.body }}>Wind {cur.windDirection} {cur.windSpeed}</div>}
+          <div className="text-white/55 text-xs mt-1" style={{ fontFamily: C.body }}>{wx.text}</div>
+        </div>
+        <div className="ml-1 self-end">
+          <div className="text-white/35 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>San Angelo</div>
         </div>
       </div>
-      {rest.map((p) => (
-        <div key={p.number} className="flex flex-col items-center text-center shrink-0 px-1" style={{ minWidth: 80 }}>
-          <span className="text-white/55 text-[10px] font-semibold truncate w-full" style={{ fontFamily: C.body }}>{p.name}</span>
-          <img src={p.icon} alt="" className="w-7 h-7 my-0.5 rounded object-cover" />
-          <span className="text-white text-sm font-bold leading-none">{p.temperature}°</span>
-          <span className="text-white/45 text-[10px] truncate w-full leading-tight mt-0.5" title={p.shortForecast}>{p.shortForecast}</span>
-        </div>
-      ))}
+      {/* forecast */}
+      <div className="flex items-center gap-5 overflow-x-auto">
+        {wx.days.map((d) => {
+          const ic = wxIcon(d.text, true);
+          return (
+            <div key={d.name} className="flex flex-col items-center shrink-0" title={d.text}>
+              <span className="text-white/45 text-[11px] font-semibold mb-1" style={{ fontFamily: C.body }}>{shortDay(d.name)}</span>
+              <ic.Icon size={22} color={ic.color} strokeWidth={1.75} />
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-white text-sm font-bold" style={{ fontFamily: C.cond }}>{d.hi}°</span>
+                {d.lo != null && <span className="text-white/40 text-xs" style={{ fontFamily: C.cond }}>{d.lo}°</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
