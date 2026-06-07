@@ -62,13 +62,13 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v21";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v22";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
-const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Other"];
+const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Other"];
 // When set (build-time), the job-site field uses Google Places for accurate
 // addresses; otherwise it falls back to the free OpenStreetMap source.
 const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
