@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v25";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v26";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -1995,6 +1995,28 @@ function ManageTrucksModal({ onClose, onChanged }) {
 
 // Staff modal: month calendar for delivery planning. Each day cell shows the
 // total yards scheduled; clicking a day lists that day's orders (with controls).
+// Staff "Past orders" history modal — completed orders, most recent first, each
+// a full OrderRow so staff can review and one-tap "Order again".
+function PastOrdersModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Inbox size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Past orders ({orders.length})</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-4 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {orders.length === 0 ? (
+            <div className="text-white/40 text-sm py-8 text-center">No completed orders yet.</div>
+          ) : (
+            orders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} />)
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onClose }) {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
@@ -2313,6 +2335,7 @@ function DispatchApp({ email, onLogout }) {
   const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
+  const [showPast, setShowPast] = useState(false);   // "Past orders" modal
   const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
@@ -2436,6 +2459,7 @@ function DispatchApp({ email, onLogout }) {
   };
 
   const activeOrders = orders.filter((o) => o.status !== "complete");
+  const completedOrders = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
   const today = localToday();
   const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today");
   const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
@@ -2464,6 +2488,9 @@ function DispatchApp({ email, onLogout }) {
       <style>{FONT}</style>
       {showCal && (
         <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onClose={() => setShowCal(false)} />
+      )}
+      {showPast && (
+        <PastOrdersModal orders={completedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onClose={() => setShowPast(false)} />
       )}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
@@ -2544,6 +2571,9 @@ function DispatchApp({ email, onLogout }) {
               </button>
               <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <CalendarDays size={16} color={ORANGE} /> Calendar
+              </button>
+              <button onClick={() => setShowPast(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <Inbox size={16} color={ORANGE} /> Past orders
               </button>
               <button onClick={() => setShowTrucks(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <Truck size={16} color={ORANGE} /> Trucks
