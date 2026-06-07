@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v53";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v54";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -232,14 +232,14 @@ function Timeline({ stageIdx }) {
   );
 }
 
-function TrackScreen({ order, onBack, onChanged, canAct = true }) {
+function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
   const [pos, setPos] = useState(order.truck_position || null);   // live truck position for the map
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
-  // canAct=false for workers: view-only, no placing/editing/paying.
-  const editable = canAct && ["requested", "scheduled"].includes(order.status);
+  // Workers manage orders like a customer; only billing (canFinance) is hidden.
+  const editable = ["requested", "scheduled"].includes(order.status);
   const cancelOrder = async () => {
     if (!window.confirm(`Cancel order ${order.id}? This can't be undone.`)) return;
     try { await deleteOrder(order.id); onChanged && onChanged(); onBack(); }
@@ -293,7 +293,7 @@ function TrackScreen({ order, onBack, onChanged, canAct = true }) {
       <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
       {orderExtras(order) && <p className="text-white/40 text-xs mt-0.5">{orderExtras(order)}</p>}
 
-      {canAct && order.prepay_required && !order.prepaid && (
+      {canFinance && order.prepay_required && !order.prepaid && (
         <div className="rounded-2xl p-4 mt-3" style={{ background: "rgba(231,115,42,0.12)", border: `1px solid ${ORANGE}` }}>
           <div className="text-white font-bold text-sm" style={{ fontFamily: C.cond }}>Payment required before delivery</div>
           <div className="text-white/55 text-xs mt-0.5" style={{ fontFamily: C.body }}>This is a COD order — pay now to get your delivery scheduled.</div>
@@ -301,7 +301,7 @@ function TrackScreen({ order, onBack, onChanged, canAct = true }) {
           {payErr && <div className="text-xs mt-1.5" style={{ color: "#ff8a85", fontFamily: C.body }}>{payErr}</div>}
         </div>
       )}
-      {canAct && order.prepay_required && order.prepaid && (
+      {canFinance && order.prepay_required && order.prepaid && (
         <div className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={14} /> Payment received — your delivery is confirmed</div>
       )}
 
@@ -334,7 +334,7 @@ function TrackScreen({ order, onBack, onChanged, canAct = true }) {
         </div>
       )}
 
-      {canAct && <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>}
+      <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>
 
       {order.has_batch_ticket ? (
         <button onClick={() => openBatchTicket(order.id).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
@@ -696,7 +696,7 @@ const CALC_SHAPES = [
 ];
 
 // Customer concrete estimator — enter dimensions, get cubic yards, then order it.
-function CalculatorScreen({ onPlaced, canAct = true }) {
+function CalculatorScreen({ onPlaced }) {
   const [shapeKey, setShapeKey] = useState("Slab");
   const [vals, setVals] = useState({});
   const [waste, setWaste] = useState(true);
@@ -763,11 +763,9 @@ function CalculatorScreen({ onPlaced, canAct = true }) {
         )}
       </div>
 
-      {canAct && (
-        <button onClick={() => setShowOrder(true)} disabled={!valid} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-          <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this Concrete"}
-        </button>
-      )}
+      <button onClick={() => setShowOrder(true)} disabled={!valid} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+        <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this Concrete"}
+      </button>
       <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>Estimate only — confirm coverage with your crew.</div>
 
       {showOrder && <OrderConcreteModal initial={{ qty: `${orderCy} CY` }} onClose={() => setShowOrder(false)} onPlaced={() => { setShowOrder(false); onPlaced && onPlaced(); }} />}
@@ -775,7 +773,7 @@ function CalculatorScreen({ onPlaced, canAct = true }) {
   );
 }
 
-function OrdersScreen({ orders, account, onOpen, onPlaced, canAct = true }) {
+function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true }) {
   const [showOrder, setShowOrder] = useState(false);
   const [reorder, setReorder] = useState(null);   // a past order to "Order again"
   const [showNotifs, setShowNotifs] = useState(false);   // notifications panel
@@ -819,26 +817,24 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canAct = true }) {
         </button>
       </div>
 
-      {canAct && (
-        <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-          <Plus size={18} /> Order Concrete
-        </button>
-      )}
+      <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+        <Plus size={18} /> Order Concrete
+      </button>
 
       <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold mb-2">My Orders</h2>
-      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>{canAct ? "No orders yet. Tap “Order Concrete” to request a delivery." : "No orders for your company yet."}</div>}
+      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet. Tap “Order Concrete” to request a delivery.</div>}
 
       {requested.length > 0 && <div className={hdr} style={{ color: "#6aa9ff" }}>Pending confirmation</div>}
-      {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canAct} />)}
+      {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canFinance} />)}
 
       {todayO.length > 0 && <div className={hdr + " mt-5"}>Today</div>}
-      {todayO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canAct} />)}
+      {todayO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canFinance} />)}
 
       {upcomingO.length > 0 && <div className={hdr + " mt-5"}>Upcoming</div>}
-      {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canAct} />)}
+      {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canFinance} />)}
 
-      {completed.length > 0 && <div className={hdr + " mt-5"}>{canAct ? "Past orders · tap “Again” to reorder" : "Past orders"}</div>}
-      {completed.map((o) => <PastOrderRow key={o.id} o={o} onOpen={onOpen} onReorder={canAct ? setReorder : null} />)}
+      {completed.length > 0 && <div className={hdr + " mt-5"}>Past orders · tap “Again” to reorder</div>}
+      {completed.map((o) => <PastOrderRow key={o.id} o={o} onOpen={onOpen} onReorder={setReorder} />)}
 
       {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
       {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} />}
@@ -3476,10 +3472,10 @@ export default function App() {
         )}
 
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
-          {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canAct={!isWorker} />
-            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} canAct={!isWorker} />
+          {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canFinance={!isWorker} />
+            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} />
             : screen === "account" && !isWorker ? <AccountScreen account={account} customerId={me.customer_id} />
-            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canAct={!isWorker} />}
+            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canFinance={!isWorker} />}
         </div>
 
         {/* bottom nav */}
