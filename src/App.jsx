@@ -958,7 +958,7 @@ function PlusLoadCard({ r, onHandle, busy }) {
 // backend config — the origin the mock GPS orbits trucks around. The fleet map
 // below is schematic (a fixed window around the plant), not a street map; swap
 // in a real basemap once the One Step GPS key is live and positions are real.
-const PLANT = { lat: 31.522751, lng: -100.394607 };   // yard: 2951 E FM 2105, San Angelo, TX (exact pin)
+const PLANT = { lat: 31.523310, lng: -100.394094 };   // yard: 2951 E FM 2105, San Angelo, TX (exact pin)
 const MAP_SPAN = 0.025;   // degrees shown each way from the plant (~2.7 km)
 
 // Project a lat/lng into the SVG viewBox (W×H) with padding. Longitude → x
