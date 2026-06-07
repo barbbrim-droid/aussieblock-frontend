@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v11";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v12";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -189,6 +189,7 @@ function Timeline({ stageIdx }) {
 
 function TrackScreen({ order, onBack, onChanged }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
+  const [pos, setPos] = useState(order.truck_position || null);   // live truck position for the map
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const editable = ["requested", "scheduled"].includes(order.status);
@@ -218,6 +219,7 @@ function TrackScreen({ order, onBack, onChanged }) {
       try {
         const fresh = await getOrder(order.id);
         if (alive && fresh && typeof fresh.progress === "number") setProgress(fresh.progress);
+        if (alive && fresh && fresh.truck_position) setPos(fresh.truck_position);
       } catch { /* ignore transient errors; keep last value */ }
     };
     tick();
@@ -289,7 +291,7 @@ ${row("Notes", order.notes)}
 
       {isLive ? (
         <>
-          <div className="mt-4"><TrackMap progress={progress} /></div>
+          <div className="mt-4"><GoogleTrackMap site={order.site} truckPosition={pos} truckLabel={order.truck} progress={progress} /></div>
           {progress > 0.92 && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck entered site geofence — proof of delivery logged</div>}
           <div className="grid grid-cols-2 gap-3 mt-3">
             <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{progress >= 1 ? "Arrived" : `${etaMin} min`}</div></div>
@@ -1190,6 +1192,91 @@ function GoogleFleetMap({ trucks }) {
 
   if (failed || !GOOGLE_PLACES_KEY) return <FleetMap trucks={trucks} />;
   return <div ref={elRef} className="w-full h-full rounded-2xl" style={{ minHeight: 340, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
+}
+
+// Real Google map for the CUSTOMER track screen: the yard, the live delivery
+// truck (with heading), and the destination job site (geocoded from its address).
+// Same dark Google map the dispatch board uses; falls back to the schematic
+// TrackMap if Maps JS isn't available (no key / API not enabled).
+function GoogleTrackMap({ site, truckPosition, truckLabel, progress }) {
+  const elRef = useRef(null), mapRef = useRef(null);
+  const truckMarkerRef = useRef(null), siteLatLngRef = useRef(null);
+  const posRef = useRef(truckPosition); posRef.current = truckPosition;
+  const [failed, setFailed] = useState(false);
+
+  const truckIcon = (maps) => ({
+    path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 6,
+    rotation: posRef.current?.heading || 0,
+    fillColor: "#ff7a3d", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5,
+  });
+
+  const drawTruck = (maps) => {
+    const p = posRef.current;
+    if (!mapRef.current || !p || p.lat == null) return;
+    const pos = { lat: p.lat, lng: p.lng };
+    if (!truckMarkerRef.current) {
+      truckMarkerRef.current = new maps.Marker({
+        position: pos, map: mapRef.current, title: truckLabel || "Truck", zIndex: 999,
+        icon: truckIcon(maps),
+        label: { text: truckLabel || "Truck", color: "#fff", fontSize: "10px", fontWeight: "600" },
+      });
+    } else {
+      truckMarkerRef.current.setPosition(pos);
+      truckMarkerRef.current.setIcon(truckIcon(maps));
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps().then((maps) => {
+      if (cancelled || !elRef.current || mapRef.current) return;
+      mapRef.current = new maps.Map(elRef.current, {
+        center: PLANT, zoom: 12, mapTypeId: maps.MapTypeId.ROADMAP,
+        disableDefaultUI: true, zoomControl: true, styles: MAP_DARK_STYLE,
+      });
+      new maps.Marker({   // yard
+        position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Yard",
+        icon: { path: maps.SymbolPath.CIRCLE, scale: 6, fillColor: ORANGE, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
+        label: { text: "Yard", color: "#e7732a", fontSize: "10px", fontWeight: "700" },
+      });
+      drawTruck(maps);
+      // Geocode the job site so the customer sees their destination (best-effort:
+      // if the Geocoding API isn't enabled it just shows yard + truck).
+      if (site) {
+        try {
+          new maps.Geocoder().geocode({ address: site }, (res, status) => {
+            if (cancelled || status !== "OK" || !res?.[0] || !mapRef.current) return;
+            const loc = res[0].geometry.location;
+            siteLatLngRef.current = loc;
+            new maps.Marker({
+              position: loc, map: mapRef.current, title: site,
+              icon: { path: maps.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 0 },   // hide arrow, use label pin below
+            });
+            new maps.Marker({
+              position: loc, map: mapRef.current, title: site,
+              icon: { path: maps.SymbolPath.CIRCLE, scale: 6, fillColor: "#ff4d4d", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
+              label: { text: "Site", color: "#ff7a7a", fontSize: "10px", fontWeight: "700" },
+            });
+            const b = new maps.LatLngBounds();
+            b.extend({ lat: PLANT.lat, lng: PLANT.lng }); b.extend(loc);
+            if (posRef.current?.lat != null) b.extend({ lat: posRef.current.lat, lng: posRef.current.lng });
+            mapRef.current.fitBounds(b, 50);
+          });
+        } catch { /* geocoder unavailable — keep yard + truck */ }
+      }
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Move the truck marker live as new positions arrive (no re-fit, so the
+  // customer can pan/zoom without the map jumping).
+  useEffect(() => {
+    const maps = window.google?.maps;
+    if (maps && mapRef.current) drawTruck(maps);
+  }, [truckPosition?.lat, truckPosition?.lng, truckPosition?.heading]);
+
+  if (failed || !GOOGLE_PLACES_KEY) return <TrackMap progress={progress} />;
+  return <div ref={elRef} className="w-full rounded-2xl" style={{ height: 240, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
 }
 
 // Pick a clean vector icon + accent color from a forecast's text.
