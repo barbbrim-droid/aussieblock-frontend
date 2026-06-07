@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v32";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v33";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -759,7 +759,7 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
   const requested = orders.filter((o) => o.status === "requested");
   // Completed orders go to their own "Past orders" history (most recent first),
   // so they don't clutter the live lists but stay easy to reorder.
-  const completed = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  const completed = orders.filter((o) => o.status === "complete" && !o.archived).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
   const active = orders.filter((o) => o.status !== "requested" && o.status !== "complete");
   const todayO = active.filter((o) => orderDay(o.when, todayKey) === "today");
   const upcomingO = active.filter((o) => orderDay(o.when, todayKey) === "upcoming");
@@ -1494,7 +1494,7 @@ function CodControls({ o }) {
   );
 }
 
-function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated }) {
+function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived }) {
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
@@ -1619,7 +1619,12 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           {err}
         </div>
       )}
-      <div className="mt-2 flex justify-end gap-2">
+      <div className="mt-2 flex justify-end gap-2 flex-wrap">
+        {onArchived && o.status === "complete" && (
+          <button onClick={async () => { setBusy(true); setErr(""); try { onArchived(await setOrderArchived(o.ref, !o.archived)); } catch (e) { setErr(e.message); } finally { setBusy(false); } }} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.7)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+            <Inbox size={12} /> {o.archived ? "Unarchive" : "Archive"}
+          </button>
+        )}
         <button onClick={() => setShowReorder(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
           <Plus size={12} /> Order again
         </button>
@@ -1822,7 +1827,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const selCust = customers.find((c) => c.id === sel);
   // The selected customer's completed orders (most recent first), for reordering.
   const selPast = selCust
-    ? orders.filter((o) => o.status === "complete" && o.customer === selCust.name).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)))
+    ? orders.filter((o) => o.status === "complete" && !o.archived && o.customer === selCust.name).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)))
     : [];
 
   return (
@@ -2074,19 +2079,27 @@ function ManageTrucksModal({ onClose, onChanged }) {
 // total yards scheduled; clicking a day lists that day's orders (with controls).
 // Staff "Past orders" history modal — completed orders, most recent first, each
 // a full OrderRow so staff can review and one-tap "Order again".
-function PastOrdersModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onClose }) {
+function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onClose }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const list = showArchived ? archived : orders;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><Inbox size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Past orders ({orders.length})</span></div>
+          <div className="flex items-center gap-2"><Inbox size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">{showArchived ? "Archived" : "Past orders"} ({list.length})</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
+        <div className="px-4 pt-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowArchived(false)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: showArchived ? NAVY : ORANGE + "22", color: showArchived ? "rgba(255,255,255,0.5)" : ORANGE, border: `1px solid ${showArchived ? "rgba(255,255,255,0.12)" : ORANGE}`, fontFamily: C.body }}>Past orders ({orders.length})</button>
+            <button onClick={() => setShowArchived(true)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: showArchived ? ORANGE + "22" : NAVY, color: showArchived ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${showArchived ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>Archived ({archived.length})</button>
+          </div>
+        </div>
         <div className="p-4 overflow-y-auto" style={{ fontFamily: C.body }}>
-          {orders.length === 0 ? (
-            <div className="text-white/40 text-sm py-8 text-center">No completed orders yet.</div>
+          {list.length === 0 ? (
+            <div className="text-white/40 text-sm py-8 text-center">{showArchived ? "No archived orders." : "No completed orders yet."}</div>
           ) : (
-            orders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} />)
+            list.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} onCreated={onCreated} onArchived={onArchived} />)
           )}
         </div>
       </div>
@@ -2536,7 +2549,9 @@ function DispatchApp({ email, onLogout }) {
   };
 
   const activeOrders = orders.filter((o) => o.status !== "complete");
-  const completedOrders = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  const allCompleted = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  const completedOrders = allCompleted.filter((o) => !o.archived);
+  const archivedOrders = allCompleted.filter((o) => o.archived);
   const today = localToday();
   const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today");
   const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
@@ -2567,7 +2582,7 @@ function DispatchApp({ email, onLogout }) {
         <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onClose={() => setShowCal(false)} />
       )}
       {showPast && (
-        <PastOrdersModal orders={completedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onClose={() => setShowPast(false)} />
+        <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onClose={() => setShowPast(false)} />
       )}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>

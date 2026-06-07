@@ -93,6 +93,11 @@ export function editOrder(ref, order) {
     body: JSON.stringify(order),
   })
 }
+// Archive or unarchive a completed order (staff). Returns the updated order.
+export function setOrderArchived(ref, archived = true) {
+  return request(`/orders/${encodeURIComponent(ref)}/archive?archived=${archived}`, { method: 'POST' })
+}
+
 // Upload a batch-ticket PDF for an order (staff). Returns the updated order.
 export async function uploadBatchTicket(ref, file) {
   const fd = new FormData()
