@@ -1014,6 +1014,84 @@ function isStale(updatedAt) {
   return (Date.now() - t) / 1000 > 45;
 }
 
+// Dark Google Maps style so the real map matches the dispatch UI.
+const MAP_DARK_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#1b2430" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1b2430" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9aa7b5" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a3543" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#b9c4d0" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#13202b" }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+];
+
+// Load the Google Maps JS API once (reuses the Places key).
+let _gmapsPromise = null;
+function loadGoogleMaps() {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if (window.google?.maps) return Promise.resolve(window.google.maps);
+  if (!GOOGLE_PLACES_KEY) return Promise.reject(new Error("no key"));
+  if (!_gmapsPromise) {
+    _gmapsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_KEY}&v=weekly`;
+      s.async = true;
+      s.onload = () => (window.google?.maps ? resolve(window.google.maps) : reject(new Error("maps not ready")));
+      s.onerror = () => reject(new Error("maps failed to load"));
+      document.head.appendChild(s);
+    });
+  }
+  return _gmapsPromise;
+}
+
+// Real Google map of the fleet. Falls back to the stylized SVG map if Maps JS
+// isn't available (no key, or the Maps JavaScript API isn't enabled yet).
+function GoogleFleetMap({ trucks }) {
+  const elRef = useRef(null), mapRef = useRef(null), markersRef = useRef([]);
+  const trucksRef = useRef(trucks); trucksRef.current = trucks;
+  const [failed, setFailed] = useState(false);
+
+  const drawTrucks = (maps) => {
+    if (!mapRef.current) return;
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = trucksRef.current
+      .filter((t) => t.lat != null && t.lng != null)
+      .map((t) => new maps.Marker({
+        position: { lat: t.lat, lng: t.lng }, map: mapRef.current, title: t.label,
+        icon: { path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 5.5, rotation: t.heading || 0,
+                fillColor: isStale(t.updated_at) ? "#7c8794" : "#ff7a3d", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 },
+        label: { text: t.label, color: "#fff", fontSize: "10px", fontWeight: "600" },
+      }));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps().then((maps) => {
+      if (cancelled || !elRef.current || mapRef.current) return;
+      mapRef.current = new maps.Map(elRef.current, {
+        center: { lat: PLANT.lat, lng: PLANT.lng }, zoom: 12,
+        disableDefaultUI: true, zoomControl: true, styles: MAP_DARK_STYLE,
+      });
+      new maps.Marker({
+        position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Plant / Yard",
+        icon: { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: ORANGE, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
+        label: { text: "Yard", color: "#e7732a", fontSize: "11px", fontWeight: "700" },
+      });
+      drawTrucks(maps);
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const maps = window.google?.maps;
+    if (maps && mapRef.current) drawTrucks(maps);
+  }, [trucks]);
+
+  if (failed || !GOOGLE_PLACES_KEY) return <FleetMap trucks={trucks} />;
+  return <div ref={elRef} className="w-full rounded-2xl" style={{ height: 300, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
+}
+
 // COD controls shown on a prepay-required order row: set the load total, create
 // the QuickBooks pay link, send it, and check whether it's been paid.
 function CodControls({ o }) {
@@ -1949,7 +2027,7 @@ function DispatchApp({ email, onLogout }) {
           {/* main columns — fill the screen; each scrolls inside so the page doesn't */}
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
-              <FleetMap trucks={trucks} />
+              <GoogleFleetMap trucks={trucks} />
               <div className="mt-3 flex flex-col gap-1.5">
                 {trucks.length === 0 ? (
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
