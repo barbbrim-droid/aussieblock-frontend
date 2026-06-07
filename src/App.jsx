@@ -13,7 +13,7 @@ const FONT = `
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap');
 /* Render native date/time pickers in dark mode so the calendar/clock icons show
    up light on the dark fields. (No invert filter — it would cancel this out.) */
-input[type="date"], input[type="time"] { color-scheme: dark; }
+input[type="date"], input[type="time"] { color-scheme: dark; min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
 /* Lock the page to the viewport so only inner areas scroll — no full-page
@@ -573,8 +573,8 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
             <AddressInput value={site} onChange={setSite} placeholder="Start typing the delivery address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
-              <div><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+              <div className="min-w-0"><label className={lbl}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+              <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
             </div>
 
             <label className={lbl}>Notes (optional)</label>
