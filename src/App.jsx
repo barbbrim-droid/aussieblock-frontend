@@ -1586,7 +1586,7 @@ function CustomerLogins() {
   const shown = customers
     .filter((c) => (f ? c.name.toLowerCase().includes(f) : true))
     .filter((c) => (codOnly ? c.cod : true))
-    .slice(0, 60);
+    .sort((a, b) => a.name.localeCompare(b.name));
   const selCust = customers.find((c) => c.id === sel);
 
   return (
@@ -1610,7 +1610,7 @@ function CustomerLogins() {
       </div>
 
       {/* customer list */}
-      <div className="max-h-48 overflow-y-auto pr-1 -mr-1">
+      <div className="max-h-[55vh] overflow-y-auto pr-1 -mr-1">
         {shown.length === 0 ? (
           <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No customers match.</div>
         ) : shown.map((c) => (
