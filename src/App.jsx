@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v10";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v11";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -2500,14 +2500,17 @@ export default function App() {
     })();
   }, []);
 
-  // Once logged in, load this customer's orders + billing.
+  // Once logged in, load this customer's orders + billing — and KEEP THEM FRESH.
+  // The list/account used to load only once, so customers had to manually refresh
+  // to see status changes or new invoices. Now we poll every 20s (silently, no
+  // spinner) and also refresh the instant the app regains focus (phone unlocked /
+  // tab refocused), so updates show up on their own.
   // Staff don't have a customer account — they get the dispatch console instead.
   useEffect(() => {
     if (!me || me.role === "staff") return;
     let alive = true;
-    (async () => {
-      setLoading(true);
-      setLoadError("");
+    const loadData = async (silent) => {
+      if (!silent) { setLoading(true); setLoadError(""); }
       try {
         const os = await getOrders();
         if (alive) setOrders(os.map((o) => ({ ...o, id: o.ref })));  // map backend `ref` -> the `id` the UI uses
@@ -2515,13 +2518,18 @@ export default function App() {
           const acct = await getBilling(me.customer_id);
           if (alive) setAccount(acct);
         }
+        if (alive && silent) setLoadError("");   // a recovered poll clears any stale error
       } catch (e) {
-        if (alive) setLoadError(e.message);
+        if (alive && !silent) setLoadError(e.message);   // keep showing current data if a background poll blips
       } finally {
-        if (alive) setLoading(false);
+        if (alive && !silent) setLoading(false);
       }
-    })();
-    return () => { alive = false; };
+    };
+    loadData(false);
+    const poll = setInterval(() => { if (alive) loadData(true); }, 20000);
+    const onVisible = () => { if (document.visibilityState === "visible" && alive) loadData(true); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { alive = false; clearInterval(poll); document.removeEventListener("visibilitychange", onVisible); };
   }, [me]);
 
   // Re-fetch this customer's orders (e.g. right after they place a new one).
