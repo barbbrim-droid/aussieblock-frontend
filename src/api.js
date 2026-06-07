@@ -255,11 +255,11 @@ export function textInvite(customerId, message) {
 export function listStaff() {
   return request('/staff')
 }
-export function createStaff(email, password, role, phone, company, project) {
+export function createStaff(email, password, role, phone, customerId, project) {
   return request('/staff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role, phone, company, project }),
+    body: JSON.stringify({ email, password, role, phone, customer_id: customerId, project }),
   })
 }
 export function deleteStaff(email) {

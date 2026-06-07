@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v51";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v52";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -143,14 +143,16 @@ function PastOrderRow({ o, onOpen, onReorder }) {
         <div style={{ fontFamily: C.cond }} className="text-white text-base font-semibold leading-tight mt-0.5 truncate">{o.project || o.site}</div>
         <div className="text-white/45 text-xs mt-0.5 truncate">{o.mix} · {o.qty}</div>
       </button>
-      <button onClick={() => onReorder(o)} title="Order this again" className="shrink-0 rounded-2xl px-3 flex flex-col items-center justify-center gap-0.5 font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-        <Plus size={16} /><span className="text-[11px]">Again</span>
-      </button>
+      {onReorder && (
+        <button onClick={() => onReorder(o)} title="Order this again" className="shrink-0 rounded-2xl px-3 flex flex-col items-center justify-center gap-0.5 font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+          <Plus size={16} /><span className="text-[11px]">Again</span>
+        </button>
+      )}
     </div>
   );
 }
 
-function OrderCard({ o, onOpen, showCustomer }) {
+function OrderCard({ o, onOpen, showCustomer, showPay = true }) {
   return (
     <button onClick={() => onOpen(o)} className="w-full text-left rounded-2xl p-4 mb-3 transition-transform active:scale-[0.98]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
       <div className="flex items-start justify-between gap-3">
@@ -167,7 +169,7 @@ function OrderCard({ o, onOpen, showCustomer }) {
           {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
           {o.use_for && <div className="text-white/40 text-xs mt-0.5 truncate">For: {o.use_for}</div>}
           {o.notes && <div className="text-white/40 text-xs mt-0.5 truncate">Note: {o.notes}</div>}
-          {o.prepay_required && (
+          {showPay && o.prepay_required && (
             <div className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: o.prepaid ? "rgba(39,192,138,0.15)" : "rgba(231,115,42,0.15)", color: o.prepaid ? GREEN : ORANGE, fontFamily: C.body }}>
               <CreditCard size={11} /> {o.prepaid ? "Paid" : "Payment due before delivery"}
             </div>
@@ -230,13 +232,14 @@ function Timeline({ stageIdx }) {
   );
 }
 
-function TrackScreen({ order, onBack, onChanged }) {
+function TrackScreen({ order, onBack, onChanged, canAct = true }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
   const [pos, setPos] = useState(order.truck_position || null);   // live truck position for the map
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
-  const editable = ["requested", "scheduled"].includes(order.status);
+  // canAct=false for workers: view-only, no placing/editing/paying.
+  const editable = canAct && ["requested", "scheduled"].includes(order.status);
   const cancelOrder = async () => {
     if (!window.confirm(`Cancel order ${order.id}? This can't be undone.`)) return;
     try { await deleteOrder(order.id); onChanged && onChanged(); onBack(); }
@@ -290,7 +293,7 @@ function TrackScreen({ order, onBack, onChanged }) {
       <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
       {orderExtras(order) && <p className="text-white/40 text-xs mt-0.5">{orderExtras(order)}</p>}
 
-      {order.prepay_required && !order.prepaid && (
+      {canAct && order.prepay_required && !order.prepaid && (
         <div className="rounded-2xl p-4 mt-3" style={{ background: "rgba(231,115,42,0.12)", border: `1px solid ${ORANGE}` }}>
           <div className="text-white font-bold text-sm" style={{ fontFamily: C.cond }}>Payment required before delivery</div>
           <div className="text-white/55 text-xs mt-0.5" style={{ fontFamily: C.body }}>This is a COD order — pay now to get your delivery scheduled.</div>
@@ -298,7 +301,7 @@ function TrackScreen({ order, onBack, onChanged }) {
           {payErr && <div className="text-xs mt-1.5" style={{ color: "#ff8a85", fontFamily: C.body }}>{payErr}</div>}
         </div>
       )}
-      {order.prepay_required && order.prepaid && (
+      {canAct && order.prepay_required && order.prepaid && (
         <div className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={14} /> Payment received — your delivery is confirmed</div>
       )}
 
@@ -331,7 +334,7 @@ function TrackScreen({ order, onBack, onChanged }) {
         </div>
       )}
 
-      <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>
+      {canAct && <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>}
 
       {order.has_batch_ticket ? (
         <button onClick={() => openBatchTicket(order.id).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
@@ -770,7 +773,7 @@ function CalculatorScreen({ onPlaced }) {
   );
 }
 
-function OrdersScreen({ orders, account, onOpen, onPlaced }) {
+function OrdersScreen({ orders, account, onOpen, onPlaced, canAct = true }) {
   const [showOrder, setShowOrder] = useState(false);
   const [reorder, setReorder] = useState(null);   // a past order to "Order again"
   const [showNotifs, setShowNotifs] = useState(false);   // notifications panel
@@ -814,24 +817,26 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
         </button>
       </div>
 
-      <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-        <Plus size={18} /> Order Concrete
-      </button>
+      {canAct && (
+        <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+          <Plus size={18} /> Order Concrete
+        </button>
+      )}
 
       <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold mb-2">My Orders</h2>
-      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet. Tap “Order Concrete” to request a delivery.</div>}
+      {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>{canAct ? "No orders yet. Tap “Order Concrete” to request a delivery." : "No orders for your company yet."}</div>}
 
       {requested.length > 0 && <div className={hdr} style={{ color: "#6aa9ff" }}>Pending confirmation</div>}
-      {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+      {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canAct} />)}
 
       {todayO.length > 0 && <div className={hdr + " mt-5"}>Today</div>}
-      {todayO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+      {todayO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canAct} />)}
 
       {upcomingO.length > 0 && <div className={hdr + " mt-5"}>Upcoming</div>}
-      {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
+      {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canAct} />)}
 
-      {completed.length > 0 && <div className={hdr + " mt-5"}>Past orders · tap “Again” to reorder</div>}
-      {completed.map((o) => <PastOrderRow key={o.id} o={o} onOpen={onOpen} onReorder={setReorder} />)}
+      {completed.length > 0 && <div className={hdr + " mt-5"}>{canAct ? "Past orders · tap “Again” to reorder" : "Past orders"}</div>}
+      {completed.map((o) => <PastOrderRow key={o.id} o={o} onOpen={onOpen} onReorder={canAct ? setReorder : null} />)}
 
       {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
       {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} />}
@@ -2366,7 +2371,7 @@ function ManageStaffModal({ onClose }) {
   const [pw, setPw] = useState("");
   const [role, setRole] = useState("worker");
   const [phone, setPhone] = useState("");
-  const [company, setCompany] = useState("");       // who they work for (pick a customer or type any name)
+  const [companyId, setCompanyId] = useState("");   // the company a worker belongs to (a real customer id) — scopes what they see
   const [project, setProject] = useState("");       // their current project/job
   const [editing, setEditing] = useState(false);   // editing an existing login (locks the email field)
   const [busy, setBusy] = useState(false);
@@ -2383,26 +2388,28 @@ function ManageStaffModal({ onClose }) {
   useEffect(() => {
     load();
     getSmsEnabled().then((r) => setSmsAuto(!!r.enabled)).catch(() => {});
-    getCustomers().then((cs) => setCompanies(cs.map((c) => c.name))).catch(() => {});   // suggestions for "who they work for"
+    getCustomers().then((cs) => setCompanies(cs.map((c) => ({ id: c.id, name: c.name })))).catch(() => {});   // the company a worker belongs to
   }, []);
 
-  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompany(""); setProject(""); setEditing(false); };
+  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompanyId(""); setProject(""); setEditing(false); };
 
   const pick = (u) => {
     setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
-    setCompany(u.company || ""); setProject(u.project || "");
+    setCompanyId(u.customer_id || ""); setProject(u.project || "");
     setEditing(true); setMsg(null); setInvite(null);
   };
 
   const submit = async () => {
+    if (role === "worker" && !companyId) { setMsg({ ok: false, text: "Pick the company this worker belongs to." }); return; }
     setBusy(true); setMsg(null);
     try {
-      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), company.trim(), project.trim());
+      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), role === "worker" ? Number(companyId) : null, project.trim());
       if (pw) {
         // A password was set (new login or a reset) — offer the invite to send.
         const appUrl = window.location.origin;
-        const roleWord = role === "staff" ? "the office dispatch board" : "the Aussieblock dispatch board";
-        const text = `Hi, you've been set up on ${roleWord}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call 325-213-5315.`;
+        const text = role === "staff"
+          ? `Hi, you've been set up on the Aussieblock dispatch board. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call ${DISPATCH_PHONE}.`
+          : `Hi, you can now track ${r.company || "your company"}'s concrete deliveries with Aussieblock. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call ${DISPATCH_PHONE}.`;
         setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
         setSent(false); setCopied(false);
         setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
@@ -2493,17 +2500,21 @@ function ManageStaffModal({ onClose }) {
             </div>
             {/* role toggle */}
             <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — no financials</button>
-              <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Full staff</button>
+              <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — one company</button>
+              <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Dispatch operator</button>
             </div>
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
             <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-2"} style={inSt} />
-            <input value={company} onChange={(e) => setCompany(e.target.value)} list="staff-company-options" placeholder="who they work for (pick a customer or type any)" className={inCls + " mb-2"} style={inSt} />
-            <datalist id="staff-company-options">{companies.map((n) => <option key={n} value={n} />)}</datalist>
+            {role === "worker" && (
+              <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inCls + " mb-2"} style={inSt}>
+                <option value="">— company they work for (required) —</option>
+                {companies.slice().sort((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
             <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">Company & project are labels only — workers still see the whole board (no billing/account info). Add a cell to text them their login.</p>
-            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6)} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+            <p className="text-white/35 text-xs mb-2">{role === "worker" ? "A worker sees only their company's orders + delivery tracking — no billing, no other companies, no dispatch board." : "A dispatch operator sees the full board (all jobs + financials). Only for your office."}</p>
+            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6) || (role === "worker" && !companyId)} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Save changes" : "Create login"}
             </button>
           </div>
@@ -3368,7 +3379,9 @@ export default function App() {
   // tab refocused), so updates show up on their own.
   // Staff don't have a customer account — they get the dispatch console instead.
   useEffect(() => {
-    if (!me || me.role !== "customer") return;   // staff/worker use the dispatch board, not this customer data
+    // Company-scoped users load this view: customers (orders + billing) and
+    // workers (orders + tracking only). Staff use the dispatch board instead.
+    if (!me || (me.role !== "customer" && me.role !== "worker")) return;
     let alive = true;
     const loadData = async (silent) => {
       if (!silent) { setLoading(true); setLoadError(""); }
@@ -3381,7 +3394,7 @@ export default function App() {
           // without the customer backing out and reopening it.
           setActive((prev) => (prev ? mapped.find((x) => x.ref === prev.ref) || prev : prev));
         }
-        if (me.customer_id != null) {
+        if (me.role === "customer" && me.customer_id != null) {   // workers never load billing
           const acct = await getBilling(me.customer_id);
           if (alive) setAccount(acct);
         }
@@ -3415,11 +3428,16 @@ export default function App() {
     setMe(null); setOrders([]); setAccount(null); setActive(null); setScreen("home");
   };
 
-  const nav = [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "account", icon: User, label: "Account" }];
+  // Workers are a customer's field people: orders + tracking only, no Estimate
+  // (that places orders) and no Account (billing). Customers get the full nav.
+  const isWorker = me?.role === "worker";
+  const nav = isWorker
+    ? [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }]
+    : [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "account", icon: User, label: "Account" }];
 
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
-  if (me.role === "staff" || me.role === "worker") return <DispatchApp email={me.email} role={me.role} onLogout={handleLogout} />;
+  if (me.role === "staff") return <DispatchApp email={me.email} role={me.role} onLogout={handleLogout} />;   // the dispatch board is the operator's only
   if (loading) return <Splash label="Loading your orders…" />;
 
   return (
@@ -3450,10 +3468,10 @@ export default function App() {
         )}
 
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
-          {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} />
-            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} />
-            : screen === "account" ? <AccountScreen account={account} customerId={me.customer_id} />
-            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} />}
+          {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canAct={!isWorker} />
+            : screen === "calc" && !isWorker ? <CalculatorScreen onPlaced={reloadOrders} />
+            : screen === "account" && !isWorker ? <AccountScreen account={account} customerId={me.customer_id} />
+            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canAct={!isWorker} />}
         </div>
 
         {/* bottom nav */}
