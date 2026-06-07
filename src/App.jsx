@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v20";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v21";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -1552,6 +1552,21 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
   );
 }
 
+// Header status pill. Pulses green while data is actually flowing; if the last
+// refresh failed (backend unreachable) it goes gray + "OFFLINE" so you can tell.
+function LivePill({ live = true }) {
+  const color = live ? GREEN : "#7c8794";
+  return (
+    <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: NAVY_DEEP, color, fontFamily: C.body }}>
+      <span className="relative flex h-2 w-2">
+        {live && <span className="absolute inline-flex h-full w-full rounded-full opacity-70 animate-ping" style={{ background: GREEN }} />}
+        <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: color }} />
+      </span>
+      {live ? "LIVE" : "OFFLINE"}
+    </span>
+  );
+}
+
 function StatTile({ icon: Icon, label, value, accent }) {
   return (
     <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -2419,7 +2434,7 @@ function DispatchApp({ email, onLogout }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: NAVY_DEEP, color: GREEN, fontFamily: C.body }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: GREEN }} /> LIVE</span>
+              <LivePill live={!err} />
               <button onClick={onLogout} title="Log out" className="p-1.5 rounded-full active:scale-90 transition-transform" style={{ background: NAVY_DEEP }}><LogOut size={14} color={ORANGE} /></button>
             </div>
           </div>
@@ -2683,7 +2698,7 @@ export default function App() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: NAVY_DEEP, color: GREEN, fontFamily: C.body }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: GREEN }} /> LIVE</span>
+              <LivePill live={!loadError} />
               <button onClick={handleLogout} title="Log out" className="p-1.5 rounded-full active:scale-90 transition-transform" style={{ background: NAVY_DEEP }}><LogOut size={14} color={ORANGE} /></button>
             </div>
           </div>
