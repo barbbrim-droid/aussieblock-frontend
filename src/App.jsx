@@ -1073,7 +1073,7 @@ function GoogleFleetMap({ trucks }) {
       if (cancelled || !elRef.current || mapRef.current) return;
       mapRef.current = new maps.Map(elRef.current, {
         center: MAP_CENTER, zoom: 11,   // San Angelo, ~15-mile radius
-        mapTypeId: maps.MapTypeId.HYBRID,   // satellite imagery + road/labels
+        mapTypeId: maps.MapTypeId.ROADMAP,   // normal map (toggle to satellite via control)
         disableDefaultUI: true, zoomControl: true, mapTypeControl: true,
         styles: MAP_DARK_STYLE,
       });
@@ -1094,6 +1094,51 @@ function GoogleFleetMap({ trucks }) {
 
   if (failed || !GOOGLE_PLACES_KEY) return <FleetMap trucks={trucks} />;
   return <div ref={elRef} className="w-full h-full rounded-2xl" style={{ minHeight: 340, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
+}
+
+// Current conditions + forecast for San Angelo (National Weather Service — free,
+// no key). A thin bar at the bottom of the dispatch board. Hides itself on error.
+function WeatherBar() {
+  const [periods, setPeriods] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const pt = await fetch(`https://api.weather.gov/points/${MAP_CENTER.lat},${MAP_CENTER.lng}`).then((r) => r.json());
+        const fc = await fetch(pt.properties.forecast).then((r) => r.json());
+        if (alive) setPeriods(fc.properties.periods || []);
+      } catch { /* leave hidden */ }
+    };
+    load();
+    const id = setInterval(load, 30 * 60 * 1000);   // refresh every 30 min
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  if (!periods || !periods.length) return null;
+  const cur = periods[0];
+  const rest = periods.slice(1, 6);
+  return (
+    <div className="shrink-0 flex items-stretch gap-3 rounded-2xl p-2.5 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center gap-2.5 pr-3 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+        <img src={cur.icon} alt="" className="w-11 h-11 rounded-lg object-cover" />
+        <div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-white text-2xl font-bold leading-none" style={{ fontFamily: C.cond }}>{cur.temperature}°{cur.temperatureUnit}</span>
+            <span className="text-white/45 text-xs" style={{ fontFamily: C.body }}>San Angelo</span>
+          </div>
+          <div className="text-white/70 text-xs mt-0.5" style={{ fontFamily: C.body }}>{cur.shortForecast}</div>
+          {cur.windSpeed && <div className="text-white/40 text-[10px]" style={{ fontFamily: C.body }}>Wind {cur.windDirection} {cur.windSpeed}</div>}
+        </div>
+      </div>
+      {rest.map((p) => (
+        <div key={p.number} className="flex flex-col items-center text-center shrink-0 px-1" style={{ minWidth: 80 }}>
+          <span className="text-white/55 text-[10px] font-semibold truncate w-full" style={{ fontFamily: C.body }}>{p.name}</span>
+          <img src={p.icon} alt="" className="w-7 h-7 my-0.5 rounded object-cover" />
+          <span className="text-white text-sm font-bold leading-none">{p.temperature}°</span>
+          <span className="text-white/45 text-[10px] truncate w-full leading-tight mt-0.5" title={p.shortForecast}>{p.shortForecast}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // COD controls shown on a prepay-required order row: set the load total, create
@@ -2095,6 +2140,8 @@ function DispatchApp({ email, onLogout }) {
               )}
             </Panel>
           </div>
+
+          <WeatherBar />
         </div>
       </div>
     </div>
