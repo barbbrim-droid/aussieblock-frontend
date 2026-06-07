@@ -1,6 +1,6 @@
 {
-  "name": "Aussieblock Dispatch",
-  "short_name": "Dispatch",
+  "name": "Aussieblock",
+  "short_name": "Aussieblock",
   "description": "Aussieblock ready-mix dispatch board — orders, fleet, and new-order alerts.",
   "start_url": "/",
   "scope": "/",
