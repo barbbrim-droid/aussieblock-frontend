@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v30";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v31";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -361,6 +361,10 @@ ${row("Notes", order.notes)}
           <div className="text-center text-white/35 text-xs py-2" style={{ fontFamily: C.body }}>Delivery ticket will be available once the load is batched.</div>
         )}
       </div>
+
+      {order.has_batch_ticket && (
+        <button onClick={() => openBatchTicket(order.id).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
+      )}
 
       {showEdit && <EditOrderModal order={order} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); onChanged && onChanged(); onBack(); }} />}
       {showReorder && <OrderConcreteModal initial={order} onClose={() => setShowReorder(false)} onPlaced={() => { setShowReorder(false); onChanged && onChanged(); onBack(); }} />}
@@ -1556,6 +1560,19 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
     catch (e) { setErr(e.message || "Could not cancel"); setBusy(false); }
   };
 
+  // Batch ticket (PDF) upload — allowed once the order is batched+.
+  const fileRef = useRef(null);
+  const batchable = ["batched", "enroute", "onsite", "complete"].includes(o.status);
+  const onPickTicket = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";   // let them re-pick the same file later
+    if (!file) return;
+    setBusy(true); setErr("");
+    try { onEdited && onEdited(await uploadBatchTicket(o.ref, file)); }
+    catch (ex) { setErr(ex.message || "Upload failed"); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="rounded-2xl p-4 mb-3" style={{ background: o.status === "requested" ? ORANGE + "1f" : NAVY, border: `1px solid ${o.status === "requested" ? ORANGE : "rgba(255,255,255,0.06)"}`, borderLeft: o.status === "requested" ? `4px solid ${ORANGE}` : (o.prepay_required ? "3px solid #6aa9ff" : undefined) }}>
       <div className="flex items-start justify-between gap-3">
@@ -1617,6 +1634,25 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
         </label>
       </div>
       {o.prepay_required && <CodControls o={o} />}
+      {batchable && (
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={onPickTicket} className="hidden" />
+          {o.has_batch_ticket ? (
+            <>
+              <button onClick={() => openBatchTicket(o.ref).catch((e) => setErr(e.message))} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: GREEN, background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
+                <FileText size={12} /> Batch ticket
+              </button>
+              <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+                {busy ? <Loader2 size={12} className="animate-spin" /> : "Replace"}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
+              {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add batch ticket (PDF)
+            </button>
+          )}
+        </div>
+      )}
       {err && (
         <div className="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>
           {err}

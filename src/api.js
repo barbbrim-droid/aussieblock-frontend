@@ -93,6 +93,33 @@ export function editOrder(ref, order) {
     body: JSON.stringify(order),
   })
 }
+// Upload a batch-ticket PDF for an order (staff). Returns the updated order.
+export async function uploadBatchTicket(ref, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+
+// Open an order's batch-ticket PDF (staff or owning customer). Fetches with the
+// auth token, then opens the PDF via a blob URL (works around no-auth <a href>).
+export async function openBatchTicket(ref) {
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url; a.target = '_blank'; a.rel = 'noopener'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
 // Flag every customer with an unpaid balance >= `days` days old as COD (staff).
 export function codFromAging(days = 30) {
   return request(`/customers/cod-from-aging?days=${days}`, { method: 'POST' })
