@@ -1,6 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
+
+// True when the logged-in office user may see financials & account info (full
+// staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
+// by DispatchApp; components read it to hide COD/billing/account UI.
+const FinanceContext = createContext(true);
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -63,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v41";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v42";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -1497,6 +1502,7 @@ function CodControls({ o }) {
 }
 
 function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver }) {
+  const canFinance = useContext(FinanceContext);   // workers don't see COD/payment bits
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
@@ -1542,7 +1548,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.ref}</span>
-            {o.prepay_required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: o.prepaid ? GREEN + "22" : "#6aa9ff22", color: o.prepaid ? GREEN : "#6aa9ff", fontFamily: C.body }}>{o.prepaid ? "COD · PAID" : "COD · UNPAID"}</span>}
+            {canFinance && o.prepay_required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: o.prepaid ? GREEN + "22" : "#6aa9ff22", color: o.prepaid ? GREEN : "#6aa9ff", fontFamily: C.body }}>{o.prepaid ? "COD · PAID" : "COD · UNPAID"}</span>}
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
             <span className="text-white/30 text-xs">·</span>
@@ -1611,7 +1617,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           </label>
         )}
       </div>
-      {o.prepay_required && <CodControls o={o} />}
+      {canFinance && o.prepay_required && <CodControls o={o} />}
       {batchable && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
           <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={onPickTicket} className="hidden" />
@@ -2220,6 +2226,7 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
 function NewOrderModal({ trucks, onClose, onCreated, initial }) {
   // `initial` (from "Order again") pre-fills spec/site/notes/time and the
   // customer (matched by name once the roster loads). Date is always re-picked.
+  const canFinance = useContext(FinanceContext);   // workers don't see the COD payment box
   const spec = useConcreteSpec(initial);
   const [customers, setCustomers] = useState([]);
   const [custFilter, setCustFilter] = useState("");
@@ -2252,7 +2259,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
       let finalNotes = notes.trim();
       if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
       const o = await createOrder({ customer_id: customerId, site: site.trim(), scheduled_for: date, time, truck: truck || null, driver, notes: finalNotes, ...spec.build() });
-      if (o.prepay_required) { setCreated(o); setBusy(false); }   // COD → show payment box
+      if (o.prepay_required && canFinance) { setCreated(o); setBusy(false); }   // COD → show payment box (staff only)
       else onCreated(o);
     } catch (e) { setErr(e.message); setBusy(false); }
   };
@@ -2444,7 +2451,8 @@ function desktopNotify(o) {
   } catch { /* ignore */ }
 }
 
-function DispatchApp({ email, onLogout }) {
+function DispatchApp({ email, role, onLogout }) {
+  const canFinance = role !== "worker";   // full staff see financials/account info; workers don't
   const [orders, setOrders] = useState([]);
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2605,6 +2613,7 @@ function DispatchApp({ email, onLogout }) {
   if (loading) return <Splash label="Loading dispatch…" />;
 
   return (
+    <FinanceContext.Provider value={canFinance}>
     <div className="h-screen w-full" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
@@ -2687,9 +2696,11 @@ function DispatchApp({ email, onLogout }) {
                   <Download size={16} /> Install app
                 </button>
               )}
-              <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <KeyRound size={16} color={ORANGE} /> Customers
-              </button>
+              {canFinance && (
+                <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                  <KeyRound size={16} color={ORANGE} /> Customers
+                </button>
+              )}
               <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <CalendarDays size={16} color={ORANGE} /> Calendar
               </button>
@@ -2804,6 +2815,7 @@ function DispatchApp({ email, onLogout }) {
         </div>
       </div>
     </div>
+    </FinanceContext.Provider>
   );
 }
 
@@ -2861,7 +2873,7 @@ export default function App() {
   // tab refocused), so updates show up on their own.
   // Staff don't have a customer account — they get the dispatch console instead.
   useEffect(() => {
-    if (!me || me.role === "staff") return;
+    if (!me || me.role !== "customer") return;   // staff/worker use the dispatch board, not this customer data
     let alive = true;
     const loadData = async (silent) => {
       if (!silent) { setLoading(true); setLoadError(""); }
@@ -2912,7 +2924,7 @@ export default function App() {
 
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
-  if (me.role === "staff") return <DispatchApp email={me.email} onLogout={handleLogout} />;
+  if (me.role === "staff" || me.role === "worker") return <DispatchApp email={me.email} role={me.role} onLogout={handleLogout} />;
   if (loading) return <Splash label="Loading your orders…" />;
 
   return (
