@@ -17,10 +17,11 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
 /* Lock the page to the viewport so only inner areas scroll — no full-page
-   rubber-band/bounce on phones. iOS needs the body actually pinned. */
-html, body, #root { height: 100%; }
+   rubber-band/bounce on phones. Pin the body and size it to the *small* viewport
+   (100svh) so the bottom tab bar stays above the mobile browser toolbar. */
+html, #root { height: 100%; }
 html { overflow: hidden; }
-body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; }
+body { margin: 0; position: fixed; top: 0; left: 0; right: 0; height: 100vh; height: 100svh; overflow: hidden; overscroll-behavior: none; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
