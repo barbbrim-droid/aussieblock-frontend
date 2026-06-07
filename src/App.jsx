@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v8";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v9";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -2128,19 +2128,38 @@ function DispatchApp({ email, onLogout }) {
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
-  const [soundOn, setSoundOn] = useState(false);   // audio armed (browser needs a click first)
+  const [soundOn, setSoundOn] = useState(false);   // audio actually resumed THIS page-load (needs a gesture)
+  // Whether the user has opted into alert sound at all (remembered across refreshes).
+  const [wantSound, setWantSound] = useState(() => {
+    try { return localStorage.getItem("ab_sound") === "1"; } catch { return false; }
+  });
+
+  // Opt in to alert sound (plays a test chime so they know it works) and remember it.
+  const enableSound = () => {
+    unlockAudio(); orderChime(); setSoundOn(true); setWantSound(true);
+    try { localStorage.setItem("ab_sound", "1"); } catch { /* private mode */ }
+  };
 
   // Ask for desktop-notification permission once.
   useEffect(() => {
     if (window.Notification && Notification.permission === "default") Notification.requestPermission().catch(() => {});
   }, []);
 
-  // Unlock audio on the first interaction so the new-order chime can play.
+  // Browsers suspend audio until a user gesture, and a full page refresh resets that.
+  // So: ANY interaction anywhere re-arms the chime (no need to hunt for a button), and
+  // we also retry resuming whenever the tab regains focus (e.g. phone unlocked).
   useEffect(() => {
-    const unlock = () => { unlockAudio(); setSoundOn(true); };
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
-    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
+    const arm = () => { unlockAudio(); setSoundOn(true); };
+    const evs = ["pointerdown", "keydown", "touchstart"];
+    evs.forEach((e) => window.addEventListener(e, arm));
+    const onVisible = () => { if (document.visibilityState === "visible") unlockAudio(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      evs.forEach((e) => window.removeEventListener(e, arm));
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, []);
 
   // Detect new customer-placed ("requested") orders between polls → chime + notify.
@@ -2265,10 +2284,17 @@ function DispatchApp({ email, onLogout }) {
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-5 py-3 gap-3">
-          {/* one-time: arm audio so new-order alerts can sound (browser blocks sound until a click) */}
-          {!soundOn && (
-            <button onClick={() => { unlockAudio(); orderChime(); setSoundOn(true); }} className="shrink-0 rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+          {/* Arm audio so new-order alerts can sound. Browsers block sound until a gesture,
+              and a page refresh resets it — so first-timers get the big button, and anyone
+              who's already opted in just gets a slim "tap to resume" that any click clears. */}
+          {!soundOn && !wantSound && (
+            <button onClick={enableSound} className="shrink-0 rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
               <Bell size={16} /> Tap to turn on new-order alert sounds
+            </button>
+          )}
+          {!soundOn && wantSound && (
+            <button onClick={enableSound} className="shrink-0 rounded-lg px-3 py-1.5 flex items-center justify-center gap-2 text-xs font-semibold active:scale-95 transition-transform" style={{ background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.5)", color: "#f59e0b", fontFamily: C.body }}>
+              <Bell size={13} /> Tap anywhere to resume order-alert sound
             </button>
           )}
           {/* new-order alert banner */}
