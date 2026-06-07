@@ -2060,6 +2060,31 @@ function orderExtras(o) {
   return [o.slump ? `${o.slump} slump` : "", o.admixtures].filter(Boolean).join(" · ");
 }
 
+// Short chime for a new order request (Web Audio — no asset needed).
+function orderChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    [880, 1175].forEach((freq, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.start(t); o.stop(t + 0.18);
+    });
+    setTimeout(() => { try { ctx.close(); } catch {} }, 600);
+  } catch { /* audio blocked — banner + notification still show */ }
+}
+function desktopNotify(o) {
+  try {
+    if (window.Notification && Notification.permission === "granted") {
+      new Notification("New concrete order request", { body: `${o.customer} · ${o.qty} ${o.mix} (${o.ref})`, tag: o.ref });
+    }
+  } catch { /* ignore */ }
+}
+
 function DispatchApp({ email, onLogout }) {
   const [orders, setOrders] = useState([]);
   const [trucks, setTrucks] = useState([]);
@@ -2070,6 +2095,26 @@ function DispatchApp({ email, onLogout }) {
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
+  const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
+  const seenReq = useRef(null);   // refs of "requested" orders already seen
+
+  // Ask for desktop-notification permission once.
+  useEffect(() => {
+    if (window.Notification && Notification.permission === "default") Notification.requestPermission().catch(() => {});
+  }, []);
+
+  // Detect new customer-placed ("requested") orders between polls → chime + notify.
+  useEffect(() => {
+    const requested = orders.filter((o) => o.status === "requested");
+    if (seenReq.current === null) { seenReq.current = new Set(requested.map((o) => o.ref)); return; }
+    const fresh = requested.filter((o) => !seenReq.current.has(o.ref));
+    if (fresh.length) {
+      fresh.forEach((o) => seenReq.current.add(o.ref));
+      setAlerts((prev) => [...fresh, ...prev]);
+      orderChime();
+      fresh.forEach(desktopNotify);
+    }
+  }, [orders]);
 
   // Pull orders + fleet at once, reusing the existing endpoints.
   const refresh = async () => {
@@ -2173,6 +2218,17 @@ function DispatchApp({ email, onLogout }) {
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-5 py-3 gap-3">
+          {/* new-order alert banner */}
+          {alerts.length > 0 && (
+            <div className="shrink-0 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3" style={{ background: "#6aa9ff1f", border: "1px solid #6aa9ff" }}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Bell size={17} color="#6aa9ff" />
+                <span className="text-white text-sm font-bold shrink-0" style={{ fontFamily: C.cond }}>{alerts.length} new order request{alerts.length > 1 ? "s" : ""}</span>
+                <span className="text-white/60 text-xs truncate" style={{ fontFamily: C.body }}>{alerts.map((a) => `${a.ref} · ${a.customer} · ${a.qty} ${a.mix}`).join("    ")}</span>
+              </div>
+              <button onClick={() => setAlerts([])} className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95" style={{ background: "#6aa9ff", color: NAVY_DEEP, fontFamily: C.body }}>Got it</button>
+            </div>
+          )}
           {/* title + actions */}
           <div className="flex items-center justify-between shrink-0 gap-2">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
