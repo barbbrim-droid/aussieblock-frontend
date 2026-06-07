@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v38";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v39";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -2841,7 +2841,13 @@ export default function App() {
       if (!silent) { setLoading(true); setLoadError(""); }
       try {
         const os = await getOrders();
-        if (alive) setOrders(os.map((o) => ({ ...o, id: o.ref })));  // map backend `ref` -> the `id` the UI uses
+        const mapped = os.map((o) => ({ ...o, id: o.ref }));   // map backend `ref` -> the `id` the UI uses
+        if (alive) {
+          setOrders(mapped);
+          // keep the order open on the Track screen fresh too, so it updates live
+          // without the customer backing out and reopening it.
+          setActive((prev) => (prev ? mapped.find((x) => x.ref === prev.ref) || prev : prev));
+        }
         if (me.customer_id != null) {
           const acct = await getBilling(me.customer_id);
           if (alive) setAccount(acct);
@@ -2864,7 +2870,9 @@ export default function App() {
   const reloadOrders = async () => {
     try {
       const os = await getOrders();
-      setOrders(os.map((o) => ({ ...o, id: o.ref })));
+      const mapped = os.map((o) => ({ ...o, id: o.ref }));
+      setOrders(mapped);
+      setActive((prev) => (prev ? mapped.find((x) => x.ref === prev.ref) || prev : prev));
     } catch { /* keep current list on transient error */ }
   };
 
