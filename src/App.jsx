@@ -1072,18 +1072,11 @@ function GoogleFleetMap({ trucks }) {
     loadGoogleMaps().then((maps) => {
       if (cancelled || !elRef.current || mapRef.current) return;
       mapRef.current = new maps.Map(elRef.current, {
-        center: MAP_CENTER,
+        center: MAP_CENTER, zoom: 10,   // San Angelo, ~30-mile radius
         mapTypeId: maps.MapTypeId.HYBRID,   // satellite imagery + road/labels
         disableDefaultUI: true, zoomControl: true, mapTypeControl: true,
         styles: MAP_DARK_STYLE,
       });
-      // Frame a ~30-mile radius around San Angelo.
-      const dLat = MAP_RADIUS_MI / 69;
-      const dLng = MAP_RADIUS_MI / (69 * Math.cos(MAP_CENTER.lat * Math.PI / 180));
-      mapRef.current.fitBounds(new maps.LatLngBounds(
-        { lat: MAP_CENTER.lat - dLat, lng: MAP_CENTER.lng - dLng },
-        { lat: MAP_CENTER.lat + dLat, lng: MAP_CENTER.lng + dLng },
-      ));
       new maps.Marker({
         position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Yard — 2951 E FM 2105, San Angelo",
         icon: { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: ORANGE, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
