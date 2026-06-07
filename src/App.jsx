@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v26";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v27";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -1661,10 +1661,11 @@ function toSmsNumber(contact) {
 
 // Staff tool: create or reset the login a customer uses to see their own orders
 // & billing, then text them an invite. Lives in the dispatch board's right column.
-function CustomerLogins() {
+function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const [customers, setCustomers] = useState([]);
   const [filter, setFilter] = useState("");
   const [sel, setSel] = useState(null);        // selected customer id
+  const [reorder, setReorder] = useState(null);   // a past order to "Order again" for this customer
   const [emailVal, setEmailVal] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1774,6 +1775,10 @@ function CustomerLogins() {
     .filter((c) => (codOnly ? c.cod : true))
     .sort((a, b) => a.name.localeCompare(b.name));
   const selCust = customers.find((c) => c.id === sel);
+  // The selected customer's completed orders (most recent first), for reordering.
+  const selPast = selCust
+    ? orders.filter((o) => o.status === "complete" && o.customer === selCust.name).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)))
+    : [];
 
   return (
     <Panel title="Customers" icon={KeyRound} count={`${codCount} COD`}>
@@ -1862,6 +1867,33 @@ function CustomerLogins() {
             </button>
           )}
         </div>
+      )}
+
+      {/* selected customer's past orders → one-tap reorder */}
+      {selCust && (
+        <div className="rounded-xl p-3 mt-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Past orders — {selCust.name}</div>
+          {selPast.length === 0 ? (
+            <div className="text-white/35 text-xs py-1" style={{ fontFamily: C.body }}>No completed orders yet.</div>
+          ) : selPast.map((o) => (
+            <div key={o.ref} className="flex items-stretch gap-2 mb-1.5">
+              <div className="flex-1 min-w-0 rounded-lg px-3 py-2" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{o.project || o.site}</div>
+                <div className="text-white/45 text-xs truncate" style={{ fontFamily: C.body }}>{formatOrderDate(o.when)} · {o.mix} · {o.qty}</div>
+              </div>
+              <button onClick={() => setReorder(o)} title="Order this again" className="shrink-0 rounded-lg px-3 flex items-center gap-1 text-xs font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={13} /> Again</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {reorder && (
+        <NewOrderModal
+          trucks={trucks}
+          initial={reorder}
+          onClose={() => setReorder(null)}
+          onCreated={(no) => { setReorder(null); setMsg({ ok: true, text: `New order ${no.ref} created for ${no.customer}.` }); onReordered && onReordered(no); }}
+        />
       )}
 
       {msg && (
@@ -2495,7 +2527,7 @@ function DispatchApp({ email, onLogout }) {
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
           <div className="w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <CustomerLogins />
+            <CustomerLogins orders={orders} trucks={trucks} onReordered={addOrder} />
             <button onClick={() => setShowLogins(false)} className="w-full mt-2 rounded-xl py-2 text-sm font-semibold text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>Close</button>
           </div>
         </div>
