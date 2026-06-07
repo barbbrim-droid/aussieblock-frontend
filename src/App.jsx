@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v13";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v14";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -1431,13 +1431,14 @@ function CodControls({ o }) {
   );
 }
 
-function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
+function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
   // row's failed change doesn't block the others or the live polling.
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [showEdit, setShowEdit] = useState(false);   // staff "Edit order" modal
 
   // The selects are *controlled* by o.status / o.truck (server truth). On a
   // rejected change the parent state never updates, so the select snaps back to
@@ -1522,11 +1523,21 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel }) {
           {err}
         </div>
       )}
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex justify-end gap-2">
+        <button onClick={() => setShowEdit(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
+          <FileText size={12} /> Edit order
+        </button>
         <button onClick={cancel} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#ff8a85", background: "rgba(239,83,80,0.1)", fontFamily: C.body }}>
           <X size={12} /> Cancel order
         </button>
       </div>
+      {showEdit && (
+        <EditOrderModal
+          order={{ ...o, id: o.ref }}
+          onClose={() => setShowEdit(false)}
+          onSaved={(u) => { setShowEdit(false); onEdited && onEdited(u); }}
+        />
+      )}
     </div>
   );
 }
@@ -1907,7 +1918,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
 
 // Staff modal: month calendar for delivery planning. Each day cell shows the
 // total yards scheduled; clicking a day lists that day's orders (with controls).
-function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onClose }) {
+function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onClose }) {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const todayKey = localToday();
@@ -1986,7 +1997,7 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onClose }
             {selOrders.length === 0 ? (
               <div className="text-white/40 text-sm py-4 text-center">No orders this day.</div>
             ) : (
-              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} />)
+              selOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={onStatus} onAssign={onAssign} onCancel={onCancel} onEdited={onEdited} />)
             )}
           </div>
         </div>
@@ -2366,7 +2377,7 @@ function DispatchApp({ email, onLogout }) {
     <div className="h-screen w-full" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
-        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onClose={() => setShowCal(false)} />
+        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onClose={() => setShowCal(false)} />
       )}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
@@ -2509,7 +2520,7 @@ function DispatchApp({ email, onLogout }) {
                     <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(todayYards)} CY scheduled today</span>
                     <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
                   </div>
-                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                  {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} />)}
                 </>
               )}
             </Panel>
@@ -2532,7 +2543,7 @@ function DispatchApp({ email, onLogout }) {
                           <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
                         </div>
                       </div>
-                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} />)}
+                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} />)}
                     </div>
                   );
                 })
