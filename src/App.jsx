@@ -1211,12 +1211,18 @@ function WeatherBar() {
     const load = async () => {
       try {
         const pt = await fetch(`https://api.weather.gov/points/${MAP_CENTER.lat},${MAP_CENTER.lng}`).then((r) => r.json());
-        const [fc, hourly] = await Promise.all([
+        const [fc, obs] = await Promise.all([
           fetch(pt.properties.forecast).then((r) => r.json()),
-          fetch(pt.properties.forecastHourly).then((r) => r.json()).catch(() => null),
+          // Real current conditions from the nearest station's latest observation.
+          (async () => {
+            try {
+              const sts = await fetch(pt.properties.observationStations).then((r) => r.json());
+              const st = sts.observationStations?.[0];
+              return st ? await fetch(`${st}/observations/latest`).then((r) => r.json()) : null;
+            } catch { return null; }
+          })(),
         ]);
         const periods = fc.properties.periods || [];
-        const now = hourly?.properties?.periods?.[0];
         // Build day cards: each daytime period + the following night for the low.
         const days = [];
         for (let i = 0; i < periods.length && days.length < 5; i++) {
@@ -1225,10 +1231,12 @@ function WeatherBar() {
           const night = periods[i + 1] && !periods[i + 1].isDaytime ? periods[i + 1] : null;
           days.push({ name: p.name, hi: p.temperature, lo: night ? night.temperature : null, text: p.shortForecast, day: true });
         }
+        const op = obs?.properties;
+        const curF = op && op.temperature?.value != null ? Math.round(op.temperature.value * 9 / 5 + 32) : null;
         if (alive) setWx({
-          tempF: now ? now.temperature : periods[0]?.temperature,
-          text: now ? now.shortForecast : periods[0]?.shortForecast,
-          day: now ? now.isDaytime : (periods[0]?.isDaytime ?? true),
+          tempF: curF != null ? curF : periods[0]?.temperature,
+          text: (curF != null && op.textDescription) ? op.textDescription : periods[0]?.shortForecast,
+          day: periods[0]?.isDaytime ?? true,
           days,
         });
       } catch { /* leave hidden */ }
