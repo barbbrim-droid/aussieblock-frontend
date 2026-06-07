@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v48";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v49";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 const RECOMMENDED_MIX = "3500 PSI";
@@ -2173,10 +2173,13 @@ function ManageTrucksModal({ onClose, onChanged }) {
 // Full-staff only; the board only renders the button for finance users.
 function ManageStaffModal({ onClose }) {
   const [staff, setStaff] = useState([]);
+  const [companies, setCompanies] = useState([]);   // customer names, for the "who they work for" suggestions
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [role, setRole] = useState("worker");
   const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");       // who they work for (pick a customer or type any name)
+  const [project, setProject] = useState("");       // their current project/job
   const [editing, setEditing] = useState(false);   // editing an existing login (locks the email field)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);            // { ok, text }
@@ -2189,19 +2192,24 @@ function ManageStaffModal({ onClose }) {
   const load = async () => {
     try { setStaff(await listStaff()); } catch (e) { setMsg({ ok: false, text: e.message }); }
   };
-  useEffect(() => { load(); getSmsEnabled().then((r) => setSmsAuto(!!r.enabled)).catch(() => {}); }, []);
+  useEffect(() => {
+    load();
+    getSmsEnabled().then((r) => setSmsAuto(!!r.enabled)).catch(() => {});
+    getCustomers().then((cs) => setCompanies(cs.map((c) => c.name))).catch(() => {});   // suggestions for "who they work for"
+  }, []);
 
-  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setEditing(false); };
+  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompany(""); setProject(""); setEditing(false); };
 
   const pick = (u) => {
     setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
+    setCompany(u.company || ""); setProject(u.project || "");
     setEditing(true); setMsg(null); setInvite(null);
   };
 
   const submit = async () => {
     setBusy(true); setMsg(null);
     try {
-      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim());
+      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), company.trim(), project.trim());
       const appUrl = window.location.origin;
       const roleWord = role === "staff" ? "the office dispatch board" : "the Aussieblock dispatch board";
       const text = `Hi, you've been set up on ${roleWord}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call 325-213-5315.`;
@@ -2269,6 +2277,9 @@ function ManageStaffModal({ onClose }) {
                       {u.email}
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "STAFF" : "WORKER"}</span>
                     </div>
+                    {(u.company || u.project) && (
+                      <div className="text-white/55 text-xs truncate flex items-center gap-1" style={{ fontFamily: C.body }}><Building2 size={11} color={ORANGE} /> {[u.company, u.project].filter(Boolean).join(" · ")}</div>
+                    )}
                     <div className="text-white/40 text-xs truncate flex items-center gap-1">{u.phone ? <><Phone size={11} /> {u.phone}</> : "No phone on file"}</div>
                   </button>
                   <button onClick={() => remove(u.email)} disabled={busy} title="Remove login" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
@@ -2292,8 +2303,11 @@ function ManageStaffModal({ onClose }) {
             </div>
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
             <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="password (min 6 characters)" autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-1"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">Workers see the board minus billing/account info. Add a cell to text them their login.</p>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-2"} style={inSt} />
+            <input value={company} onChange={(e) => setCompany(e.target.value)} list="staff-company-options" placeholder="who they work for (pick a customer or type any)" className={inCls + " mb-2"} style={inSt} />
+            <datalist id="staff-company-options">{companies.map((n) => <option key={n} value={n} />)}</datalist>
+            <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />
+            <p className="text-white/35 text-xs mb-2">Company & project are labels only — workers still see the whole board (no billing/account info). Add a cell to text them their login.</p>
             <button onClick={submit} disabled={busy || !email.trim() || pw.length < 6} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Reset password" : "Create login"}
             </button>

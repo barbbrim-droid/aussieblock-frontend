@@ -244,11 +244,11 @@ export function textInvite(customerId, message) {
 export function listStaff() {
   return request('/staff')
 }
-export function createStaff(email, password, role, phone) {
+export function createStaff(email, password, role, phone, company, project) {
   return request('/staff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role, phone }),
+    body: JSON.stringify({ email, password, role, phone, company, project }),
   })
 }
 export function deleteStaff(email) {
