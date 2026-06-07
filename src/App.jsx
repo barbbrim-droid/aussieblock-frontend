@@ -1918,7 +1918,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
   const selCust = customers.find((c) => c.id === customerId);
   const f = custFilter.trim().toLowerCase();
   const shown = f ? customers.filter((c) => c.name.toLowerCase().includes(f)).slice(0, 25) : [];
-  const canSubmit = customerId && site.trim() && spec.valid && date && !busy;
+  const canSubmit = customerId && site.trim() && spec.valid && date >= localToday() && !busy;
 
   const submit = async () => {
     setErr(""); setBusy(true);
