@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v34";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v35";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -2732,6 +2732,18 @@ function DispatchApp({ email, onLogout }) {
                 </>
               )}
             </Panel>
+            <Panel title="Completed" icon={CheckCircle2} count={completedOrders.length} fill>
+              {completedOrders.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No completed orders. Set an order to “complete” and it lands here to review or archive.</div>
+              ) : (
+                <>
+                  {completedOrders.slice(0, 50).map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} />)}
+                  {completedOrders.length > 50 && (
+                    <div className="text-white/40 text-xs text-center py-2" style={{ fontFamily: C.body }}>+{completedOrders.length - 50} more — archive to clear, or open “Past orders”.</div>
+                  )}
+                </>
+              )}
+            </Panel>
             <Panel title="Upcoming orders" icon={CalendarPlus} count={upcomingOrders.length} fill>
               {upcomingOrders.length === 0 ? (
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>Nothing scheduled ahead.</div>
@@ -2755,18 +2767,6 @@ function DispatchApp({ email, onLogout }) {
                     </div>
                   );
                 })
-              )}
-            </Panel>
-            <Panel title="Completed" icon={CheckCircle2} count={completedOrders.length} fill>
-              {completedOrders.length === 0 ? (
-                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No completed orders. Set an order to “complete” and it lands here to review or archive.</div>
-              ) : (
-                <>
-                  {completedOrders.slice(0, 50).map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} />)}
-                  {completedOrders.length > 50 && (
-                    <div className="text-white/40 text-xs text-center py-2" style={{ fontFamily: C.body }}>+{completedOrders.length - 50} more — archive to clear, or open “Past orders”.</div>
-                  )}
-                </>
               )}
             </Panel>
           </div>
