@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
@@ -524,8 +524,8 @@ function useConcreteSpec(initial) {
 
 // Customer-facing: place a concrete order from the app. Lands as "requested" for
 // staff to confirm.
-function OrderConcreteModal({ onClose, onPlaced }) {
-  const spec = useConcreteSpec();
+function OrderConcreteModal({ onClose, onPlaced, initial }) {
+  const spec = useConcreteSpec(initial);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [site, setSite] = useState("");
@@ -642,6 +642,92 @@ function EditOrderModal({ order, onClose, onSaved }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Concrete volume shapes — calc() returns cubic FEET from the entered dimensions.
+const CALC_SHAPES = [
+  { key: "Slab", fields: [["Length", "ft"], ["Width", "ft"], ["Thickness", "in"]], calc: (v) => v[0] * v[1] * (v[2] / 12) },
+  { key: "Wall", fields: [["Length", "ft"], ["Height", "ft"], ["Thickness", "in"]], calc: (v) => v[0] * v[1] * (v[2] / 12) },
+  { key: "Footing", fields: [["Length", "ft"], ["Width", "in"], ["Depth", "in"]], calc: (v) => v[0] * (v[1] / 12) * (v[2] / 12) },
+  { key: "Column", fields: [["Diameter", "in"], ["Height", "ft"]], calc: (v) => Math.PI * Math.pow((v[0] / 2) / 12, 2) * v[1] },
+];
+
+// Customer concrete estimator — enter dimensions, get cubic yards, then order it.
+function CalculatorScreen({ onPlaced }) {
+  const [shapeKey, setShapeKey] = useState("Slab");
+  const [vals, setVals] = useState({});
+  const [waste, setWaste] = useState(true);
+  const [showOrder, setShowOrder] = useState(false);
+  const shape = CALC_SHAPES.find((s) => s.key === shapeKey);
+
+  const nums = shape.fields.map(([label]) => parseFloat(vals[label]));
+  const valid = nums.every((n) => n > 0);
+  const cubicFt = valid ? shape.calc(nums) : 0;
+  const cy = cubicFt / 27;
+  const orderCy = valid ? Math.ceil((waste ? cy * 1.1 : cy) * 4) / 4 : 0;   // round up to 1/4 yd
+
+  const inCls = "w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
+
+  return (
+    <div className="px-4 pb-6 pt-2">
+      <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">Concrete estimator</h2>
+      <p className="text-white/45 text-sm mb-4" style={{ fontFamily: C.body }}>Enter your dimensions to estimate how many cubic yards you need.</p>
+
+      {/* shape */}
+      <div className="grid grid-cols-4 gap-2 mb-4">
+        {CALC_SHAPES.map((s) => {
+          const on = s.key === shapeKey;
+          return (
+            <button key={s.key} onClick={() => { setShapeKey(s.key); setVals({}); }} className="rounded-lg py-2 text-sm font-semibold active:scale-95 transition-transform"
+              style={{ background: on ? ORANGE + "22" : NAVY, border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.12)"}`, color: on ? ORANGE : "#fff", fontFamily: C.body }}>{s.key}</button>
+          );
+        })}
+      </div>
+
+      {/* dimensions */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        {shape.fields.map(([label, unit]) => (
+          <div key={label}>
+            <label className={lbl}>{label}</label>
+            <div className="flex items-center rounded-lg" style={inSt}>
+              <input type="number" min="0" step="any" value={vals[label] || ""} onChange={(e) => setVals((v) => ({ ...v, [label]: e.target.value }))} placeholder="0" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+              <span className="px-3 text-white/55 text-sm">{unit}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <label className="flex items-center gap-2 mb-4 cursor-pointer">
+        <input type="checkbox" checked={waste} onChange={(e) => setWaste(e.target.checked)} />
+        <span className="text-white/70 text-sm" style={{ fontFamily: C.body }}>Add 10% for waste & spillage (recommended)</span>
+      </label>
+
+      {/* result */}
+      <div className="rounded-2xl p-4 text-center mb-4" style={{ background: NAVY, border: `1px solid ${valid ? ORANGE : "rgba(255,255,255,0.1)"}` }}>
+        {valid ? (
+          <>
+            <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-4xl font-bold leading-none">{orderCy} <span className="text-xl">CY</span></div>
+            <div className="text-white/60 text-xs mt-1" style={{ fontFamily: C.body }}>recommended order{waste ? " · incl. 10% waste" : ""}</div>
+            <div className="text-white/35 text-[11px] mt-1" style={{ fontFamily: C.body }}>exact volume {cy.toFixed(2)} yd³ ({cubicFt.toFixed(1)} ft³)</div>
+            {orderCy > 0 && orderCy < 5 && (
+              <div className="mt-2 text-[11px] rounded-lg px-2 py-1.5" style={{ background: "rgba(231,115,42,0.12)", color: ORANGE, fontFamily: C.body }}>Orders under 5 yd³ carry a $200 short-load fee.</div>
+            )}
+          </>
+        ) : (
+          <div className="text-white/40 text-sm py-3" style={{ fontFamily: C.body }}>Enter all dimensions to see your estimate.</div>
+        )}
+      </div>
+
+      <button onClick={() => setShowOrder(true)} disabled={!valid} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+        <Plus size={18} /> Order {valid ? `${orderCy} CY` : "this concrete"}
+      </button>
+      <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>Estimate only — confirm coverage with your crew.</div>
+
+      {showOrder && <OrderConcreteModal initial={{ qty: `${orderCy} CY` }} onClose={() => setShowOrder(false)} onPlaced={() => { setShowOrder(false); onPlaced && onPlaced(); }} />}
     </div>
   );
 }
@@ -2276,7 +2362,7 @@ export default function App() {
     setMe(null); setOrders([]); setAccount(null); setActive(null); setScreen("home");
   };
 
-  const nav = [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "account", icon: User, label: "Account" }];
+  const nav = [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "account", icon: User, label: "Account" }];
 
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
@@ -2312,6 +2398,7 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} />
+            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} />
             : screen === "account" ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} />}
         </div>
