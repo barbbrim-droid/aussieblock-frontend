@@ -136,7 +136,7 @@ function PastOrderRow({ o, onOpen, onReorder }) {
     <div className="flex items-stretch gap-2 mb-2.5">
       <button onClick={() => onOpen(o)} className="flex-1 min-w-0 text-left rounded-2xl p-3 transition-transform active:scale-[0.98]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="flex items-center gap-2">
-          <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-xs font-bold tracking-wider">{o.id}</span>
+          <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-xs font-bold tracking-wider">{o.ref}</span>
           <span className="text-white/40 text-xs">·</span>
           <span className="text-white/55 text-xs">{formatOrderDate(o.when)}</span>
         </div>
@@ -158,7 +158,7 @@ function OrderCard({ o, onOpen, showCustomer, showPay = true }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.id}</span>
+            <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.ref}</span>
             <span className="text-white/40 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
             {o.truck && o.truck !== "—" && (<><span className="text-white/40 text-xs">·</span><span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span></>)}
@@ -241,8 +241,8 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   // Workers manage orders like a customer; only billing (canFinance) is hidden.
   const editable = ["requested", "scheduled"].includes(order.status);
   const cancelOrder = async () => {
-    if (!window.confirm(`Cancel order ${order.id}? This can't be undone.`)) return;
-    try { await deleteOrder(order.id); onChanged && onChanged(); onBack(); }
+    if (!window.confirm(`Cancel order ${order.ref}? This can't be undone.`)) return;
+    try { await deleteOrder(order.ref); onChanged && onChanged(); onBack(); }
     catch (e) { alert(e.message); }
   };
 
@@ -251,7 +251,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
     const w = window.open("", "_blank");
     setPayErr("");
     try {
-      const r = await getOrderPaymentStatus(order.id);
+      const r = await getOrderPaymentStatus(order.ref);
       if (r.link) { if (w) w.location = r.link; else window.location.href = r.link; }
       else { if (w) w.close(); setPayErr(r.prepaid ? "This order is already paid." : "Payment link isn't ready yet — Aussieblock is setting it up."); }
     } catch (e) { if (w) w.close(); setPayErr(e.message); }
@@ -264,7 +264,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
     let alive = true;
     const tick = async () => {
       try {
-        const fresh = await getOrder(order.id);
+        const fresh = await getOrder(order.ref);
         if (alive && fresh && typeof fresh.progress === "number") setProgress(fresh.progress);
         if (alive && fresh && fresh.truck_position) setPos(fresh.truck_position);
       } catch { /* ignore transient errors; keep last value */ }
@@ -272,7 +272,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
     tick();
     const iv = setInterval(tick, 4000);
     return () => { alive = false; clearInterval(iv); };
-  }, [order.id]);
+  }, [order.ref]);
 
   const etaMin = Math.max(0, Math.round((1 - progress) * 22));
   // Drive the status pill + timeline from the order's REAL status, so a scheduled
@@ -285,7 +285,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
     <div className="px-4 pb-6 pt-2">
       <button onClick={onBack} className="flex items-center gap-1 text-white/60 text-sm mb-3 active:opacity-60"><ChevronLeft size={18} /> Back</button>
       <div className="flex items-baseline justify-between">
-        <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{order.id}</span>
+        <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{order.ref}</span>
         <StatusPill status={order.status} />
       </div>
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.project || order.site}</h2>
@@ -337,7 +337,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>
 
       {order.has_batch_ticket ? (
-        <button onClick={() => openBatchTicket(order.id).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
+        <button onClick={() => openBatchTicket(order.ref).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
       ) : isLive ? (
         <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch ticket will appear here once it's uploaded.</div>
       ) : null}
@@ -655,7 +655,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
     try {
       let finalNotes = notes.trim();
       if (spec.shortNote) finalNotes = (finalNotes ? finalNotes + " — " : "") + spec.shortNote;
-      const o = await editOrder(order.id, { site: site.trim(), scheduled_for: date, time, notes: finalNotes, ...spec.build() });
+      const o = await editOrder(order.ref, { site: site.trim(), scheduled_for: date, time, notes: finalNotes, ...spec.build() });
       onSaved(o);
     } catch (e) { setErr(e.message); setBusy(false); }
   };
@@ -664,7 +664,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><FileText size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Modify order {order.id}</span></div>
+          <div className="flex items-center gap-2"><FileText size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Modify order {order.ref}</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
@@ -794,11 +794,11 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true, co
   const money = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const notifs = [];
   orders.filter((o) => o.prepay_required && !o.prepaid).forEach((o) =>
-    notifs.push({ key: "pay-" + o.id, Icon: CreditCard, color: ORANGE, title: `Payment due — ${o.id}`, sub: `${o.mix} · ${o.qty} — tap to pay`, order: o }));
+    notifs.push({ key: "pay-" + o.ref, Icon: CreditCard, color: ORANGE, title: `Payment due — ${o.ref}`, sub: `${o.mix} · ${o.qty} — tap to pay`, order: o }));
   orders.filter((o) => ["enroute", "onsite", "pouring"].includes(o.status)).forEach((o) =>
-    notifs.push({ key: "live-" + o.id, Icon: Truck, color: ORANGE_HOT, title: `${(STATUS_META[o.status] || {}).label || "On the way"} — ${o.id}`, sub: o.project || o.site, order: o }));
+    notifs.push({ key: "live-" + o.ref, Icon: Truck, color: ORANGE_HOT, title: `${(STATUS_META[o.status] || {}).label || "On the way"} — ${o.ref}`, sub: o.project || o.site, order: o }));
   orders.filter((o) => o.status === "requested").forEach((o) =>
-    notifs.push({ key: "req-" + o.id, Icon: Clock, color: "#6aa9ff", title: `Awaiting confirmation — ${o.id}`, sub: `${o.mix} · ${o.qty}`, order: o }));
+    notifs.push({ key: "req-" + o.ref, Icon: Clock, color: "#6aa9ff", title: `Awaiting confirmation — ${o.ref}`, sub: `${o.mix} · ${o.qty}`, order: o }));
   (account?.invoices || []).filter((i) => i.status === "overdue" || i.status === "due").forEach((i) =>
     notifs.push({ key: "inv-" + i.id, Icon: FileText, color: i.status === "overdue" ? "#ff8a85" : ORANGE, title: `Invoice ${money(i.amount)} ${i.status}`, sub: `Dated ${i.date} — see Account to pay` }));
   return (
@@ -825,16 +825,16 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true, co
       {orders.length === 0 && <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>No orders yet. Tap “Order Concrete” to request a delivery.</div>}
 
       {requested.length > 0 && <div className={hdr} style={{ color: "#6aa9ff" }}>Pending confirmation</div>}
-      {requested.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canFinance} />)}
+      {requested.map((o) => <OrderCard key={o.ref} o={o} onOpen={onOpen} showPay={canFinance} />)}
 
       {todayO.length > 0 && <div className={hdr + " mt-5"}>Today</div>}
-      {todayO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canFinance} />)}
+      {todayO.map((o) => <OrderCard key={o.ref} o={o} onOpen={onOpen} showPay={canFinance} />)}
 
       {upcomingO.length > 0 && <div className={hdr + " mt-5"}>Upcoming</div>}
-      {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} showPay={canFinance} />)}
+      {upcomingO.map((o) => <OrderCard key={o.ref} o={o} onOpen={onOpen} showPay={canFinance} />)}
 
       {completed.length > 0 && <div className={hdr + " mt-5"}>Past orders · tap “Again” to reorder</div>}
-      {completed.map((o) => <PastOrderRow key={o.id} o={o} onOpen={onOpen} onReorder={setReorder} />)}
+      {completed.map((o) => <PastOrderRow key={o.ref} o={o} onOpen={onOpen} onReorder={setReorder} />)}
 
       {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
       {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} />}
