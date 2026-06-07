@@ -2213,12 +2213,17 @@ export default function App() {
   useEffect(() => {
     const update = () => setVh(window.visualViewport?.height || window.innerHeight);
     update();
+    const t1 = setTimeout(update, 200);   // iOS Safari settles its toolbar after first paint
+    const t2 = setTimeout(update, 800);
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
+    window.addEventListener("load", update);
     window.visualViewport?.addEventListener("resize", update);
     return () => {
+      clearTimeout(t1); clearTimeout(t2);
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
+      window.removeEventListener("load", update);
       window.visualViewport?.removeEventListener("resize", update);
     };
   }, []);
