@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v54";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v55";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -773,7 +773,7 @@ function CalculatorScreen({ onPlaced }) {
   );
 }
 
-function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true }) {
+function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true, companyName }) {
   const [showOrder, setShowOrder] = useState(false);
   const [reorder, setReorder] = useState(null);   // a past order to "Order again"
   const [showNotifs, setShowNotifs] = useState(false);   // notifications panel
@@ -806,7 +806,7 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true }) 
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="text-white/45 text-sm" style={{ fontFamily: C.body }}>Welcome back</div>
-          <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">{account?.company || "Your account"}</h1>
+          <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">{account?.company || companyName || "Your account"}</h1>
           <p className="text-white/40 text-sm mt-0.5">{todayLabel}</p>
         </div>
         <button onClick={() => setShowNotifs(true)} title="Notifications" className="relative mt-1 active:scale-90 transition-transform">
@@ -3475,7 +3475,7 @@ export default function App() {
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canFinance={!isWorker} />
             : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} />
             : screen === "account" && !isWorker ? <AccountScreen account={account} customerId={me.customer_id} />
-            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canFinance={!isWorker} />}
+            : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canFinance={!isWorker} companyName={me.company} />}
         </div>
 
         {/* bottom nav */}
