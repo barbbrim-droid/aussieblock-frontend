@@ -116,6 +116,17 @@ export function deleteBatchTicket(ref) {
   return request(`/orders/${encodeURIComponent(ref)}/batch-ticket`, { method: 'DELETE' })
 }
 
+// Save the full delivered batch-ticket fields for an order (staff). `data` is a
+// plain object of every paper-ticket field. Returns the updated order (whose
+// `batch_data` now holds what was saved).
+export function saveBatchData(ref, data) {
+  return request(`/orders/${encodeURIComponent(ref)}/batch-data`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data }),
+  })
+}
+
 // Open an order's batch-ticket PDF (staff or owning customer). Fetches with the
 // auth token, then opens the PDF via a blob URL (works around no-auth <a href>).
 export async function openBatchTicket(ref) {

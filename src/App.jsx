@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -68,9 +68,12 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v50";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v51";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
+// Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
+// "Copy & open Google Messages" instead of a dead sms: link.
+const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
@@ -1801,6 +1804,15 @@ function toSmsNumber(contact) {
   return null;
 }
 
+// Desktop texting helper: copy the invite to the clipboard and open Google
+// Messages for web (paired to the dispatch phone) in a new tab — staff paste it
+// into a new text, sent from the dispatch number. Google's web app can't be
+// pre-filled with a recipient/body, so copy + open is the best we can do.
+function copyAndOpenMessages(text) {
+  try { navigator.clipboard?.writeText(text); } catch { /* ignore */ }
+  window.open("https://messages.google.com/web", "_blank", "noopener");
+}
+
 // Staff tool: create or reset the login a customer uses to see their own orders
 // & billing, then text them an invite. Lives in the dispatch board's right column.
 function CustomerLogins({ orders = [], trucks = [], onReordered }) {
@@ -2058,21 +2070,24 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
               ) : (
                 <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
               )
+            ) : !IS_MOBILE ? (
+              // Desktop/laptop: copy the message + open Google Messages for web.
+              <button onClick={() => { copyAndOpenMessages(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                <Send size={14} /> Copy & open Messages
+              </button>
+            ) : invite.sms ? (
+              // Phone: open the messaging app pre-filled.
+              <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                <Send size={14} /> Text invite
+              </a>
             ) : (
-              // Fallback: open the staff phone's messaging app.
-              invite.sms ? (
-                <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
-                  <Send size={14} /> Text invite
-                </a>
-              ) : (
-                <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
-              )
+              <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
             )}
             <button onClick={() => { navigator.clipboard?.writeText(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
               {copied ? <CheckCircle2 size={14} color={GREEN} /> : <Download size={14} />} {copied ? "Copied" : "Copy text"}
             </button>
           </div>
-          <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts the customer automatically from your business number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
+          <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts the customer automatically from your business number." : !IS_MOBILE ? "Copies the message and opens Google Messages (paired to your dispatch phone) — paste it into a new text. Sent from your dispatch number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
         </div>
       )}
     </Panel>
@@ -2337,20 +2352,22 @@ function ManageStaffModal({ onClose }) {
                   ) : (
                     <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
                   )
+                ) : !IS_MOBILE ? (
+                  <button onClick={() => { copyAndOpenMessages(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                    <Send size={14} /> Copy & open Messages
+                  </button>
+                ) : invite.sms ? (
+                  <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                    <Send size={14} /> Text invite
+                  </a>
                 ) : (
-                  invite.sms ? (
-                    <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
-                      <Send size={14} /> Text invite
-                    </a>
-                  ) : (
-                    <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
-                  )
+                  <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
                 )}
                 <button onClick={() => { navigator.clipboard?.writeText(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
                   {copied ? <CheckCircle2 size={14} color={GREEN} /> : <Download size={14} />} {copied ? "Copied" : "Copy text"}
                 </button>
               </div>
-              <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts them automatically from your business number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
+              <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts them automatically from your business number." : !IS_MOBILE ? "Copies the message and opens Google Messages (paired to your dispatch phone) — paste it into a new text. Sent from your dispatch number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
             </div>
           )}
         </div>
