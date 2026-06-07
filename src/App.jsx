@@ -1070,8 +1070,10 @@ function GoogleFleetMap({ trucks }) {
     loadGoogleMaps().then((maps) => {
       if (cancelled || !elRef.current || mapRef.current) return;
       mapRef.current = new maps.Map(elRef.current, {
-        center: { lat: PLANT.lat, lng: PLANT.lng }, zoom: 12,
-        disableDefaultUI: true, zoomControl: true, styles: MAP_DARK_STYLE,
+        center: { lat: PLANT.lat, lng: PLANT.lng }, zoom: 14,
+        mapTypeId: maps.MapTypeId.HYBRID,   // satellite imagery + road/labels
+        disableDefaultUI: true, zoomControl: true, mapTypeControl: true,
+        styles: MAP_DARK_STYLE,
       });
       new maps.Marker({
         position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Yard — 2951 E FM 2105, San Angelo",
