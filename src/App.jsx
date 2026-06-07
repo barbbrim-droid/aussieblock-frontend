@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v36";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v37";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -1690,7 +1690,7 @@ function StatTile({ icon: Icon, label, value, accent }) {
 // body — used by the single-screen dispatch dashboard so the page never scrolls.
 function Panel({ title, icon: Icon, count, children, fill = false }) {
   return (
-    <div className={"rounded-2xl p-4" + (fill ? " flex flex-col min-h-0 h-full" : "")} style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className={"rounded-2xl p-4 min-w-0" + (fill ? " flex flex-col min-h-0 h-full" : "")} style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <Icon size={16} color={ORANGE} />
         <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold">{title}</h2>
@@ -2693,7 +2693,7 @@ function DispatchApp({ email, onLogout }) {
 
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               Fleet (map) gets the most width; the two order columns are narrower. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-3">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
