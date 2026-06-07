@@ -576,6 +576,9 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
               <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
               <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
             </div>
+            {date && date < localToday() && (
+              <div className="rounded-lg px-3 py-2 mb-3 text-xs font-semibold" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85", fontFamily: C.body }}>Delivery date can’t be in the past — pick today or later.</div>
+            )}
 
             <label className={lbl}>Notes (optional)</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
