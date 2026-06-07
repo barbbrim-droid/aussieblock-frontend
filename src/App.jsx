@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v18";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v19";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -696,7 +696,7 @@ function CalculatorScreen({ onPlaced }) {
 
   return (
     <div className="px-4 pb-6 pt-2">
-      <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">Concrete estimator</h2>
+      <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">Concrete Estimator</h2>
       <p className="text-white/45 text-sm mb-4" style={{ fontFamily: C.body }}>Enter your dimensions to estimate how many cubic yards you need.</p>
 
       {/* shape */}
