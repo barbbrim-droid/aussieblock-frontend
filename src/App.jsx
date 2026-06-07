@@ -2026,8 +2026,9 @@ function DispatchApp({ email, onLogout }) {
             <StatTile icon={Navigation} label="Trucks moving" value={`${movingTrucks}/${trucks.length}`} accent={GREEN} />
           </div>
 
-          {/* main columns — fill the screen; each scrolls inside so the page doesn't */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {/* main columns — fill the screen; each scrolls inside so the page doesn't.
+              Fleet (map) gets the most width; the two order columns are narrower. */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.7fr_1fr_1fr] gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
