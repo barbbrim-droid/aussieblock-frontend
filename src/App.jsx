@@ -573,7 +573,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
             <AddressInput value={site} onChange={setSite} placeholder="Start typing the delivery address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+              <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
               <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
             </div>
 
@@ -631,7 +631,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
           <label className={lbl}>Job site</label>
           <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
             <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
           <label className={lbl}>Notes (optional)</label>
@@ -1990,7 +1990,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
           {spec.fields}
 
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
             <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
 
