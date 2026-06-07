@@ -1,0 +1,15 @@
+{
+  "name": "Aussieblock Dispatch",
+  "short_name": "Dispatch",
+  "description": "Aussieblock ready-mix dispatch board — orders, fleet, and new-order alerts.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c1117",
+  "theme_color": "#0c1117",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

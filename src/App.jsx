@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v9";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v10";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -2140,6 +2140,33 @@ function DispatchApp({ email, onLogout }) {
     try { localStorage.setItem("ab_sound", "1"); } catch { /* private mode */ }
   };
 
+  // Installed-app (PWA) support. When the board runs as an installed app the
+  // browser allows the alarm to sound WITHOUT a click, so we arm it on mount and
+  // never show the "tap to resume" prompt. `installPrompt` holds the browser's
+  // deferred install event so the "Install app" button can trigger it.
+  const isStandalone = typeof window !== "undefined" &&
+    ((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true);
+  const [installPrompt, setInstallPrompt] = useState(null);
+
+  useEffect(() => {
+    if (isStandalone) { unlockAudio(); setSoundOn(true); }   // installed → sound works without a click
+  }, [isStandalone]);
+
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => { window.removeEventListener("beforeinstallprompt", onPrompt); window.removeEventListener("appinstalled", onInstalled); };
+  }, []);
+
+  const promptInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    try { await installPrompt.userChoice; } catch { /* dismissed */ }
+    setInstallPrompt(null);
+  };
+
   // Ask for desktop-notification permission once.
   useEffect(() => {
     if (window.Notification && Notification.permission === "default") Notification.requestPermission().catch(() => {});
@@ -2316,6 +2343,11 @@ function DispatchApp({ email, onLogout }) {
               <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><CalendarPlus size={14} color={ORANGE_HOT} /><span className="text-white/55">Scheduled</span><span className="text-white font-bold">{upcomingOrders.length}</span></span>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
+              {installPrompt && (
+                <button onClick={promptInstall} title="Install the dispatch board as an app so order alerts sound without a click" className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                  <Download size={16} /> Install app
+                </button>
+              )}
               <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <KeyRound size={16} color={ORANGE} /> Customers
               </button>
