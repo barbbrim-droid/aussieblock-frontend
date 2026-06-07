@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v42";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v43";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -1774,7 +1774,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
 
   const pick = (c) => {
     setSel(c.id);
-    setEmailVal(c.login_email || "");
+    setEmailVal(c.login_email || c.email || "");   // pre-fill with the QuickBooks email when no login yet
     setPw("");
     setMsg(null);
     setInvite(null);
