@@ -99,10 +99,11 @@ export function setOrderArchived(ref, archived = true) {
 }
 
 // Upload a batch-ticket PDF for an order (staff). Returns the updated order.
-export async function uploadBatchTicket(ref, file) {
+export async function uploadBatchTicket(ref, file, variant = 'view') {
   const fd = new FormData()
   fd.append('file', file)
-  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket`, {
+  const q = variant === 'print' ? '?variant=print' : ''
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket${q}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
     body: fd,
@@ -129,8 +130,9 @@ export function saveBatchData(ref, data) {
 
 // Open an order's batch-ticket PDF (staff or owning customer). Fetches with the
 // auth token, then opens the PDF via a blob URL (works around no-auth <a href>).
-export async function openBatchTicket(ref) {
-  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket`, {
+export async function openBatchTicket(ref, variant = 'view') {
+  const q = variant === 'print' ? '?variant=print' : ''
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket${q}`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   })
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }

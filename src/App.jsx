@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
@@ -1871,6 +1871,11 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
               <button onClick={() => openBatchTicket(o.ref).catch((e) => setErr(e.message))} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: GREEN, background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
                 <FileText size={12} /> Batch ticket
               </button>
+              {o.has_print_ticket && (
+                <button onClick={() => openBatchTicket(o.ref, "print").catch((e) => setErr(e.message))} title="Open the printer-friendly (light) version" className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: ORANGE, background: ORANGE + "1a", border: `1px solid ${ORANGE}55`, fontFamily: C.body }}>
+                  <Printer size={12} /> Print
+                </button>
+              )}
               <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
                 {busy ? <Loader2 size={12} className="animate-spin" /> : "Replace"}
               </button>
