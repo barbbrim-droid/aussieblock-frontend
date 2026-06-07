@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v19";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v20";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -589,7 +589,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
             {spec.fields}
 
             <label className={lbl}>Job site</label>
-            <AddressInput value={site} onChange={setSite} placeholder="Start typing the delivery address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
+            <AddressInput value={site} onChange={setSite} placeholder="Type address or business name" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
@@ -651,7 +651,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
           {spec.fields}
           <label className={lbl}>Job site</label>
-          <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
+          <AddressInput value={site} onChange={setSite} placeholder="Type address or business name" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
             <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
@@ -2104,7 +2104,7 @@ function NewOrderModal({ trucks, onClose, onCreated }) {
           )}
 
           <label className={lbl}>Job site</label>
-          <AddressInput value={site} onChange={setSite} placeholder="Start typing the address…" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
+          <AddressInput value={site} onChange={setSite} placeholder="Type address or business name" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
 
           {spec.fields}
 
