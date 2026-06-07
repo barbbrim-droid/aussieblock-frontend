@@ -258,7 +258,7 @@ ${row("Notes", order.notes)}
   };
 
   return (
-    <div className="px-4 pb-24 pt-2">
+    <div className="px-4 pb-6 pt-2">
       <button onClick={onBack} className="flex items-center gap-1 text-white/60 text-sm mb-3 active:opacity-60"><ChevronLeft size={18} /> Back</button>
       <div className="flex items-baseline justify-between">
         <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{order.id}</span>
@@ -650,7 +650,7 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
   const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const hdr = "text-white/50 text-xs font-semibold uppercase tracking-widest mb-2";
   return (
-    <div className="px-4 pb-24 pt-2">
+    <div className="px-4 pb-6 pt-2">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="text-white/45 text-sm" style={{ fontFamily: C.body }}>Welcome back</div>
@@ -748,7 +748,7 @@ ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class=
   };
 
   return (
-    <div className="px-4 pb-24 pt-2">
+    <div className="px-4 pb-6 pt-2">
       <h1 style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mb-4">Account</h1>
 
       {/* customer identity */}
@@ -2167,11 +2167,11 @@ export default function App() {
   if (loading) return <Splash label="Loading your orders…" />;
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4" style={{ background: "#0c1117" }}>
+    <div className="w-full min-h-[100dvh] flex justify-center sm:items-center sm:p-4" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
-      <div className="w-full max-w-sm rounded-[2.2rem] overflow-hidden shadow-2xl relative" style={{ background: NAVY_DEEP, fontFamily: C.body, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="w-full sm:max-w-sm h-[100dvh] sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden rounded-none sm:rounded-[2.2rem] sm:shadow-2xl sm:border sm:border-white/10" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {/* brand header */}
-        <div className="px-4 pt-3 pb-3" style={{ background: ORANGE }}>
+        <div className="px-4 pt-3 pb-3 shrink-0" style={{ background: ORANGE }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <Roo size={34} />
@@ -2188,19 +2188,19 @@ export default function App() {
         </div>
 
         {loadError && (
-          <div className="px-4 py-2.5 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85", fontFamily: C.body }}>
+          <div className="px-4 py-2.5 text-xs shrink-0" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85", fontFamily: C.body }}>
             Couldn’t load data: {loadError}
           </div>
         )}
 
-        <div className="min-h-[600px]">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} />
             : screen === "account" ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} />}
         </div>
 
         {/* bottom nav */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-around py-3" style={{ background: NAVY, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="shrink-0 flex items-center justify-around py-3" style={{ background: NAVY, borderTop: "1px solid rgba(255,255,255,0.06)", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
           {nav.map(({ k, icon: Icon, label }) => {
             const on = screen === k;
             return (
