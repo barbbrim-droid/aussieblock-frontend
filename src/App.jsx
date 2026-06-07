@@ -21,7 +21,7 @@ input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: poin
    (100svh) so the bottom tab bar stays above the mobile browser toolbar. */
 html, body, #root { height: 100%; }
 html { overflow: hidden; }
-body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; }
+body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
@@ -2369,12 +2369,18 @@ export default function App() {
     window.addEventListener("orientationchange", update);
     window.addEventListener("load", update);
     window.visualViewport?.addEventListener("resize", update);
+    // Block iOS pinch-zoom (it ignores user-scalable=no) — keeps the app native-feeling.
+    const noZoom = (e) => e.preventDefault();
+    document.addEventListener("gesturestart", noZoom);
+    document.addEventListener("gesturechange", noZoom);
     return () => {
       clearTimeout(t1); clearTimeout(t2);
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
       window.removeEventListener("load", update);
       window.visualViewport?.removeEventListener("resize", update);
+      document.removeEventListener("gesturestart", noZoom);
+      document.removeEventListener("gesturechange", noZoom);
     };
   }, []);
 
