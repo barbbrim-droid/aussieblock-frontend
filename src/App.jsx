@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v46";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v47";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
@@ -2143,6 +2143,177 @@ function ManageTrucksModal({ onClose, onChanged }) {
   );
 }
 
+// Staff modal: add/reset/remove office logins — workers (concrete crew / TxDOT
+// engineers, no financials) and full staff — then text them their invite. Mirrors
+// the customer-login flow (ManageTrucksModal layout + CustomerLogins invite box).
+// Full-staff only; the board only renders the button for finance users.
+function ManageStaffModal({ onClose }) {
+  const [staff, setStaff] = useState([]);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [role, setRole] = useState("worker");
+  const [phone, setPhone] = useState("");
+  const [editing, setEditing] = useState(false);   // editing an existing login (locks the email field)
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);            // { ok, text }
+  const [invite, setInvite] = useState(null);      // { email, phone, sms, text } after create
+  const [smsAuto, setSmsAuto] = useState(false);   // app can send texts itself (Twilio)
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const load = async () => {
+    try { setStaff(await listStaff()); } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  useEffect(() => { load(); getSmsEnabled().then((r) => setSmsAuto(!!r.enabled)).catch(() => {}); }, []);
+
+  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setEditing(false); };
+
+  const pick = (u) => {
+    setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
+    setEditing(true); setMsg(null); setInvite(null);
+  };
+
+  const submit = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim());
+      const appUrl = window.location.origin;
+      const roleWord = role === "staff" ? "the office dispatch board" : "the Aussieblock dispatch board";
+      const text = `Hi, you've been set up on ${roleWord}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Questions? Call 325-213-5315.`;
+      setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
+      setSent(false); setCopied(false);
+      setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
+      setPw("");
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (target) => {
+    if (!window.confirm(`Remove the login for ${target}? They won't be able to sign in.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      await deleteStaff(target);
+      setMsg({ ok: true, text: `Login removed for ${target}.` });
+      if (email.trim().toLowerCase() === target) reset();
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendText = async () => {
+    setSending(true);
+    try {
+      const r = await staffTextInvite(invite.email, invite.text);
+      setSent(true);
+      setMsg({ ok: true, text: `Text sent to ${invite.email} (${r.to}).` });
+    } catch (e) {
+      setMsg({ ok: false, text: `Couldn't send: ${e.message}` });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const inCls = "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><User size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Workers &amp; staff</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {/* current logins */}
+          <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Office logins ({staff.length}) — tap to reset</div>
+          {staff.length === 0 ? (
+            <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ background: NAVY, borderRadius: 12 }}>No logins yet — add your first below.</div>
+          ) : (
+            <div className="mb-4">
+              {staff.map((u) => (
+                <div key={u.email} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: `1px solid ${editing && email.trim().toLowerCase() === u.email ? ORANGE : "rgba(255,255,255,0.06)"}` }}>
+                  <button onClick={() => pick(u)} className="min-w-0 flex-1 text-left">
+                    <div className="text-white text-sm font-semibold truncate flex items-center gap-2" style={{ fontFamily: C.cond }}>
+                      {u.email}
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "STAFF" : "WORKER"}</span>
+                    </div>
+                    <div className="text-white/40 text-xs truncate flex items-center gap-1">{u.phone ? <><Phone size={11} /> {u.phone}</> : "No phone on file"}</div>
+                  </button>
+                  <button onClick={() => remove(u.email)} disabled={busy} title="Remove login" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
+                    <Trash2 size={15} color="#ff8a85" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* add / reset form */}
+          <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{editing ? `Reset ${email}` : "Add a login"}</div>
+              {editing && <button onClick={reset} className="text-xs font-semibold" style={{ color: ORANGE, fontFamily: C.body }}>+ New</button>}
+            </div>
+            {/* role toggle */}
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — no financials</button>
+              <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Full staff</button>
+            </div>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
+            <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="password (min 6 characters)" autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-1"} style={inSt} />
+            <p className="text-white/35 text-xs mb-2">Workers see the board minus billing/account info. Add a cell to text them their login.</p>
+            <button onClick={submit} disabled={busy || !email.trim() || pw.length < 6} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Reset password" : "Create login"}
+            </button>
+          </div>
+
+          {msg && (
+            <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>
+          )}
+
+          {invite && (
+            <div className="rounded-xl p-3 mt-2" style={{ background: NAVY, border: `1px solid ${ORANGE}` }}>
+              <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Send the invite to {invite.email}</div>
+              <div className="text-white/45 text-xs mb-2" style={{ fontFamily: C.body }}>Phone on file: {invite.phone || "none"}</div>
+              <div className="flex gap-2">
+                {smsAuto ? (
+                  invite.sms ? (
+                    <button onClick={sendText} disabled={sending || sent} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-60" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                      {sending ? <Loader2 size={14} className="animate-spin" /> : sent ? <CheckCircle2 size={14} /> : <Send size={14} />} {sent ? "Sent" : sending ? "Sending…" : "Send text"}
+                    </button>
+                  ) : (
+                    <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
+                  )
+                ) : (
+                  invite.sms ? (
+                    <a href={`sms:${invite.sms}?body=${encodeURIComponent(invite.text)}`} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+                      <Send size={14} /> Text invite
+                    </a>
+                  ) : (
+                    <div className="flex-1 rounded-lg py-2 text-center text-xs text-white/40" style={{ fontFamily: C.body }}>No phone on file</div>
+                  )
+                )}
+                <button onClick={() => { navigator.clipboard?.writeText(invite.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="flex-1 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+                  {copied ? <CheckCircle2 size={14} color={GREEN} /> : <Download size={14} />} {copied ? "Copied" : "Copy text"}
+                </button>
+              </div>
+              <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts them automatically from your business number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Staff modal: month calendar for delivery planning. Each day cell shows the
 // total yards scheduled; clicking a day lists that day's orders (with controls).
 // Staff "Past orders" history modal — completed orders, most recent first, each
@@ -2504,6 +2675,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [showPast, setShowPast] = useState(false);   // "Past orders" modal
   const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
+  const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
@@ -2672,6 +2844,7 @@ function DispatchApp({ email, role, onLogout }) {
           </div>
         </div>
       )}
+      {showStaff && <ManageStaffModal onClose={() => setShowStaff(false)} />}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
@@ -2741,6 +2914,11 @@ function DispatchApp({ email, role, onLogout }) {
               {canFinance && (
                 <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                   <KeyRound size={16} color={ORANGE} /> Customers
+                </button>
+              )}
+              {canFinance && (
+                <button onClick={() => setShowStaff(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                  <User size={16} color={ORANGE} /> Workers
                 </button>
               )}
               <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>

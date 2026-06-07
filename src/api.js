@@ -234,6 +234,33 @@ export function textInvite(customerId, message) {
     body: JSON.stringify({ message }),
   })
 }
+
+// Office logins — workers (concrete crew / TxDOT engineers) and full staff.
+// All four are full-staff only (require_finance). listStaff() returns
+// [{email, role, phone}]; createStaff() creates OR resets a login (role 'staff'
+// = full access, 'worker' = orders/tracking, no financials); deleteStaff()
+// revokes one; staffTextInvite() texts that login its invite (same texting
+// service / sms-fallback as the customer invite).
+export function listStaff() {
+  return request('/staff')
+}
+export function createStaff(email, password, role, phone) {
+  return request('/staff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, role, phone }),
+  })
+}
+export function deleteStaff(email) {
+  return request(`/staff/${encodeURIComponent(email)}`, { method: 'DELETE' })
+}
+export function staffTextInvite(email, message) {
+  return request(`/staff/${encodeURIComponent(email)}/text-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  })
+}
 export function handlePlusLoad(requestId) {
   return request(`/dispatch/plus-loads/${requestId}/handle`, { method: 'POST' })
 }
