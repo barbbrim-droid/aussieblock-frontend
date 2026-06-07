@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v44";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v45";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -859,6 +859,7 @@ function AccountScreen({ account, customerId }) {
   // Track which invoice (if any) we're fetching a pay link for, plus any error.
   const [paying, setPaying] = useState(null);
   const [payErr, setPayErr] = useState("");
+  const [showStatement, setShowStatement] = useState(false);   // in-app statement overlay (always closable)
 
   if (!account) {
     return <div className="px-4 pt-10 text-center text-white/50" style={{ fontFamily: C.body }}>No billing account is linked to this login.</div>;
@@ -917,6 +918,7 @@ ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class=
 <tbody>${rows || `<tr><td colspan="5" class="muted">No invoices on file.</td></tr>`}</tbody>
 <tfoot><tr><td colspan="4" class="r"><strong>Total</strong></td><td class="r"><strong>${usd(total)}</strong></td></tr></tfoot></table>
 <button onclick="window.print()">Print / Save as PDF</button>
+<button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
 <div class="muted" style="margin-top:22px;">Questions? Aussieblock office &middot; 325-213-5315</div></body></html>`);
     w.document.close();
   };
@@ -981,7 +983,7 @@ ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class=
       {/* invoices */}
       <div className="flex items-center justify-between mt-5 mb-2">
         <span className="text-white/50 text-xs font-semibold uppercase tracking-widest">Invoices</span>
-        <button onClick={openStatement} className="flex items-center gap-1 text-xs active:opacity-60" style={{ color: ORANGE, fontFamily: C.body }}><Download size={12} /> Statement</button>
+        <button onClick={() => setShowStatement(true)} className="flex items-center gap-1 text-xs active:opacity-60" style={{ color: ORANGE, fontFamily: C.body }}><Download size={12} /> Statement</button>
       </div>
       {invoices.map((inv) => {
         const m = INV_STATUS[inv.status] || INV_STATUS.due;
@@ -1025,6 +1027,46 @@ ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class=
           <div className="text-white text-sm" style={{ fontFamily: C.body }}>Aussieblock office · 325-213-5315</div>
         </div>
       </div>
+
+      {showStatement && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto" style={{ background: "rgba(0,0,0,0.75)" }} onClick={() => setShowStatement(false)}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden my-4" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+              <div className="flex items-center gap-2"><FileText size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Account Statement</span></div>
+              <button onClick={() => setShowStatement(false)} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+            </div>
+            <div className="p-5" style={{ fontFamily: C.body }}>
+              <div className="text-white font-bold" style={{ fontFamily: C.cond }}>{account.company}</div>
+              <div className="text-white/45 text-xs">Account {account.acctNo || "—"} · Terms {account.terms || "—"}</div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="rounded-xl p-3" style={{ background: NAVY }}><div className="text-white/45 text-[11px] uppercase tracking-wide">Current balance</div><div className="text-white text-xl font-bold mt-0.5" style={{ fontFamily: C.cond }}>{usd(outstanding)}</div></div>
+                {pastDue > 0 && <div className="rounded-xl p-3" style={{ background: "rgba(239,83,80,0.12)" }}><div className="text-[11px] uppercase tracking-wide" style={{ color: "#ff8a85" }}>Past due</div><div className="text-xl font-bold mt-0.5" style={{ color: "#ff8a85", fontFamily: C.cond }}>{usd(pastDue)}</div></div>}
+              </div>
+              <div className="text-white/50 text-xs font-semibold uppercase tracking-widest mt-4 mb-2">Invoices</div>
+              <div className="max-h-[40vh] overflow-y-auto -mr-1 pr-1">
+                {invoices.length === 0 ? (
+                  <div className="text-white/40 text-sm py-3 text-center">No invoices on file.</div>
+                ) : invoices.map((inv) => {
+                  const m = INV_STATUS[inv.status] || INV_STATUS.due;
+                  return (
+                    <div key={inv.id} className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div className="min-w-0">
+                        <div className="text-white text-sm truncate">{inv.id}{inv.order ? ` · ${inv.order}` : ""}</div>
+                        <div className="text-white/40 text-xs">{inv.date || ""} · <span style={{ color: m.color }}>{m.label}</span></div>
+                      </div>
+                      <div className="text-white text-sm font-semibold shrink-0 ml-2">{usd(inv.amount)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button onClick={openStatement} className="flex-1 rounded-xl py-2.5 flex items-center justify-center gap-2 text-sm font-semibold text-white active:scale-95" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><Download size={15} /> Print / Save PDF</button>
+                <button onClick={() => setShowStatement(false)} className="flex-1 rounded-xl py-2.5 text-sm font-bold active:scale-95" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
