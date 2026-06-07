@@ -1993,7 +1993,11 @@ function DispatchApp({ email, onLogout }) {
         <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-5 py-3 gap-3">
           {/* title + actions */}
           <div className="flex items-center justify-between shrink-0 gap-2">
-            <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight shrink-0">Dispatch board</h1>
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight">Dispatch board</h1>
+              <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><Package size={14} color={ORANGE} /><span className="text-white/55">Today</span><span className="text-white font-bold">{todayOrders.length}</span></span>
+              <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><CalendarPlus size={14} color={ORANGE_HOT} /><span className="text-white/55">Scheduled</span><span className="text-white font-bold">{upcomingOrders.length}</span></span>
+            </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <KeyRound size={16} color={ORANGE} /> Customers
@@ -2018,13 +2022,6 @@ function DispatchApp({ email, onLogout }) {
               Couldn’t load dispatch data: {err}
             </div>
           )}
-
-          {/* stat tiles */}
-          <div className="grid grid-cols-3 gap-3 shrink-0">
-            <StatTile icon={Package} label="Today's orders" value={todayOrders.length} accent={ORANGE} />
-            <StatTile icon={CalendarPlus} label="Scheduled orders" value={upcomingOrders.length} accent={ORANGE_HOT} />
-            <StatTile icon={Navigation} label="Trucks moving" value={`${movingTrucks}/${trucks.length}`} accent={GREEN} />
-          </div>
 
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               Fleet (map) gets the most width; the two order columns are narrower. */}
