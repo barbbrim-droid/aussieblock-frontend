@@ -958,7 +958,7 @@ function PlusLoadCard({ r, onHandle, busy }) {
 // backend config — the origin the mock GPS orbits trucks around. The fleet map
 // below is schematic (a fixed window around the plant), not a street map; swap
 // in a real basemap once the One Step GPS key is live and positions are real.
-const PLANT = { lat: 31.4421, lng: -100.4503 };
+const PLANT = { lat: 31.420597, lng: -100.393333 };   // 2951 E FM 2105, San Angelo, TX
 const MAP_SPAN = 0.025;   // degrees shown each way from the plant (~2.7 km)
 
 // Project a lat/lng into the SVG viewBox (W×H) with padding. Longitude → x
@@ -1074,7 +1074,7 @@ function GoogleFleetMap({ trucks }) {
         disableDefaultUI: true, zoomControl: true, styles: MAP_DARK_STYLE,
       });
       new maps.Marker({
-        position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Plant / Yard",
+        position: { lat: PLANT.lat, lng: PLANT.lng }, map: mapRef.current, title: "Yard — 2951 E FM 2105, San Angelo",
         icon: { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: ORANGE, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
         label: { text: "Yard", color: "#e7732a", fontSize: "11px", fontWeight: "700" },
       });
