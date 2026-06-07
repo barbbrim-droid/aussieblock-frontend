@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -1297,6 +1297,20 @@ function CustomerLogins() {
     }
   };
 
+  const runAging = async () => {
+    if (!window.confirm("Flag every customer with an unpaid balance 30+ days old as COD?")) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await codFromAging(30);
+      await load();
+      setMsg({ ok: true, text: r.newly_flagged.length ? `Flagged ${r.newly_flagged.length} new COD customer(s) (30+ day balances).` : "No new customers to flag — all 30+ day balances are already COD." });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const f = filter.trim().toLowerCase();
   const codCount = customers.filter((c) => c.cod).length;
   const shown = customers
@@ -1322,6 +1336,7 @@ function CustomerLogins() {
       <div className="flex items-center gap-2 mb-2">
         <button onClick={() => setCodOnly(false)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: codOnly ? NAVY : "#6aa9ff22", color: codOnly ? "rgba(255,255,255,0.5)" : "#6aa9ff", border: `1px solid ${codOnly ? "rgba(255,255,255,0.12)" : "#6aa9ff"}`, fontFamily: C.body }}>All</button>
         <button onClick={() => setCodOnly(true)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: codOnly ? "#6aa9ff22" : NAVY, color: codOnly ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${codOnly ? "#6aa9ff" : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>COD only ({codCount})</button>
+        <button onClick={runAging} disabled={busy} className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full active:scale-95 disabled:opacity-50" style={{ background: "#6aa9ff22", color: "#6aa9ff", border: "1px solid #6aa9ff", fontFamily: C.body }}>Auto-COD 30+ day balances</button>
       </div>
 
       {/* customer list */}

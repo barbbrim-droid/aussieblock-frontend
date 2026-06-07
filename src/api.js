@@ -93,6 +93,10 @@ export function editOrder(ref, order) {
     body: JSON.stringify(order),
   })
 }
+// Flag every customer with an unpaid balance >= `days` days old as COD (staff).
+export function codFromAging(days = 30) {
+  return request(`/customers/cod-from-aging?days=${days}`, { method: 'POST' })
+}
 // COD: mark a customer pay-before-delivery on/off (staff only).
 export function setCustomerCod(customerId, cod) {
   return request(`/customers/${customerId}/cod`, {
