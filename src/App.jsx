@@ -19,9 +19,9 @@ input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: poin
 /* Lock the page to the viewport so only inner areas scroll — no full-page
    rubber-band/bounce on phones. Pin the body and size it to the *small* viewport
    (100svh) so the bottom tab bar stays above the mobile browser toolbar. */
-html, #root { height: 100%; }
+html, body, #root { height: 100%; }
 html { overflow: hidden; }
-body { margin: 0; position: fixed; top: 0; left: 0; right: 0; height: 100vh; height: var(--app-h, 100svh); overflow: hidden; overscroll-behavior: none; }
+body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
@@ -2206,15 +2206,21 @@ export default function App() {
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
+  // Real visible height in px (works on every browser, incl. in-app webviews and
+  // ones without svh) so the app fits exactly and the bottom tabs stay in view.
+  const [vh, setVh] = useState(() => (typeof window !== "undefined" ? (window.visualViewport?.height || window.innerHeight) : 0));
 
-  // Pin the app to the actual visible height (works on every browser, incl. ones
-  // without svh support and in-app webviews) so the bottom tabs stay in view.
   useEffect(() => {
-    const setH = () => document.documentElement.style.setProperty("--app-h", window.innerHeight + "px");
-    setH();
-    window.addEventListener("resize", setH);
-    window.addEventListener("orientationchange", setH);
-    return () => { window.removeEventListener("resize", setH); window.removeEventListener("orientationchange", setH); };
+    const update = () => setVh(window.visualViewport?.height || window.innerHeight);
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    window.visualViewport?.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      window.visualViewport?.removeEventListener("resize", update);
+    };
   }, []);
 
   // On first load, check whether a saved token is still valid.
@@ -2273,7 +2279,7 @@ export default function App() {
   if (loading) return <Splash label="Loading your orders…" />;
 
   return (
-    <div className="w-full h-full flex justify-center sm:items-center sm:p-4" style={{ background: "#0c1117" }}>
+    <div className="w-full flex justify-center sm:items-center sm:p-4 overflow-hidden" style={{ height: vh ? `${vh}px` : "100dvh", background: "#0c1117" }}>
       <style>{FONT}</style>
       <div className="w-full sm:max-w-sm h-full sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden rounded-none sm:rounded-[2.2rem] sm:shadow-2xl sm:border sm:border-white/10" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {/* brand header */}
