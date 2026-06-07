@@ -21,7 +21,7 @@ input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: poin
    (100svh) so the bottom tab bar stays above the mobile browser toolbar. */
 html, #root { height: 100%; }
 html { overflow: hidden; }
-body { margin: 0; position: fixed; top: 0; left: 0; right: 0; height: 100vh; height: 100svh; overflow: hidden; overscroll-behavior: none; }
+body { margin: 0; position: fixed; top: 0; left: 0; right: 0; height: 100vh; height: var(--app-h, 100svh); overflow: hidden; overscroll-behavior: none; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
@@ -2206,6 +2206,16 @@ export default function App() {
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
+
+  // Pin the app to the actual visible height (works on every browser, incl. ones
+  // without svh support and in-app webviews) so the bottom tabs stay in view.
+  useEffect(() => {
+    const setH = () => document.documentElement.style.setProperty("--app-h", window.innerHeight + "px");
+    setH();
+    window.addEventListener("resize", setH);
+    window.addEventListener("orientationchange", setH);
+    return () => { window.removeEventListener("resize", setH); window.removeEventListener("orientationchange", setH); };
+  }, []);
 
   // On first load, check whether a saved token is still valid.
   useEffect(() => {
