@@ -1072,7 +1072,7 @@ function GoogleFleetMap({ trucks }) {
     loadGoogleMaps().then((maps) => {
       if (cancelled || !elRef.current || mapRef.current) return;
       mapRef.current = new maps.Map(elRef.current, {
-        center: MAP_CENTER, zoom: 10,   // San Angelo, ~30-mile radius
+        center: MAP_CENTER, zoom: 11,   // San Angelo, ~15-mile radius
         mapTypeId: maps.MapTypeId.HYBRID,   // satellite imagery + road/labels
         disableDefaultUI: true, zoomControl: true, mapTypeControl: true,
         styles: MAP_DARK_STYLE,
