@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v24";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v25";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -114,6 +114,27 @@ function StatusPill({ status }) {
     <span style={{ background: m.color + "22", color: m.color, fontFamily: C.body }} className="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide uppercase">
       {m.label}
     </span>
+  );
+}
+
+// Compact past/completed order row: tap the left to view it, or "Again" to
+// reorder it in one tap. (Separate buttons, not nested.)
+function PastOrderRow({ o, onOpen, onReorder }) {
+  return (
+    <div className="flex items-stretch gap-2 mb-2.5">
+      <button onClick={() => onOpen(o)} className="flex-1 min-w-0 text-left rounded-2xl p-3 transition-transform active:scale-[0.98]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-xs font-bold tracking-wider">{o.id}</span>
+          <span className="text-white/40 text-xs">·</span>
+          <span className="text-white/55 text-xs">{formatOrderDate(o.when)}</span>
+        </div>
+        <div style={{ fontFamily: C.cond }} className="text-white text-base font-semibold leading-tight mt-0.5 truncate">{o.project || o.site}</div>
+        <div className="text-white/45 text-xs mt-0.5 truncate">{o.mix} · {o.qty}</div>
+      </button>
+      <button onClick={() => onReorder(o)} title="Order this again" className="shrink-0 rounded-2xl px-3 flex flex-col items-center justify-center gap-0.5 font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+        <Plus size={16} /><span className="text-[11px]">Again</span>
+      </button>
+    </div>
   );
 }
 
@@ -767,11 +788,15 @@ function CalculatorScreen({ onPlaced }) {
 
 function OrdersScreen({ orders, account, onOpen, onPlaced }) {
   const [showOrder, setShowOrder] = useState(false);
+  const [reorder, setReorder] = useState(null);   // a past order to "Order again"
   const todayKey = localToday();
   const requested = orders.filter((o) => o.status === "requested");
-  const confirmed = orders.filter((o) => o.status !== "requested");
-  const todayO = confirmed.filter((o) => orderDay(o.when, todayKey) === "today");
-  const upcomingO = confirmed.filter((o) => orderDay(o.when, todayKey) === "upcoming");
+  // Completed orders go to their own "Past orders" history (most recent first),
+  // so they don't clutter the live lists but stay easy to reorder.
+  const completed = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  const active = orders.filter((o) => o.status !== "requested" && o.status !== "complete");
+  const todayO = active.filter((o) => orderDay(o.when, todayKey) === "today");
+  const upcomingO = active.filter((o) => orderDay(o.when, todayKey) === "upcoming");
   const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const hdr = "text-white/50 text-xs font-semibold uppercase tracking-widest mb-2";
   return (
@@ -801,7 +826,11 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
       {upcomingO.length > 0 && <div className={hdr + " mt-5"}>Upcoming</div>}
       {upcomingO.map((o) => <OrderCard key={o.id} o={o} onOpen={onOpen} />)}
 
+      {completed.length > 0 && <div className={hdr + " mt-5"}>Past orders · tap “Again” to reorder</div>}
+      {completed.map((o) => <PastOrderRow key={o.id} o={o} onOpen={onOpen} onReorder={setReorder} />)}
+
       {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
+      {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} />}
     </div>
   );
 }
