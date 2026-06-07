@@ -2068,21 +2068,35 @@ function orderExtras(o) {
   return [o.slump ? `${o.slump} slump` : "", o.admixtures].filter(Boolean).join(" · ");
 }
 
-// Short chime for a new order request (Web Audio — no asset needed).
+// One shared audio context, unlocked on the first user interaction (browsers
+// block sound until then). orderChime() then plays an attention chime.
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) _audioCtx = new Ctx();
+  }
+  return _audioCtx;
+}
+function unlockAudio() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+}
 function orderChime() {
   try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new Ctx();
-    [880, 1175].forEach((freq, i) => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const start = ctx.currentTime + 0.02;
+    [880, 1175, 1568].forEach((freq, i) => {   // ascending 3-tone alert
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = freq;
-      const t = ctx.currentTime + i * 0.18;
+      o.connect(g); g.connect(ctx.destination); o.type = "triangle"; o.frequency.value = freq;
+      const t = start + i * 0.16;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-      o.start(t); o.stop(t + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      o.start(t); o.stop(t + 0.16);
     });
-    setTimeout(() => { try { ctx.close(); } catch {} }, 600);
   } catch { /* audio blocked — banner + notification still show */ }
 }
 function desktopNotify(o) {
@@ -2109,6 +2123,14 @@ function DispatchApp({ email, onLogout }) {
   // Ask for desktop-notification permission once.
   useEffect(() => {
     if (window.Notification && Notification.permission === "default") Notification.requestPermission().catch(() => {});
+  }, []);
+
+  // Unlock audio on the first interaction so the new-order chime can play.
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
   }, []);
 
   // Detect new customer-placed ("requested") orders between polls → chime + notify.
@@ -2256,6 +2278,9 @@ function DispatchApp({ email, onLogout }) {
               </button>
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
                 <CalendarPlus size={16} /> New order
+              </button>
+              <button onClick={() => { unlockAudio(); orderChime(); }} title="Test new-order sound" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+                <Bell size={16} color={ORANGE} />
               </button>
               <button onClick={refresh} title="Refresh now" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
                 <RefreshCw size={16} color={ORANGE} />
