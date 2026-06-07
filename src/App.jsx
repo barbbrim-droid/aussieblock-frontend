@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v6";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v7";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -2092,14 +2092,15 @@ function orderChime() {
     if (!ctx) return;
     const play = () => {
       const start = ctx.currentTime + 0.05;
-      [880, 1175, 1568].forEach((freq, i) => {   // ascending 3-tone alert
+      // Alternating two-tone alarm (a "new order!" buzzer), more attention-grabbing.
+      [988, 740, 988, 740, 988, 740].forEach((freq, i) => {
         const o = ctx.createOscillator(), g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination); o.type = "triangle"; o.frequency.value = freq;
-        const t = start + i * 0.16;
+        o.connect(g); g.connect(ctx.destination); o.type = "square"; o.frequency.value = freq;
+        const t = start + i * 0.2;
         g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.5, t + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-        o.start(t); o.stop(t + 0.18);
+        g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        o.start(t); o.stop(t + 0.2);
       });
     };
     // Schedule the tones only once the context is actually running, or they play silently.
@@ -2153,6 +2154,13 @@ function DispatchApp({ email, onLogout }) {
       fresh.forEach(desktopNotify);
     }
   }, [orders]);
+
+  // Keep sounding the alarm every 90s while there are unacknowledged order requests.
+  useEffect(() => {
+    if (!alerts.length) return;
+    const id = setInterval(() => orderChime(), 90000);
+    return () => clearInterval(id);
+  }, [alerts.length]);
 
   // Pull orders + fleet at once, reusing the existing endpoints.
   const refresh = async () => {
