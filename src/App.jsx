@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v29";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v30";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -789,6 +789,7 @@ function CalculatorScreen({ onPlaced }) {
 function OrdersScreen({ orders, account, onOpen, onPlaced }) {
   const [showOrder, setShowOrder] = useState(false);
   const [reorder, setReorder] = useState(null);   // a past order to "Order again"
+  const [showNotifs, setShowNotifs] = useState(false);   // notifications panel
   const todayKey = localToday();
   const requested = orders.filter((o) => o.status === "requested");
   // Completed orders go to their own "Past orders" history (most recent first),
@@ -799,6 +800,20 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
   const upcomingO = active.filter((o) => orderDay(o.when, todayKey) === "upcoming");
   const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const hdr = "text-white/50 text-xs font-semibold uppercase tracking-widest mb-2";
+
+  // Notifications: things needing the customer's attention, built from their own
+  // orders + account (no backend). The bell shows the count; tapping an order
+  // alert opens it (Track), where they can pay / track / get the ticket.
+  const money = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const notifs = [];
+  orders.filter((o) => o.prepay_required && !o.prepaid).forEach((o) =>
+    notifs.push({ key: "pay-" + o.id, Icon: CreditCard, color: ORANGE, title: `Payment due — ${o.id}`, sub: `${o.mix} · ${o.qty} — tap to pay`, order: o }));
+  orders.filter((o) => o.status === "enroute" || o.status === "onsite").forEach((o) =>
+    notifs.push({ key: "live-" + o.id, Icon: Truck, color: ORANGE_HOT, title: `${o.status === "onsite" ? "On site" : "On the way"} — ${o.id}`, sub: o.project || o.site, order: o }));
+  orders.filter((o) => o.status === "requested").forEach((o) =>
+    notifs.push({ key: "req-" + o.id, Icon: Clock, color: "#6aa9ff", title: `Awaiting confirmation — ${o.id}`, sub: `${o.mix} · ${o.qty}`, order: o }));
+  (account?.invoices || []).filter((i) => i.status === "overdue" || i.status === "due").forEach((i) =>
+    notifs.push({ key: "inv-" + i.id, Icon: FileText, color: i.status === "overdue" ? "#ff8a85" : ORANGE, title: `Invoice ${money(i.amount)} ${i.status}`, sub: `Dated ${i.date} — see Account to pay` }));
   return (
     <div className="px-4 pb-6 pt-2">
       <div className="flex items-start justify-between mb-4">
@@ -807,7 +822,12 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
           <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight">{account?.company || "Your account"}</h1>
           <p className="text-white/40 text-sm mt-0.5">{todayLabel}</p>
         </div>
-        <Bell size={20} className="text-white/60 mt-1" />
+        <button onClick={() => setShowNotifs(true)} title="Notifications" className="relative mt-1 active:scale-90 transition-transform">
+          <Bell size={22} className="text-white/70" />
+          {notifs.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: "#ff4d4d", color: "#fff", fontFamily: C.body }}>{notifs.length}</span>
+          )}
+        </button>
       </div>
 
       <button onClick={() => setShowOrder(true)} className="w-full rounded-2xl py-3.5 mb-5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
@@ -831,6 +851,34 @@ function OrdersScreen({ orders, account, onOpen, onPlaced }) {
 
       {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
       {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} />}
+
+      {showNotifs && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setShowNotifs(false)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden max-h-[80vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+              <div className="flex items-center gap-2"><Bell size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Notifications</span></div>
+              <button onClick={() => setShowNotifs(false)} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+            </div>
+            <div className="p-4 overflow-y-auto" style={{ fontFamily: C.body }}>
+              {notifs.length === 0 ? (
+                <div className="text-center py-10">
+                  <CheckCircle2 size={30} color={GREEN} className="mx-auto mb-2" />
+                  <div className="text-white/60 text-sm">You're all caught up.</div>
+                </div>
+              ) : notifs.map((n) => (
+                <button key={n.key} onClick={() => { if (n.order) { setShowNotifs(false); onOpen(n.order); } }} className="w-full text-left flex items-center gap-3 rounded-xl p-3 mb-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <n.Icon size={18} color={n.color} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{n.title}</div>
+                    {n.sub && <div className="text-white/45 text-xs truncate">{n.sub}</div>}
+                  </div>
+                  {n.order && <ChevronRight size={16} className="text-white/30 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
