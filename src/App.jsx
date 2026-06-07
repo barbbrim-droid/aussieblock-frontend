@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun6-v14";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun6-v15";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
@@ -1469,9 +1469,9 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited }) {
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span>
           </div>
-          <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.site}</div>
+          <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.project || o.site}</div>
+          {o.project && <div className="text-white/45 text-xs mt-0.5 truncate flex items-center gap-1"><MapPin size={12} /> {o.site}</div>}
           <div className="text-white/50 text-sm mt-0.5 truncate">{o.customer} · {o.mix}</div>
-          {o.project && <div className="text-white/40 text-xs mt-0.5 truncate">Project: {o.project}</div>}
           {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
           {o.use_for && <div className="text-white/40 text-xs mt-0.5 truncate">For: {o.use_for}</div>}
           {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
