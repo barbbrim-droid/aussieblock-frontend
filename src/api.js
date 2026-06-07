@@ -111,6 +111,11 @@ export async function uploadBatchTicket(ref, file) {
   return res.json()
 }
 
+// Remove an order's batch-ticket PDF (staff). Returns the updated order.
+export function deleteBatchTicket(ref) {
+  return request(`/orders/${encodeURIComponent(ref)}/batch-ticket`, { method: 'DELETE' })
+}
+
 // Open an order's batch-ticket PDF (staff or owning customer). Fetches with the
 // auth token, then opens the PDF via a blob URL (works around no-auth <a href>).
 export async function openBatchTicket(ref) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, setOrderArchived, logout, isLoggedIn } from "./api";
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -62,7 +62,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v35";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v36";   // bump on each deploy to verify clients aren't cached
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast"];
@@ -1605,6 +1605,9 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
               </button>
               <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
                 {busy ? <Loader2 size={12} className="animate-spin" /> : "Replace"}
+              </button>
+              <button onClick={async () => { if (!window.confirm(`Remove the batch ticket for ${o.ref}?`)) return; setBusy(true); setErr(""); try { onEdited && onEdited(await deleteBatchTicket(o.ref)); } catch (ex) { setErr(ex.message); } finally { setBusy(false); } }} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#ff8a85", background: "rgba(239,83,80,0.1)", fontFamily: C.body }}>
+                <Trash2 size={12} /> Remove
               </button>
             </>
           ) : (
