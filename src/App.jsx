@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -424,14 +424,14 @@ function parseSpec(o = {}) {
   const uf = o.use_for || "";
   const useFor = !uf ? "" : (USES.includes(uf) ? uf : "Other");
   const useOther = useFor === "Other" ? uf : "";
-  const admix = []; let extraSet = "1 hr", fiberExtra = "", colorDetail = "";
+  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "";
   String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
     if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
-    else if (p.startsWith("Fiber")) { admix.push("Fiber"); const m = p.match(/([\d.]+)\s*lbs/); if (m) { const t = parseFloat(m[1]); if (t > 3) fiberExtra = String(t - 3); } }
+    else if (p.startsWith("Fiber")) { admix.push("Fiber"); const m = p.match(/([\d.]+)\s*lbs/); if (m) { const t = parseFloat(m[1]); if (t && t !== 3) fiberLbs = m[1]; } }
     else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
     else if (p === "Accelerant") admix.push("Accelerant");
   });
-  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberExtra, colorDetail, project: o.project || "" };
+  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, colorDetail, project: o.project || "" };
 }
 
 function useConcreteSpec(initial) {
@@ -443,7 +443,7 @@ function useConcreteSpec(initial) {
   const [slump, setSlump] = useState(p.slump);
   const [admix, setAdmix] = useState(p.admix);
   const [extraSet, setExtraSet] = useState(p.extraSet);
-  const [fiberExtra, setFiberExtra] = useState(p.fiberExtra);
+  const [fiberLbs, setFiberLbs] = useState(p.fiberLbs);
   const [colorDetail, setColorDetail] = useState(p.colorDetail);
   const [project, setProject] = useState(p.project);
   const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
@@ -461,7 +461,7 @@ function useConcreteSpec(initial) {
     admixtures: admix.map((a) => {
       if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
-      if (a === "Fiber") { const x = parseFloat(fiberExtra); return x > 0 ? `Fiber: ${3 + x} lbs/yd` : "Fiber: 3 lbs/yd"; }
+      if (a === "Fiber") { const x = parseFloat(fiberLbs); return x > 0 ? `Fiber: ${x} lbs/yd` : "Fiber: 3 lbs/yd"; }
       return a;
     }),
     project: project.trim(),
@@ -541,9 +541,9 @@ function useConcreteSpec(initial) {
       )}
       {admix.includes("Fiber") && (
         <div className="mb-3">
-          <label className={lbl}>Fiber — extra lbs/yd (standard is 3)</label>
+          <label className={lbl}>Fiber — lbs/yd (3 is standard)</label>
           <div className="flex items-center rounded-lg" style={inSt}>
-            <input type="number" min="0" step="0.5" value={fiberExtra} onChange={(e) => setFiberExtra(e.target.value)} placeholder="0 (just the standard 3)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <input type="number" min="0" step="0.5" value={fiberLbs} onChange={(e) => setFiberLbs(e.target.value)} placeholder="3 (standard)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
             <span className="px-3 text-white/55 text-sm">lbs/yd</span>
           </div>
         </div>
@@ -1563,47 +1563,16 @@ function WeatherBar() {
   );
 }
 
-// COD controls shown on a prepay-required order row: pull the customer's open
-// QuickBooks invoice as the pay link, send it, and check whether it's been paid.
-// The amount comes from that invoice — staff don't enter one.
+// COD notice shown on a COD order row: this just FLAGS that the customer is COD
+// so dispatch sends a payment request to the office, who generates the invoice in
+// QuickBooks. No pay link / charge happens here — billing is handled by the office.
 function CodControls({ o }) {
-  const [link, setLink] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [paid, setPaid] = useState(!!o.prepaid);
-
-  if (paid) return <div className="mt-2 text-xs font-semibold flex items-center gap-1" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={13} /> Prepaid — cleared for dispatch</div>;
-
-  const charge = async () => {
-    setBusy(true); setMsg("");
-    try {
-      const r = await chargeOrder(o.ref);
-      if (r.link) { setLink(r.link); setMsg(`Pay link ready${r.amount ? ` for ${usd(r.amount)}` : ""} — send it to the customer.`); }
-      else { setMsg(`Invoice #${r.doc_number} found in QuickBooks (no email on file for a link). Collect payment there — unlocks when paid.`); }
-    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
-  };
-  const check = async () => {
-    setBusy(true); setMsg("");
-    try {
-      const r = await getOrderPaymentStatus(o.ref);
-      if (r.prepaid) setPaid(true);
-      else { setMsg(`Not paid yet${r.balance != null ? ` — balance ${usd(r.balance)}` : ""}.`); if (r.link) setLink(r.link); }
-    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
-  };
+  if (o.prepaid) return <div className="mt-2 text-xs font-semibold flex items-center gap-1" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={13} /> Paid — invoice settled</div>;
 
   return (
     <div className="mt-2 rounded-lg p-2.5" style={{ background: "rgba(106,169,255,0.1)", border: "1px solid rgba(106,169,255,0.4)" }}>
-      <div className="text-xs font-semibold mb-1.5" style={{ color: "#6aa9ff", fontFamily: C.body }}>COD — payment required before dispatch</div>
-      <div className="text-[11px] text-white/55 mb-2" style={{ fontFamily: C.body }}>Pulls the customer's open QuickBooks invoice — the amount comes from there.</div>
-      <button onClick={charge} disabled={busy} className="w-full rounded-lg py-2 text-sm font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{busy ? "…" : "Get pay link"}</button>
-      {link && (
-        <div className="flex gap-2 mt-2">
-          <a href={link} target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg py-1.5 text-xs font-semibold" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>Open pay link</a>
-          <button onClick={() => { navigator.clipboard?.writeText(link); setMsg("Link copied."); }} className="flex-1 rounded-lg py-1.5 text-xs font-semibold text-white active:scale-95" style={{ border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>Copy link</button>
-        </div>
-      )}
-      <button onClick={check} disabled={busy} className="w-full mt-2 text-xs font-semibold py-1 active:opacity-70" style={{ color: "#6aa9ff", fontFamily: C.body }}>{busy ? "…" : "Check if paid"}</button>
-      {msg && <div className="text-[11px] mt-1 text-white/60" style={{ fontFamily: C.body }}>{msg}</div>}
+      <div className="text-xs font-semibold mb-1 flex items-center gap-1.5" style={{ color: "#6aa9ff", fontFamily: C.body }}><CreditCard size={13} /> COD customer</div>
+      <div className="text-[11px] text-white/60" style={{ fontFamily: C.body }}>Send a payment request to the office so they can generate an invoice for this order.</div>
     </div>
   );
 }
@@ -2921,7 +2890,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
           <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
             <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "#6aa9ff22" }}><CreditCard size={26} color="#6aa9ff" /></div>
             <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>Order {created.ref} created</div>
-            <div className="text-xs font-semibold mb-3" style={{ color: "#6aa9ff" }}>{created.customer} is COD — collect payment before this order can be dispatched.</div>
+            <div className="text-xs font-semibold mb-3" style={{ color: "#6aa9ff" }}>{created.customer} is COD — send a payment request to the office to generate an invoice.</div>
             <CodControls o={created} />
             <button onClick={() => onCreated(created)} className="w-full mt-4 rounded-xl py-2.5 font-bold active:scale-[0.98]" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>Done</button>
             <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>You can also do this later from the order on the board.</div>
@@ -2938,7 +2907,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
                 </span>
                 <button onClick={() => { setCustomerId(null); setCustFilter(""); }} className="text-xs shrink-0 ml-2" style={{ color: ORANGE }}>change</button>
               </div>
-              {selCust.cod && <div className="mt-1.5 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5" style={{ background: "#6aa9ff1a", color: "#6aa9ff", fontFamily: C.body }}><CreditCard size={13} /> COD customer — payment required before this order can be dispatched.</div>}
+              {selCust.cod && <div className="mt-1.5 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5" style={{ background: "#6aa9ff1a", color: "#6aa9ff", fontFamily: C.body }}><CreditCard size={13} /> COD customer — send a payment request to the office to generate an invoice.</div>}
             </div>
           ) : (
             <div className="mb-3">
