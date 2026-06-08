@@ -1913,7 +1913,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
 
   // Batch ticket (PDF) upload — allowed once the order is batched+.
   const fileRef = useRef(null);
-  const batchable = ["batched", "enroute", "onsite", "pouring", "complete"].includes(o.status);
+  const batchable = ["batched", "enroute", "onsite", "pouring", "returning", "complete"].includes(o.status);
   const onPickTicket = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";   // let them re-pick the same file later
