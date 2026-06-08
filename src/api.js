@@ -117,6 +117,36 @@ export function deleteBatchTicket(ref) {
   return request(`/orders/${encodeURIComponent(ref)}/batch-ticket`, { method: 'DELETE' })
 }
 
+// ── Knowledge Center (shared PDF library) ──
+// getDocs lists the library (any login). uploadDoc/deleteDoc are operator-only.
+// openDoc fetches with the bearer token and opens the PDF via a blob URL.
+export function getDocs() {
+  return request('/docs')
+}
+export async function uploadDoc(title, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${API_BASE}/docs?title=${encodeURIComponent(title)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+export async function openDoc(id) {
+  const res = await fetch(`${API_BASE}/docs/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url; a.target = '_blank'; a.rel = 'noopener'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+export function deleteDoc(id) {
+  return request(`/docs/${id}`, { method: 'DELETE' })
+}
+
 // Save the full delivered batch-ticket fields for an order (staff). `data` is a
 // plain object of every paper-ticket field. Returns the updated order (whose
 // `batch_data` now holds what was saved).

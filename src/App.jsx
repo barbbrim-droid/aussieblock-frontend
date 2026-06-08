@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -769,6 +769,44 @@ function CalculatorScreen({ onPlaced }) {
       <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>Estimate only — confirm coverage with your crew.</div>
 
       {showOrder && <OrderConcreteModal initial={{ qty: `${orderCy} CY` }} onClose={() => setShowOrder(false)} onPlaced={() => { setShowOrder(false); onPlaced && onPlaced(); }} />}
+    </div>
+  );
+}
+
+// Knowledge Center — the shared PDF library (guides, spec sheets, safety). Read-
+// only here; the office uploads/removes from the dispatch board. Shown to every
+// company-side login (workers + admins).
+function KnowledgeScreen() {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let alive = true;
+    getDocs()
+      .then((d) => { if (alive) { setDocs(d); setLoading(false); } })
+      .catch((e) => { if (alive) { setErr(e.message); setLoading(false); } });
+    return () => { alive = false; };
+  }, []);
+  return (
+    <div className="px-4 pb-6 pt-2">
+      <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mb-1">Knowledge Center</h1>
+      <p className="text-white/45 text-sm mb-4" style={{ fontFamily: C.body }}>Guides, spec sheets &amp; safety docs from Aussieblock.</p>
+      {loading ? (
+        <div className="text-white/40 text-sm py-8 text-center" style={{ fontFamily: C.body }}>Loading…</div>
+      ) : err ? (
+        <div className="text-sm py-3 rounded-lg px-3" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>
+      ) : docs.length === 0 ? (
+        <div className="text-white/40 text-sm py-10 text-center" style={{ fontFamily: C.body }}>No documents yet — check back soon.</div>
+      ) : docs.map((d) => (
+        <button key={d.id} onClick={() => openDoc(d.id).catch((e) => alert(e.message))} className="w-full text-left rounded-2xl p-4 mb-3 flex items-center gap-3 transition-transform active:scale-[0.98]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="shrink-0 rounded-xl p-2.5" style={{ background: ORANGE + "22" }}><FileText size={20} color={ORANGE} /></div>
+          <div className="min-w-0 flex-1">
+            <div className="text-white text-base font-semibold leading-tight truncate" style={{ fontFamily: C.cond }}>{d.title}</div>
+            <div className="text-white/40 text-xs mt-0.5" style={{ fontFamily: C.body }}>PDF · tap to open</div>
+          </div>
+          <Download size={18} className="text-white/40 shrink-0" />
+        </button>
+      ))}
     </div>
   );
 }
@@ -2572,6 +2610,78 @@ function ManageStaffModal({ onClose }) {
   );
 }
 
+// Staff modal: manage the Knowledge Center — upload PDFs (title + file) and
+// remove them. The library is shared; every worker/admin sees it in their app.
+function ManageDocsModal({ onClose }) {
+  const [docs, setDocs] = useState([]);
+  const [title, setTitle] = useState("");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const fileRef = useRef(null);
+
+  const load = async () => { try { setDocs(await getDocs()); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  useEffect(() => { load(); }, []);
+
+  const upload = async () => {
+    if (!title.trim() || !file) { setMsg({ ok: false, text: "Add a title and choose a PDF." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      await uploadDoc(title.trim(), file);
+      setMsg({ ok: true, text: `Uploaded "${title.trim()}".` });
+      setTitle(""); setFile(null); if (fileRef.current) fileRef.current.value = "";
+      await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (d) => {
+    if (!window.confirm(`Remove "${d.title}" from the Knowledge Center?`)) return;
+    setBusy(true); setMsg(null);
+    try { await deleteDoc(d.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const inCls = "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><BookOpen size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Knowledge Center</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Library ({docs.length}) — visible to all workers &amp; admins</div>
+          {docs.length === 0 ? (
+            <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ background: NAVY, borderRadius: 12 }}>No documents yet — add your first below.</div>
+          ) : (
+            <div className="mb-4">
+              {docs.map((d) => (
+                <div key={d.id} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <button onClick={() => openDoc(d.id).catch((e) => alert(e.message))} className="min-w-0 flex-1 text-left flex items-center gap-2">
+                    <FileText size={15} color={ORANGE} className="shrink-0" />
+                    <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{d.title}</span>
+                  </button>
+                  <button onClick={() => remove(d)} disabled={busy} title="Remove" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}><Trash2 size={15} color="#ff8a85" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Add a document (PDF)</div>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Concrete Safety Sheet)" className={inCls + " mb-2"} style={inSt} />
+            <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full text-xs text-white/70 mb-2 file:mr-3 file:rounded-lg file:border-0 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:bg-white/10 file:text-white" style={{ fontFamily: C.body }} />
+            <button onClick={upload} disabled={busy || !title.trim() || !file} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Upload</button>
+          </div>
+          {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Staff modal: month calendar for delivery planning. Each day cell shows the
 // total yards scheduled; clicking a day lists that day's orders (with controls).
 // Staff "Past orders" history modal — completed orders, most recent first, each
@@ -2974,6 +3084,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showPast, setShowPast] = useState(false);   // "Past orders" modal
   const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
+  const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
@@ -3143,6 +3254,7 @@ function DispatchApp({ email, role, onLogout }) {
         </div>
       )}
       {showStaff && <ManageStaffModal onClose={() => setShowStaff(false)} />}
+      {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
@@ -3219,6 +3331,9 @@ function DispatchApp({ email, role, onLogout }) {
                   <User size={16} color={ORANGE} /> Workers
                 </button>
               )}
+              <button onClick={() => setShowDocs(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <BookOpen size={16} color={ORANGE} /> Knowledge
+              </button>
               <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <CalendarDays size={16} color={ORANGE} /> Calendar
               </button>
@@ -3445,8 +3560,8 @@ export default function App() {
   // get the full nav including Account.
   const isWorker = me?.role === "worker";
   const nav = isWorker
-    ? [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }]
-    : [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "account", icon: User, label: "Account" }];
+    ? [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "docs", icon: BookOpen, label: "Docs" }]
+    : [{ k: "home", icon: List, label: "Orders" }, { k: "track", icon: MapPin, label: "Track" }, { k: "calc", icon: Calculator, label: "Estimate" }, { k: "docs", icon: BookOpen, label: "Docs" }, { k: "account", icon: User, label: "Account" }];
 
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
@@ -3482,6 +3597,7 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canFinance={!isWorker} />
+            : screen === "docs" ? <KnowledgeScreen />
             : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} />
             : screen === "account" && !isWorker ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canFinance={!isWorker} companyName={me.company} />}
