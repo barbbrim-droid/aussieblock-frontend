@@ -153,6 +153,34 @@ function PastOrderRow({ o, onOpen, onReorder }) {
   );
 }
 
+// Compact row for the dispatch board's Completed column — completed orders are
+// just reference, so we skip the full controls. One line of summary + Archive
+// (clear it off the board). Full details/batch ticket live under "Past orders".
+function CompletedRow({ o, onArchived }) {
+  const [busy, setBusy] = useState(false);
+  const archive = async () => {
+    setBusy(true);
+    try { onArchived(await setOrderArchived(o.ref, true)); }
+    catch (e) { alert(e.message); setBusy(false); }
+  };
+  return (
+    <div className="flex items-stretch gap-2 mb-1.5">
+      <div className="flex-1 min-w-0 rounded-xl px-2.5 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 size={12} color={GREEN} className="shrink-0" />
+          <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-xs font-bold tracking-wider">{o.ref}</span>
+          <span className="text-white/30 text-xs">·</span>
+          <span className="text-white/50 text-xs truncate">{formatOrderDate(o.when)}</span>
+        </div>
+        <div className="text-white/70 text-xs mt-0.5 truncate" style={{ fontFamily: C.body }}>{o.customer} · {o.mix} · {o.qty}</div>
+      </div>
+      <button onClick={archive} disabled={busy} title="Archive — clear from the board" className="shrink-0 rounded-xl px-2.5 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}>
+        <Inbox size={14} />
+      </button>
+    </div>
+  );
+}
+
 function OrderCard({ o, onOpen, showCustomer, showPay = true }) {
   return (
     <button onClick={() => onOpen(o)} className="w-full text-left rounded-2xl p-4 mb-3 transition-transform active:scale-[0.98]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -3383,8 +3411,9 @@ function DispatchApp({ email, role, onLogout }) {
           )}
 
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
-              Fleet (map) gets the most width; the two order columns are narrower. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              Today's orders gets the most room (it's where the day's work happens);
+              Completed + Upcoming are kept narrow as reference columns. */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
@@ -3431,7 +3460,7 @@ function DispatchApp({ email, role, onLogout }) {
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No completed orders. Set an order to “complete” and it lands here to review or archive.</div>
               ) : (
                 <>
-                  {completedOrders.slice(0, 50).map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} />)}
+                  {completedOrders.slice(0, 50).map((o) => <CompletedRow key={o.ref} o={o} onArchived={applyOrder} />)}
                   {completedOrders.length > 50 && (
                     <div className="text-white/40 text-xs text-center py-2" style={{ fontFamily: C.body }}>+{completedOrders.length - 50} more — archive to clear, or open “Past orders”.</div>
                   )}
