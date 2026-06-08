@@ -15,6 +15,25 @@ const NAVY_DEEP = "#161d27";
 const GREEN = "#27c08a";
 const WARN = "#f5a524";   // amber — double-booked slot warning on the dispatch board
 
+// Give each truck its own color on the maps so they're easy to tell apart.
+// Distinct, readable on the dark map; assigned by sorted label so colors are
+// stable for a given fleet.
+const TRUCK_COLORS = ["#ff7a3d", "#4da3ff", "#27c08a", "#c77dff", "#ffd23d", "#ff5d8f", "#3dd6d6", "#ff9f1c"];
+function truckColorMap(trucks) {
+  const m = {};
+  [...new Set((trucks || []).map((t) => t.label))].sort()
+    .forEach((label, i) => { m[label] = TRUCK_COLORS[i % TRUCK_COLORS.length]; });
+  return m;
+}
+// Straight-line distance in miles between two {lat,lng} points (null if either missing).
+function milesBetween(a, b) {
+  if (!a || !b || a.lat == null || b.lat == null) return null;
+  const R = 3958.8, r = (x) => (x * Math.PI) / 180;
+  const dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 const FONT = `
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap');
 /* Render native date/time pickers in dark mode so the calendar/clock icons show
@@ -264,6 +283,7 @@ function Timeline({ stageIdx }) {
 function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const [progress, setProgress] = useState(order.progress || 0.05);
   const [pos, setPos] = useState(order.truck_position || null);   // live truck position for the map
+  const [siteLatLng, setSiteLatLng] = useState(null);             // job site coords (from the map's geocode) — for a real ETA
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
@@ -303,7 +323,15 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
     return () => { alive = false; clearInterval(iv); };
   }, [order.ref]);
 
-  const etaMin = Math.max(0, Math.round((1 - progress) * 22));
+  // Real ETA from the truck's live distance to the job site (~30 mph avg, 1.3x for
+  // roads vs straight line). Falls back to the rough progress estimate only until
+  // the site address has geocoded. "Arriving" once it's essentially there.
+  const remMi = milesBetween(pos, siteLatLng);
+  const arrived = ["onsite", "pouring", "complete"].includes(order.status);
+  const etaMin = remMi != null
+    ? Math.round((remMi * 1.3) / 30 * 60)
+    : Math.max(0, Math.round((1 - progress) * 22));
+  const etaText = arrived ? "Arrived" : ((remMi != null && remMi < 0.2) || etaMin <= 0 ? "Arriving" : `${etaMin} min`);
   // Drive the status pill + timeline from the order's REAL status, so a scheduled
   // or requested order doesn't look like it's already en route.
   const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, complete: 4 };
@@ -336,10 +364,10 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
 
       {isLive ? (
         <>
-          <div className="mt-4"><GoogleTrackMap site={order.site} truckPosition={pos} truckLabel={order.truck} progress={progress} /></div>
-          {progress > 0.92 && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck entered site geofence — proof of delivery logged</div>}
+          <div className="mt-4"><GoogleTrackMap site={order.site} truckPosition={pos} truckLabel={order.truck} progress={progress} onSite={setSiteLatLng} /></div>
+          {arrived && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck on site — proof of delivery logged</div>}
           <div className="grid grid-cols-2 gap-3 mt-3">
-            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{progress >= 1 ? "Arrived" : `${etaMin} min`}</div></div>
+            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{etaText}</div></div>
             <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div>{order.driver && order.driver !== "—" && <div className="text-white/55 text-xs mt-1 flex items-center gap-1" style={{ fontFamily: C.body }}><User size={12} /> {order.driver}</div>}</div>
           </div>
           <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
@@ -1371,13 +1399,14 @@ function GoogleFleetMap({ trucks }) {
 
   const drawTrucks = (maps) => {
     if (!mapRef.current) return;
+    const colors = truckColorMap(trucksRef.current);
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = trucksRef.current
       .filter((t) => t.lat != null && t.lng != null)
       .map((t) => new maps.Marker({
         position: { lat: t.lat, lng: t.lng }, map: mapRef.current, title: t.label,
-        icon: { path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 5.5, rotation: t.heading || 0,
-                fillColor: isStale(t.updated_at) ? "#7c8794" : "#ff7a3d", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 },
+        icon: { path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 6, rotation: t.heading || 0,
+                fillColor: isStale(t.updated_at) ? "#7c8794" : (colors[t.label] || "#ff7a3d"), fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 },
         label: { text: t.label, color: "#fff", fontSize: "10px", fontWeight: "600" },
       }));
   };
@@ -1415,7 +1444,7 @@ function GoogleFleetMap({ trucks }) {
 // truck (with heading), and the destination job site (geocoded from its address).
 // Same dark Google map the dispatch board uses; falls back to the schematic
 // TrackMap if Maps JS isn't available (no key / API not enabled).
-function GoogleTrackMap({ site, truckPosition, truckLabel, progress }) {
+function GoogleTrackMap({ site, truckPosition, truckLabel, progress, onSite }) {
   const elRef = useRef(null), mapRef = useRef(null);
   const truckMarkerRef = useRef(null), siteLatLngRef = useRef(null);
   const posRef = useRef(truckPosition); posRef.current = truckPosition;
@@ -1465,6 +1494,7 @@ function GoogleTrackMap({ site, truckPosition, truckLabel, progress }) {
             if (cancelled || status !== "OK" || !res?.[0] || !mapRef.current) return;
             const loc = res[0].geometry.location;
             siteLatLngRef.current = loc;
+            onSite && onSite({ lat: loc.lat(), lng: loc.lng() });   // report site coords up for a real ETA
             new maps.Marker({
               position: loc, map: mapRef.current, title: site,
               icon: { path: maps.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 0 },   // hide arrow, use label pin below
@@ -1901,6 +1931,19 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           <span className="text-[11px] font-semibold" style={{ color: WARN, fontFamily: C.body }}>
             Double-booked — same slot ({o.time}) as {clash.map((c) => `${c.ref} (${c.customer})`).join(", ")}. Call or reschedule.
           </span>
+        </div>
+      )}
+      {o.arrival_pending && (
+        <div className="mb-2.5 rounded-lg px-2.5 py-2" style={{ background: GREEN + "1a", border: `1px solid ${GREEN}` }}>
+          <div className="flex items-start gap-1.5">
+            <MapPin size={13} color={GREEN} className="mt-0.5 shrink-0" />
+            <span className="text-[11px] font-semibold" style={{ color: GREEN, fontFamily: C.body }}>
+              {o.truck} looks parked at the job site — mark it On site?
+            </span>
+          </div>
+          <button onClick={() => run(onStatus, "onsite")} disabled={busy} className="w-full mt-1.5 rounded-lg py-1.5 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+            {busy ? "…" : "Confirm On site"}
+          </button>
         </div>
       )}
       <div className="flex items-start justify-between gap-3">
@@ -3531,11 +3574,12 @@ function DispatchApp({ email, role, onLogout }) {
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
                 ) : trucks.map((t) => {
                   const s = truckStatus(t);
+                  const tColor = truckColorMap(trucks)[t.label] || ORANGE;
                   return (
-                    <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <Truck size={14} color={ORANGE} />
+                          <Truck size={14} color={tColor} />
                           <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
                         </div>
                         {t.notes && <div className="text-white/40 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{t.notes}</div>}
