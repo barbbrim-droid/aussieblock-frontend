@@ -2543,6 +2543,16 @@ function ManageStaffModal({ onClose }) {
 
   const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompanyId(""); setProject(""); setEditing(false); };
 
+  // Auto-generate an email + password for a worker so the office doesn't have to
+  // invent one. These are just login ids (workers never type them — they use the
+  // tap-to-login link), so a random handle is fine.
+  const fillWorker = () => {
+    const rand = () => Math.random().toString(36).slice(2, 8);
+    setRole("worker");
+    setEmail(`crew-${rand()}@texausrock.com`);
+    setPw(`crew${rand()}`);
+  };
+
   const pick = (u) => {
     setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
     setCompanyId(u.customer_id || ""); setProject(u.project || "");
@@ -2664,6 +2674,11 @@ function ManageStaffModal({ onClose }) {
                 <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — no billing</button>
                 <button onClick={() => setRole("customer")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "customer" ? GREEN + "22" : NAVY_DEEP, color: role === "customer" ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${role === "customer" ? GREEN : "rgba(255,255,255,0.12)"}` }}>Admin — + billing</button>
               </div>
+            )}
+            {role === "worker" && !editing && (
+              <button type="button" onClick={fillWorker} className="w-full mb-2 rounded-lg py-2 flex items-center justify-center gap-1.5 text-xs font-bold active:scale-[0.98] transition-transform" style={{ background: "#6aa9ff22", color: "#6aa9ff", border: "1px solid #6aa9ff", fontFamily: C.body }}>
+                <KeyRound size={13} /> Auto-generate login (no email/password to type)
+              </button>
             )}
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
             <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
