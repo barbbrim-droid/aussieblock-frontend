@@ -3431,6 +3431,8 @@ function DispatchApp({ email, role, onLogout }) {
 
   // Yard totals for planning: today's total, and upcoming grouped by day.
   const todayYards = todayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
+  // Yards poured today = completed orders scheduled for today.
+  const completedTodayYards = allCompleted.filter((o) => o.when === today).reduce((sum, o) => sum + parseYards(o.qty), 0);
   const upcomingByDay = {};
   for (const o of upcomingOrders) (upcomingByDay[o.when || "—"] ||= []).push(o);
   for (const day of Object.keys(upcomingByDay)) upcomingByDay[day].sort(byTimeAsc);   // earliest first within each day
@@ -3517,6 +3519,7 @@ function DispatchApp({ email, role, onLogout }) {
               <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight">Dispatch board</h1>
               <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><Package size={14} color={ORANGE} /><span className="text-white/55">Today</span><span className="text-white font-bold">{todayOrders.length}</span></span>
               <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><CalendarPlus size={14} color={ORANGE_HOT} /><span className="text-white/55">Scheduled</span><span className="text-white font-bold">{upcomingOrders.length}</span></span>
+              <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}><CheckCircle2 size={14} color={GREEN} /><span className="text-white/55">Poured today</span><span className="font-bold" style={{ color: GREEN }}>{fmtYards(completedTodayYards)} CY</span></span>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               {installPrompt && (
