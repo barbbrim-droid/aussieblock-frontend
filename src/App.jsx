@@ -57,13 +57,13 @@ function Roo({ size = 32, variant = "tile" }) {
 const STATUS_META = {
   requested: { label: "Requested", color: "#6aa9ff" },   // customer-placed, awaiting confirm
   scheduled: { label: "Scheduled", color: "#7c8794" },
-  batched: { label: "Batched", color: ORANGE },
+  batched: { label: "Loading at yard", color: ORANGE },
   enroute: { label: "En route", color: ORANGE_HOT },
   onsite: { label: "On site", color: GREEN },
   pouring: { label: "Pouring", color: GREEN },
   complete: { label: "Complete", color: GREEN },
 };
-const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
+const STAGES = ["Loading at yard", "En route", "On site", "Pouring", "Complete"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
