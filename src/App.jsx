@@ -1672,7 +1672,11 @@ function mergeBatch(saved) {
 }
 
 function BatchTicketForm({ o, onEdited }) {
-  const [d, setD] = useState(() => mergeBatch(o.batch_data));
+  const [d, setD] = useState(() => {
+    const b = mergeBatch(o.batch_data);
+    if (!b.date) b.date = orderDateUS(o.when);   // default the batch Date to the order's delivery date (M/D/YYYY)
+    return b;
+  });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [savedOk, setSavedOk] = useState(false);
@@ -2860,6 +2864,7 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
   const active = orders.filter((o) => o.status !== "complete");
   const byDay = {};
   for (const o of active) (byDay[o.when] ||= []).push(o);
+  for (const day of Object.keys(byDay)) byDay[day].sort(byTimeAsc);   // earliest first within each day
   const yardsFor = (key) => (byDay[key] || []).reduce((s, o) => s + parseYards(o.qty), 0);
 
   const pad = (n) => String(n).padStart(2, "0");
@@ -3089,6 +3094,18 @@ function orderDay(when, today) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s > today ? "upcoming" : "today";
   return "today";
 }
+// Sort a day's orders by scheduled time, earliest first. Times are "HH:MM"
+// (24-hour, from the time picker) so a string compare is chronological; orders
+// with no time set sort to the bottom.
+function byTimeAsc(a, b) {
+  return String(a.time || "99:99").localeCompare(String(b.time || "99:99"));
+}
+// Order's scheduled date as US M/D/YYYY with no leading zeros: "2026-06-08" ->
+// "6/8/2026". Returns "" for legacy/blank values so callers can fall back.
+function orderDateUS(when) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((when || "").trim());
+  return m ? `${Number(m[2])}/${Number(m[3])}/${m[1]}` : "";
+}
 // Human-readable scheduled date: "2026-06-08" -> "Mon, Jun 8" (adds the year only
 // if it's not the current year). Legacy "today"/"tomorrow" are just capitalized.
 function formatOrderDate(when) {
@@ -3312,7 +3329,7 @@ function DispatchApp({ email, role, onLogout }) {
   const completedOrders = allCompleted.filter((o) => !o.archived);
   const archivedOrders = allCompleted.filter((o) => o.archived);
   const today = localToday();
-  const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today");
+  const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today").sort(byTimeAsc);
   const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
 
@@ -3331,6 +3348,7 @@ function DispatchApp({ email, role, onLogout }) {
   const todayYards = todayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
   const upcomingByDay = {};
   for (const o of upcomingOrders) (upcomingByDay[o.when || "—"] ||= []).push(o);
+  for (const day of Object.keys(upcomingByDay)) upcomingByDay[day].sort(byTimeAsc);   // earliest first within each day
   const upcomingDays = Object.keys(upcomingByDay).sort();
 
   if (loading) return <Splash label="Loading dispatch…" />;
