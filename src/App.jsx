@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v62";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v63";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -2154,8 +2154,10 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
     .sort((a, b) => a.name.localeCompare(b.name));
   const selCust = customers.find((c) => c.id === sel);
   // The selected customer's completed orders (most recent first), for reordering.
+  // Staff history/reorder tool — show ALL of this customer's completed orders,
+  // including archived ones (archiving only declutters the board + customer app).
   const selPast = selCust
-    ? orders.filter((o) => o.status === "complete" && !o.archived && o.customer === selCust.name).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)))
+    ? orders.filter((o) => o.status === "complete" && o.customer === selCust.name).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)))
     : [];
 
   return (
