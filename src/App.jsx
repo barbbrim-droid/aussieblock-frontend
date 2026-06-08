@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v61";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v62";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -2042,6 +2042,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const [sel, setSel] = useState(null);        // selected customer id
   const [reorder, setReorder] = useState(null);   // a past order to "Order again" for this customer
   const [emailVal, setEmailVal] = useState("");
+  const [phoneVal, setPhoneVal] = useState("");   // pre-filled from the customer's QuickBooks phone, used for the invite text
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);        // { ok, text }
@@ -2074,6 +2075,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const pick = (c) => {
     setSel(c.id);
     setEmailVal(c.login_email || (c.email || "").split(",")[0].trim() || "");   // pre-fill with the QuickBooks email (first if several) when no login yet
+    setPhoneVal(c.contact || "");   // pre-fill the phone from QuickBooks, like the email
     setPw("");
     setMsg(null);
     setInvite(null);
@@ -2086,10 +2088,11 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
     const password = pw;
     setBusy(true); setMsg(null);
     try {
-      const r = await setCustomerLogin(sel, emailVal.trim(), password);
+      const r = await setCustomerLogin(sel, emailVal.trim(), password, phoneVal.trim());
       const appUrl = window.location.origin;
       const text = `Hi ${cust.name} — Aussieblock has an app for ordering and tracking your concrete deliveries, and paying invoices online. You can place orders, track the trucks live, and view your account. Open ${appUrl} and sign in — email: ${r.email}, password: ${password}. Call or text us at ${DISPATCH_PHONE}. Add it to your phone's home screen (quick steps): ${appUrl}/add-to-home-screen.pdf`;
-      setInvite({ id: cust.id, name: cust.name, phone: cust.contact, sms: toSmsNumber(cust.contact), text });
+      const invitePhone = phoneVal.trim() || cust.contact;
+      setInvite({ id: cust.id, name: cust.name, phone: invitePhone, sms: toSmsNumber(invitePhone), text });
       setSent(false);
       setMsg({ ok: true, text: `Login ${r.action} for ${cust.name}. Send the invite below 👇` });
       setPw("");
@@ -2107,7 +2110,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
     try {
       await removeCustomerLogin(sel);
       setMsg({ ok: true, text: `Login removed for ${selCust.name}.` });
-      setEmailVal(""); setPw("");
+      setEmailVal(""); setPhoneVal(""); setPw("");
       await load();
     } catch (e) {
       setMsg({ ok: false, text: e.message });
@@ -2210,6 +2213,14 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
             value={emailVal}
             onChange={(e) => setEmailVal(e.target.value)}
             placeholder="customer email"
+            autoComplete="off"
+            className="w-full rounded-lg px-3 py-2 mb-2 text-sm text-white outline-none placeholder:text-white/30"
+            style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
+          />
+          <input
+            value={phoneVal}
+            onChange={(e) => setPhoneVal(e.target.value)}
+            placeholder="customer phone (for the invite text)"
             autoComplete="off"
             className="w-full rounded-lg px-3 py-2 mb-2 text-sm text-white outline-none placeholder:text-white/30"
             style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}

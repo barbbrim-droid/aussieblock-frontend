@@ -254,11 +254,11 @@ export function getPlusLoads() {
 export function getCustomers() {
   return request('/customers')
 }
-export function setCustomerLogin(customerId, email, password) {
+export function setCustomerLogin(customerId, email, password, phone) {
   return request(`/customers/${customerId}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, phone }),
   })
 }
 export function removeCustomerLogin(customerId) {
