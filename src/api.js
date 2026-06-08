@@ -121,12 +121,12 @@ export function deleteBatchTicket(ref) {
 // getDocs lists the library (any login). uploadDoc/deleteDoc are operator-only.
 // openDoc fetches with the bearer token and opens the PDF via a blob URL.
 export function getDocs() {
-  return request('/docs')
+  return request('/knowledge')   // path is /knowledge (FastAPI reserves /docs for Swagger UI)
 }
 export async function uploadDoc(title, file) {
   const fd = new FormData()
   fd.append('file', file)
-  const res = await fetch(`${API_BASE}/docs?title=${encodeURIComponent(title)}`, {
+  const res = await fetch(`${API_BASE}/knowledge?title=${encodeURIComponent(title)}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
     body: fd,
@@ -135,7 +135,7 @@ export async function uploadDoc(title, file) {
   return res.json()
 }
 export async function openDoc(id) {
-  const res = await fetch(`${API_BASE}/docs/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  const res = await fetch(`${API_BASE}/knowledge/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   const url = URL.createObjectURL(await res.blob())
   const a = document.createElement('a')
@@ -144,7 +144,7 @@ export async function openDoc(id) {
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 export function deleteDoc(id) {
-  return request(`/docs/${id}`, { method: 'DELETE' })
+  return request(`/knowledge/${id}`, { method: 'DELETE' })
 }
 
 // Save the full delivered batch-ticket fields for an order (staff). `data` is a
