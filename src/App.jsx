@@ -2032,12 +2032,17 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       {canFinance && o.prepay_required && <CodControls o={o} />}
       {batchable && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={onPickTicket} className="hidden" />
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.heic" onChange={onPickTicket} className="hidden" />
           {o.has_batch_ticket ? (
             <>
               <button onClick={() => openBatchTicket(o.ref).catch((e) => setErr(e.message))} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: GREEN, background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
                 <FileText size={12} /> Batch ticket
               </button>
+              {o.has_original && (
+                <button onClick={() => openBatchTicket(o.ref, "original").catch((e) => setErr(e.message))} title="Open the original scan/photo you uploaded" className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: "rgba(255,255,255,0.65)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+                  <FileText size={12} /> Original
+                </button>
+              )}
               {o.has_print_ticket && (
                 <button onClick={() => openBatchTicket(o.ref, "print").catch((e) => setErr(e.message))} title="Open the printer-friendly (light) version" className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: ORANGE, background: ORANGE + "1a", border: `1px solid ${ORANGE}55`, fontFamily: C.body }}>
                   <Printer size={12} /> Print
@@ -2052,7 +2057,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             </>
           ) : (
             <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
-              {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add batch ticket (PDF)
+              {busy ? <><Loader2 size={12} className="animate-spin" /> Converting…</> : <><Plus size={12} /> Add batch ticket (PDF or photo)</>}
             </button>
           )}
         </div>
