@@ -1847,7 +1847,10 @@ function annotateClashes(orders) {
   });
 }
 
-function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver }) {
+function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver, compact }) {
+  // `compact` (Upcoming column): a leaner card for future orders — keep Status,
+  // Truck, Edit and Cancel; drop the Driver picker, "Order again" and "Ticket
+  // details" (all day-of tasks) to cut the clutter.
   const canFinance = useContext(FinanceContext);   // workers don't see COD/payment bits
   const clash = o.clash && o.clash.length ? o.clash : null;   // shares a date+time with another order
   const pct = Math.round((o.progress || 0) * 100);
@@ -1934,7 +1937,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       )}
 
       {/* staff controls — set the delivery stage and put a truck on the job */}
-      <div className={`mt-2 pt-2 grid ${onDriver ? "grid-cols-3" : "grid-cols-2"} gap-1.5`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className={`mt-2 pt-2 grid ${onDriver && !compact ? "grid-cols-3" : "grid-cols-2"} gap-1.5`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <label className="flex flex-col gap-0.5">
           <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Status</span>
           <select
@@ -1958,7 +1961,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
         </label>
-        {onDriver && (
+        {onDriver && !compact && (
           <label className="flex flex-col gap-0.5">
             <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Driver</span>
             <select
@@ -2012,12 +2015,16 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             <Inbox size={12} /> {o.archived ? "Unarchive" : "Archive"}
           </button>
         )}
-        <button onClick={() => setShowReorder(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
-          <Plus size={12} /> Order again
-        </button>
-        <button onClick={() => setShowBatch((v) => !v)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: showBatch ? NAVY_DEEP : "#fff", background: showBatch ? GREEN : NAVY_DEEP, border: showBatch ? "none" : "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
-          <ClipboardList size={12} /> Ticket details
-        </button>
+        {!compact && (
+          <button onClick={() => setShowReorder(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
+            <Plus size={12} /> Order again
+          </button>
+        )}
+        {!compact && (
+          <button onClick={() => setShowBatch((v) => !v)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: showBatch ? NAVY_DEEP : "#fff", background: showBatch ? GREEN : NAVY_DEEP, border: showBatch ? "none" : "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
+            <ClipboardList size={12} /> Ticket details
+          </button>
+        )}
         <button onClick={() => setShowEdit(true)} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
           <FileText size={12} /> Edit order
         </button>
@@ -3564,7 +3571,7 @@ function DispatchApp({ email, role, onLogout }) {
                           <div className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>CY total</div>
                         </div>
                       </div>
-                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} />)}
+                      {dayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} compact />)}
                     </div>
                   );
                 })
