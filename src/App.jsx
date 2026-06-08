@@ -1629,6 +1629,31 @@ const BATCH_BLANK = {
 
 const getAt = (obj, path) => path.split(".").reduce((x, k) => (x == null ? x : x[k]), obj);
 
+// TxDOT batch reporting: water is batched in pounds but inspectors report gallons.
+// 1 US gallon of water ≈ 8.34 lb.
+const WATER_LB_PER_GAL = 8.34;
+const lbsToGal = (lbs) => {
+  const n = parseFloat(lbs);
+  return isFinite(n) ? `${(n / WATER_LB_PER_GAL).toFixed(1)} gal` : "";
+};
+// Max water-to-cement ratio by TxDOT class: Class A & B = 0.60, Class C = 0.45.
+function wcMaxForMix(mix) {
+  const m = String(mix || "").toLowerCase();
+  if (m.includes("class c")) return 0.45;
+  if (m.includes("class a") || m.includes("class b")) return 0.60;
+  return null;
+}
+// Water/cement ratio from the batch sheet, preferring Actual, then Target, then
+// Design — whichever column has both water and cement filled in.
+function waterCementRatio(d) {
+  for (const col of ["actual", "target", "design"]) {
+    const w = parseFloat(getAt(d, `mix_design.water.${col}`));
+    const c = parseFloat(getAt(d, `mix_design.cement.${col}`));
+    if (isFinite(w) && isFinite(c) && c > 0) return { wc: w / c, col };
+  }
+  return null;
+}
+
 function mergeBatch(saved) {
   // deep-merge a (possibly partial/older) saved record onto the blank template
   const b = JSON.parse(JSON.stringify(BATCH_BLANK));
@@ -1736,16 +1761,42 @@ function BatchTicketForm({ o, onEdited }) {
           <span></span><span>Design</span><span>Target</span><span>Actual</span>
         </div>
         {["rock", "sand", "cement", "air", "water"].map((row) => (
-          <div key={row} className="grid gap-2 items-center" style={{ gridTemplateColumns: "70px 1fr 1fr 1fr" }}>
-            <span className="text-white/70 text-xs capitalize" style={{ fontFamily: C.body }}>{row}</span>
-            {["design", "target", "actual"].map((col) => (
-              <input key={col} value={getAt(d, `mix_design.${row}.${col}`) || ""} onChange={(e) => set(`mix_design.${row}.${col}`, e.target.value)}
-                className="rounded-lg px-2 py-1.5 text-sm outline-none w-full"
-                style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
-            ))}
+          <div key={row} className="grid gap-2 items-start" style={{ gridTemplateColumns: "70px 1fr 1fr 1fr" }}>
+            <span className="text-white/70 text-xs capitalize pt-1.5" style={{ fontFamily: C.body }}>{row}{row === "water" ? " (lb)" : ""}</span>
+            {["design", "target", "actual"].map((col) => {
+              const val = getAt(d, `mix_design.${row}.${col}`) || "";
+              return (
+                <div key={col}>
+                  <input value={val} onChange={(e) => set(`mix_design.${row}.${col}`, e.target.value)}
+                    className="rounded-lg px-2 py-1.5 text-sm outline-none w-full"
+                    style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+                  {row === "water" && lbsToGal(val) && (
+                    <span className="block text-[10px] mt-0.5 px-1" style={{ color: "#6aa9ff", fontFamily: C.body }}>≈ {lbsToGal(val)}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
+      {/* Water/cement ratio vs TxDOT max for the order's class */}
+      {(() => {
+        const r = waterCementRatio(d);
+        if (!r) return null;
+        const max = wcMaxForMix(o.mix);
+        const over = max != null && r.wc > max + 1e-9;
+        const color = over ? "#ff8a85" : GREEN;
+        return (
+          <div className="mt-2 rounded-lg px-2.5 py-2 text-xs flex items-center gap-1.5" style={{ background: color + "1a", border: `1px solid ${color}55`, color, fontFamily: C.body }}>
+            {over ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
+            <span className="font-semibold">W/C ratio {r.wc.toFixed(2)}</span>
+            <span className="opacity-80">({r.col})</span>
+            {max != null
+              ? <span className="opacity-80">· max {max.toFixed(2)} for {o.mix}{over ? " — OVER MAX" : ""}</span>
+              : <span className="opacity-80">· no TxDOT max for this mix</span>}
+          </div>
+        );
+      })()}
 
       {groupHead("Pricing")}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
