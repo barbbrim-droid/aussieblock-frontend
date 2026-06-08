@@ -818,8 +818,10 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true, co
   const todayKey = localToday();
   const requested = orders.filter((o) => o.status === "requested");
   // Completed orders go to their own "Past orders" history (most recent first),
-  // so they don't clutter the live lists but stay easy to reorder.
-  const completed = orders.filter((o) => o.status === "complete" && !o.archived).slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  // so they don't clutter the live lists but stay easy to reorder. Archived
+  // orders are shown here too — archiving only declutters the staff board, it
+  // shouldn't hide a crew's delivery history.
+  const completed = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
   const active = orders.filter((o) => o.status !== "requested" && o.status !== "complete");
   const todayO = active.filter((o) => orderDay(o.when, todayKey) === "today");
   const upcomingO = active.filter((o) => orderDay(o.when, todayKey) === "upcoming");
