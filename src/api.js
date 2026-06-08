@@ -184,12 +184,13 @@ export function setCustomerCod(customerId, cod) {
     body: JSON.stringify({ cod }),
   })
 }
-// Create a QuickBooks invoice + pay link for a COD load (staff only). Returns
-// { amount, link, doc_number }.
-export function chargeOrder(ref, amount) {
+// Create a pay link for a COD load from the customer's existing QuickBooks
+// invoice (staff only). The amount comes from that invoice — no amount entered.
+// Returns { amount, link, doc_number }.
+export function chargeOrder(ref) {
   return request(`/orders/${encodeURIComponent(ref)}/charge`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({}),
   })
 }
 // COD payment status for an order (staff, or the owning customer). Returns
@@ -227,6 +228,11 @@ export function deleteTruck(label) {
 }
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)
+}
+// Pull the latest A/R from QuickBooks into the app now (staff). The "Sync now"
+// button calls this; billing also auto-syncs when opened.
+export function syncBilling() {
+  return request(`/billing/sync`, { method: 'POST' })
 }
 // Fetch a customer-facing QuickBooks payment link for one invoice (what the
 // "Make a payment" button opens). The link is hosted by Intuit — the customer

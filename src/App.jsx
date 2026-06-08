@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, chargeOrder, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1563,10 +1563,10 @@ function WeatherBar() {
   );
 }
 
-// COD controls shown on a prepay-required order row: set the load total, create
-// the QuickBooks pay link, send it, and check whether it's been paid.
+// COD controls shown on a prepay-required order row: pull the customer's open
+// QuickBooks invoice as the pay link, send it, and check whether it's been paid.
+// The amount comes from that invoice — staff don't enter one.
 function CodControls({ o }) {
-  const [amount, setAmount] = useState(o.prepay_amount ? String(o.prepay_amount) : "");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -1577,9 +1577,9 @@ function CodControls({ o }) {
   const charge = async () => {
     setBusy(true); setMsg("");
     try {
-      const r = await chargeOrder(o.ref, parseFloat(amount));
-      if (r.link) { setLink(r.link); setMsg("Pay link ready — send it to the customer."); }
-      else { setMsg(`Invoice #${r.doc_number} created in QuickBooks (no email on file for a link). Collect payment there — unlocks when paid.`); }
+      const r = await chargeOrder(o.ref);
+      if (r.link) { setLink(r.link); setMsg(`Pay link ready${r.amount ? ` for ${usd(r.amount)}` : ""} — send it to the customer.`); }
+      else { setMsg(`Invoice #${r.doc_number} found in QuickBooks (no email on file for a link). Collect payment there — unlocks when paid.`); }
     } catch (e) { setMsg(e.message); } finally { setBusy(false); }
   };
   const check = async () => {
@@ -1594,13 +1594,8 @@ function CodControls({ o }) {
   return (
     <div className="mt-2 rounded-lg p-2.5" style={{ background: "rgba(106,169,255,0.1)", border: "1px solid rgba(106,169,255,0.4)" }}>
       <div className="text-xs font-semibold mb-1.5" style={{ color: "#6aa9ff", fontFamily: C.body }}>COD — payment required before dispatch</div>
-      <div className="flex gap-2">
-        <div className="flex items-center rounded-lg flex-1" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
-          <span className="pl-2 text-white/50 text-sm">$</span>
-          <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="load total" className="w-full bg-transparent px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ fontFamily: C.body }} />
-        </div>
-        <button onClick={charge} disabled={busy || !amount} className="rounded-lg px-3 text-sm font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{o.prepay_amount ? "Update" : "Create"} link</button>
-      </div>
+      <div className="text-[11px] text-white/55 mb-2" style={{ fontFamily: C.body }}>Pulls the customer's open QuickBooks invoice — the amount comes from there.</div>
+      <button onClick={charge} disabled={busy} className="w-full rounded-lg py-2 text-sm font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{busy ? "…" : "Get pay link"}</button>
       {link && (
         <div className="flex gap-2 mt-2">
           <a href={link} target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg py-1.5 text-xs font-semibold" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>Open pay link</a>
@@ -2053,9 +2048,16 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const [sent, setSent] = useState(false);
   const [codOnly, setCodOnly] = useState(false);   // filter list to COD customers
 
+  const [syncing, setSyncing] = useState(false);
   const load = async () => {
     try { setCustomers(await getCustomers()); }
     catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  const syncNow = async () => {
+    setSyncing(true);
+    try { await syncBilling(); await load(); setMsg({ ok: true, text: "Synced with QuickBooks." }); }
+    catch (e) { setMsg({ ok: false, text: "Sync failed: " + e.message }); }
+    finally { setSyncing(false); }
   };
   useEffect(() => { load(); getSmsEnabled().then((r) => setSmsAuto(!!r.enabled)).catch(() => {}); }, []);
 
@@ -2173,6 +2175,10 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
           style={{ fontFamily: C.body }}
         />
       </div>
+      {/* Sync with QuickBooks on demand (billing also auto-syncs when opened) */}
+      <button onClick={syncNow} disabled={syncing} className="w-full flex items-center justify-center gap-2 rounded-xl py-2 mb-2 text-sm font-semibold active:scale-[0.99] transition-transform disabled:opacity-60" style={{ background: NAVY, color: ORANGE, border: `1px solid ${ORANGE}55`, fontFamily: C.body }}>
+        <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing with QuickBooks…" : "Sync QuickBooks now"}
+      </button>
       {/* COD filter */}
       <div className="flex items-center gap-2 mb-2">
         <button onClick={() => setCodOnly(false)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: codOnly ? NAVY : "#6aa9ff22", color: codOnly ? "rgba(255,255,255,0.5)" : "#6aa9ff", border: `1px solid ${codOnly ? "rgba(255,255,255,0.12)" : "#6aa9ff"}`, fontFamily: C.body }}>All</button>
