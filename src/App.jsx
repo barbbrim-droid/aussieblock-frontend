@@ -1914,9 +1914,18 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             <span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span>
             {o.driver && o.driver !== "—" && (<><span className="text-white/30 text-xs">·</span><span className="text-white/60 text-xs flex items-center gap-1"><User size={12} /> {o.driver}</span></>)}
           </div>
-          <div style={{ fontFamily: C.cond }} className="text-white text-base font-semibold leading-tight mt-0.5 truncate">{o.project || o.site}</div>
-          {o.project && <div className="text-white/45 text-xs truncate flex items-center gap-1"><MapPin size={12} /> {o.site}</div>}
-          <div className="text-white/50 text-sm truncate">{o.customer} · {o.mix}</div>
+          {compact ? (
+            <>
+              <div style={{ fontFamily: C.cond }} className="text-white text-base font-bold leading-tight mt-0.5 truncate">{o.customer}</div>
+              <div className="text-white/55 text-xs truncate">{[o.project || o.site, o.mix].filter(Boolean).join(" · ")}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontFamily: C.cond }} className="text-white text-base font-semibold leading-tight mt-0.5 truncate">{o.project || o.site}</div>
+              {o.project && <div className="text-white/45 text-xs truncate flex items-center gap-1"><MapPin size={12} /> {o.site}</div>}
+              <div className="text-white/50 text-sm truncate">{o.customer} · {o.mix}</div>
+            </>
+          )}
           {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
           {o.use_for && <div className="text-white/40 text-xs mt-0.5 truncate">For: {o.use_for}</div>}
           {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
@@ -2575,7 +2584,7 @@ function ManageStaffModal({ onClose }) {
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : role === "customer"
           ? `Hi — Aussieblock has an app for ordering and tracking concrete deliveries and managing your account. You can place orders, track the trucks live, and view invoices for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
-          : `Hi — Aussieblock has an app for tracking concrete deliveries for ${r.company || "your company"}. Just tap this link to open it already signed in — no login needed: ${quickLink} (Backup login if ever needed — email: ${r.email}, password: ${pw}.) Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
+          : `Hi! This is Aussieblock, your ready-mix concrete supplier. We've set you up on our app so you can see your scheduled deliveries for ${r.company || "your company"} and track the trucks live on a map. Just tap this link and the app opens already signed in — no username or password to type: ${quickLink} (Backup login if the link ever stops working — email: ${r.email}, password: ${pw}.) Questions? Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
         setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text, quickLink, isWorker: role === "worker" });
         setSent(false); setCopied(false); setLinkCopied(false);
         setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
