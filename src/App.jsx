@@ -1836,7 +1836,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   };
 
   return (
-    <div className="rounded-2xl p-4 mb-3" style={{ background: clash ? "rgba(245,165,36,0.10)" : (o.status === "requested" ? ORANGE + "1f" : NAVY), border: `1px solid ${clash ? WARN : (o.status === "requested" ? ORANGE : "rgba(255,255,255,0.06)")}`, borderLeft: clash ? `4px solid ${WARN}` : (o.status === "requested" ? `4px solid ${ORANGE}` : (o.prepay_required ? "3px solid #6aa9ff" : undefined)) }}>
+    <div className="rounded-xl p-3 mb-2" style={{ background: clash ? "rgba(245,165,36,0.10)" : (o.status === "requested" ? ORANGE + "1f" : NAVY), border: `1px solid ${clash ? WARN : (o.status === "requested" ? ORANGE : "rgba(255,255,255,0.06)")}`, borderLeft: clash ? `4px solid ${WARN}` : (o.status === "requested" ? `4px solid ${ORANGE}` : (o.prepay_required ? "3px solid #6aa9ff" : undefined)) }}>
       {clash && (
         <div className="mb-2.5 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5" style={{ background: "rgba(245,165,36,0.14)", border: `1px solid ${WARN}` }}>
           <AlertTriangle size={13} color={WARN} className="mt-0.5 shrink-0" />
@@ -1856,21 +1856,21 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             <span className="text-white/60 text-xs flex items-center gap-1"><Truck size={12} /> {o.truck}</span>
             {o.driver && o.driver !== "—" && (<><span className="text-white/30 text-xs">·</span><span className="text-white/60 text-xs flex items-center gap-1"><User size={12} /> {o.driver}</span></>)}
           </div>
-          <div style={{ fontFamily: C.cond }} className="text-white text-lg font-semibold leading-tight mt-1 truncate">{o.project || o.site}</div>
-          {o.project && <div className="text-white/45 text-xs mt-0.5 truncate flex items-center gap-1"><MapPin size={12} /> {o.site}</div>}
-          <div className="text-white/50 text-sm mt-0.5 truncate">{o.customer} · {o.mix}</div>
+          <div style={{ fontFamily: C.cond }} className="text-white text-base font-semibold leading-tight mt-0.5 truncate">{o.project || o.site}</div>
+          {o.project && <div className="text-white/45 text-xs truncate flex items-center gap-1"><MapPin size={12} /> {o.site}</div>}
+          <div className="text-white/50 text-sm truncate">{o.customer} · {o.mix}</div>
           {orderExtras(o) && <div className="text-white/40 text-xs mt-0.5 truncate">{orderExtras(o)}</div>}
           {o.use_for && <div className="text-white/40 text-xs mt-0.5 truncate">For: {o.use_for}</div>}
           {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
         </div>
         <div className="text-right shrink-0">
-          <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none">{o.qty}</div>
-          <div className="mt-2"><StatusPill status={o.status} /></div>
+          <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-xl font-bold leading-none">{o.qty}</div>
+          <div className="mt-1"><StatusPill status={o.status} /></div>
         </div>
       </div>
       {/* progress bar — only meaningful once a truck is rolling */}
       {(o.status === "enroute" || o.status === "batched" || o.status === "onsite") && (
-        <div className="mt-3">
+        <div className="mt-2">
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: o.status === "onsite" ? GREEN : ORANGE }} />
           </div>
@@ -1879,24 +1879,24 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       )}
 
       {/* staff controls — set the delivery stage and put a truck on the job */}
-      <div className="mt-3 pt-3 grid grid-cols-2 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <label className="flex flex-col gap-1">
+      <div className={`mt-2 pt-2 grid ${onDriver ? "grid-cols-3" : "grid-cols-2"} gap-1.5`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <label className="flex flex-col gap-0.5">
           <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Status</span>
           <select
             value={o.status} disabled={busy}
             onChange={(e) => run(onStatus, e.target.value)}
-            className="rounded-lg px-2 py-1.5 text-sm outline-none disabled:opacity-50 cursor-pointer"
+            className="rounded-lg px-2 py-1 text-sm outline-none disabled:opacity-50 cursor-pointer"
             style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
           >
             {ORDER_STATUSES.map((s) => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-0.5">
           <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Truck</span>
           <select
             value={o.truck} disabled={busy}
             onChange={(e) => run(onAssign, e.target.value)}
-            className="rounded-lg px-2 py-1.5 text-sm outline-none disabled:opacity-50 cursor-pointer"
+            className="rounded-lg px-2 py-1 text-sm outline-none disabled:opacity-50 cursor-pointer"
             style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
           >
             <option value="—">Unassigned</option>
@@ -1904,12 +1904,12 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           </select>
         </label>
         {onDriver && (
-          <label className="flex flex-col gap-1 col-span-2">
+          <label className="flex flex-col gap-0.5">
             <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Driver</span>
             <select
               value={o.driver || "—"} disabled={busy}
               onChange={(e) => run(onDriver, e.target.value)}
-              className="rounded-lg px-2 py-1.5 text-sm outline-none disabled:opacity-50 cursor-pointer"
+              className="rounded-lg px-2 py-1 text-sm outline-none disabled:opacity-50 cursor-pointer"
               style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
             >
               <option value="—">Unassigned</option>
@@ -3413,11 +3413,11 @@ function DispatchApp({ email, role, onLogout }) {
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               Today's orders gets the most room (it's where the day's work happens);
               Completed + Upcoming are kept narrow as reference columns. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.2fr)_minmax(0,0.7fr)_minmax(0,0.7fr)] gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
-                <div className="shrink-0 overflow-y-auto flex flex-col gap-1.5 mt-3" style={{ maxHeight: "40%" }}>
+                <div className="shrink-0 overflow-y-auto flex flex-col gap-1.5 mt-3" style={{ maxHeight: "32%" }}>
                 {trucks.length === 0 ? (
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
                 ) : trucks.map((t) => {
