@@ -6,6 +6,7 @@ services:
   - type: web
     name: aussieblock-app
     runtime: static
+    autoDeploy: true              # deploy automatically on every push to the connected branch
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     # Single-page app: serve index.html for any path so refresh/deep links work.
