@@ -328,7 +328,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   // roads vs straight line). Falls back to the rough progress estimate only until
   // the site address has geocoded. "Arriving" once it's essentially there.
   const remMi = milesBetween(pos, siteLatLng);
-  const arrived = ["onsite", "pouring", "complete"].includes(order.status);
+  const arrived = ["onsite", "pouring", "returning", "complete"].includes(order.status);
   const etaMin = remMi != null
     ? Math.round((remMi * 1.3) / 30 * 60)
     : Math.max(0, Math.round((1 - progress) * 22));
@@ -3580,6 +3580,9 @@ function DispatchApp({ email, role, onLogout }) {
                 ) : trucks.map((t) => {
                   const s = truckStatus(t);
                   const tColor = truckColorMap(trucks)[t.label] || ORANGE;
+                  // ETA back to the yard while returning (straight-line ~30mph, 1.3x roads).
+                  const yardMi = s.job?.status === "returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
+                  const yardEta = yardMi != null ? Math.max(1, Math.round((yardMi * 1.3) / 30 * 60)) : null;
                   return (
                     <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
                       <div className="min-w-0">
@@ -3593,6 +3596,11 @@ function DispatchApp({ email, role, onLogout }) {
                           </div>
                         ) : (
                           <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>No active job{t.notes ? ` · ${t.notes}` : ""}</div>
+                        )}
+                        {yardEta != null && (
+                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#4da3ff", fontFamily: C.body }}>
+                            <Navigation size={11} /> Back to yard · ~{yardEta} min
+                          </div>
                         )}
                       </div>
                       <span className="shrink-0">
