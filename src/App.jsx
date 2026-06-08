@@ -2523,6 +2523,7 @@ function ManageStaffModal({ onClose }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const load = async () => {
     try { setStaff(await listStaff()); } catch (e) { setMsg({ ok: false, text: e.message }); }
@@ -2550,13 +2551,16 @@ function ManageStaffModal({ onClose }) {
         // A password was set (new login or a reset) — offer the invite to send.
         const appUrl = window.location.origin;
         const addHome = ` Add it to your phone's home screen (quick steps): ${appUrl}/add-to-home-screen.pdf`;
+        // Tap-to-open link that signs them in automatically (no typing). The
+        // credentials ride in the URL; App() consumes + scrubs them on open.
+        const quickLink = `${appUrl}/?login=${encodeURIComponent(btoa(`${r.email}:${pw}`))}`;
         const text = (role === "staff"
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : role === "customer"
           ? `Hi — Aussieblock has an app for ordering and tracking concrete deliveries and managing your account. You can place orders, track the trucks live, and view invoices for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
-          : `Hi — Aussieblock has an app for ordering and tracking concrete deliveries. You can place orders, see the schedule, and track the trucks live for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
-        setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
-        setSent(false); setCopied(false);
+          : `Hi — Aussieblock has an app for tracking concrete deliveries for ${r.company || "your company"}. Just tap this link to open it already signed in — no login needed: ${quickLink} (Backup login if ever needed — email: ${r.email}, password: ${pw}.) Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
+        setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text, quickLink, isWorker: role === "worker" });
+        setSent(false); setCopied(false); setLinkCopied(false);
         setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
       } else {
         // Details-only save (existing login, password left unchanged).
@@ -2702,7 +2706,12 @@ function ManageStaffModal({ onClose }) {
                   {copied ? <CheckCircle2 size={14} color={GREEN} /> : <Download size={14} />} {copied ? "Copied" : "Copy text"}
                 </button>
               </div>
-              <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{smsAuto ? "\"Send text\" texts them automatically from your business number." : !IS_MOBILE ? "Copies the message and opens Google Messages (paired to your dispatch phone) — paste it into a new text. Sent from your dispatch number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
+              {invite.quickLink && (
+                <button onClick={() => { navigator.clipboard?.writeText(invite.quickLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1500); }} className="w-full mt-2 rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-semibold active:scale-[0.98] transition-transform" style={{ background: "#6aa9ff22", color: "#6aa9ff", border: "1px solid #6aa9ff", fontFamily: C.body }}>
+                  {linkCopied ? <CheckCircle2 size={14} color={GREEN} /> : <KeyRound size={14} />} {linkCopied ? "Link copied" : "Copy tap-to-login link"}
+                </button>
+              )}
+              <div className="text-white/35 text-[11px] mt-2" style={{ fontFamily: C.body }}>{invite.isWorker ? "The tap-to-login link opens the app already signed in — no email or password to type. Anyone with the link can open this worker view, so share it only with your crew." : smsAuto ? "\"Send text\" texts them automatically from your business number." : !IS_MOBILE ? "Copies the message and opens Google Messages (paired to your dispatch phone) — paste it into a new text. Sent from your dispatch number." : "\"Text invite\" opens your phone's messaging app with the message ready — just hit send."}</div>
             </div>
           )}
         </div>
@@ -3608,9 +3617,27 @@ export default function App() {
     };
   }, []);
 
-  // On first load, check whether a saved token is still valid.
+  // On first load, check whether a saved token is still valid — and honor a
+  // quick-login link (?login=<base64 email:password>) so field crews can tap a
+  // link and land in the app already signed in, no typing. We consume the token
+  // then scrub it from the address bar so the credentials don't linger in
+  // history/bookmarks. The login is saved, so later opens stay signed in too.
   useEffect(() => {
     (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const tok = params.get("login");
+      if (tok) {
+        try {
+          const [email, ...rest] = atob(decodeURIComponent(tok)).split(":");
+          await login(email, rest.join(":"));
+          setMe(await getMe());
+        } catch { /* bad/expired link — fall through to the normal login screen */ }
+        params.delete("login");
+        const clean = window.location.pathname + (params.toString() ? `?${params}` : "") + window.location.hash;
+        window.history.replaceState({}, "", clean);
+        setAuthChecked(true);
+        return;
+      }
       if (isLoggedIn()) {
         try { setMe(await getMe()); } catch { /* token expired/invalid — show login */ }
       }
