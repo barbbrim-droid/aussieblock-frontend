@@ -80,12 +80,13 @@ const STATUS_META = {
   enroute: { label: "En route", color: ORANGE_HOT },
   onsite: { label: "On site", color: GREEN },
   pouring: { label: "Pouring", color: GREEN },
+  returning: { label: "Returning to yard", color: "#4da3ff" },
   complete: { label: "Complete", color: GREEN },
 };
-const STAGES = ["Loading at yard", "En route", "On site", "Pouring", "Complete"];
+const STAGES = ["Loading at yard", "En route", "On site", "Pouring", "Returning", "Complete"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
-const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
+const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "returning", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
 const BUILD_TAG = "build Jun8-v64";   // bump on each deploy to verify clients aren't cached
@@ -334,8 +335,8 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const etaText = arrived ? "Arrived" : ((remMi != null && remMi < 0.2) || etaMin <= 0 ? "Arriving" : `${etaMin} min`);
   // Drive the status pill + timeline from the order's REAL status, so a scheduled
   // or requested order doesn't look like it's already en route.
-  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, complete: 4 };
-  const isLive = ["batched", "enroute", "onsite", "pouring", "complete"].includes(order.status);
+  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
+  const isLive = ["batched", "enroute", "onsite", "pouring", "returning", "complete"].includes(order.status);
   const stageIdx = STATUS_STAGE[order.status] ?? -1;
 
   return (
@@ -892,7 +893,7 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true, co
   const notifs = [];
   orders.filter((o) => o.prepay_required && !o.prepaid).forEach((o) =>
     notifs.push({ key: "pay-" + o.ref, Icon: CreditCard, color: ORANGE, title: `Payment due — ${o.ref}`, sub: `${o.mix} · ${o.qty} — tap to pay`, order: o }));
-  orders.filter((o) => ["enroute", "onsite", "pouring"].includes(o.status)).forEach((o) =>
+  orders.filter((o) => ["enroute", "onsite", "pouring", "returning"].includes(o.status)).forEach((o) =>
     notifs.push({ key: "live-" + o.ref, Icon: Truck, color: ORANGE_HOT, title: `${(STATUS_META[o.status] || {}).label || "On the way"} — ${o.ref}`, sub: o.project || o.site, order: o }));
   orders.filter((o) => o.status === "requested").forEach((o) =>
     notifs.push({ key: "req-" + o.ref, Icon: Clock, color: "#6aa9ff", title: `Awaiting confirmation — ${o.ref}`, sub: `${o.mix} · ${o.qty}`, order: o }));
@@ -3419,12 +3420,13 @@ function DispatchApp({ email, role, onLogout }) {
   // Each truck's status, derived from the order it's assigned to. (Later, GPS
   // geofences for the yard / job site will drive At yard vs On site automatically.)
   const truckStatus = (t) => {
-    const o = activeOrders.find((x) => x.truck === t.label && ["batched", "enroute", "onsite", "pouring"].includes(x.status));
+    const o = activeOrders.find((x) => x.truck === t.label && ["batched", "enroute", "onsite", "pouring", "returning"].includes(x.status));
     if (!o) return { label: "At yard", color: "#7c8794" };
-    if (o.status === "pouring") return { label: "Pouring", color: GREEN, order: o.ref };
-    if (o.status === "onsite") return { label: "On site", color: GREEN, order: o.ref };
-    if (o.status === "enroute") return { label: "En route", color: ORANGE_HOT, order: o.ref };
-    return { label: "Loading", color: ORANGE, order: o.ref };   // batched
+    if (o.status === "returning") return { label: "Returning", color: "#4da3ff", order: o.ref, job: o };
+    if (o.status === "pouring") return { label: "Pouring", color: GREEN, order: o.ref, job: o };
+    if (o.status === "onsite") return { label: "On site", color: GREEN, order: o.ref, job: o };
+    if (o.status === "enroute") return { label: "En route", color: ORANGE_HOT, order: o.ref, job: o };
+    return { label: "Loading", color: ORANGE, order: o.ref, job: o };   // batched
   };
 
   // Yard totals for planning: today's total, and upcoming grouped by day.
@@ -3565,7 +3567,7 @@ function DispatchApp({ email, role, onLogout }) {
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               Today's orders gets the most room (it's where the day's work happens);
               Completed + Upcoming are kept narrow as reference columns. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.2fr)_minmax(0,0.7fr)_minmax(0,0.7fr)] gap-3">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
@@ -3582,10 +3584,15 @@ function DispatchApp({ email, role, onLogout }) {
                           <Truck size={14} color={tColor} />
                           <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
                         </div>
-                        {t.notes && <div className="text-white/40 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{t.notes}</div>}
+                        {s.job ? (
+                          <div className="text-xs truncate mt-0.5" style={{ color: "rgba(255,255,255,0.7)", fontFamily: C.body }}>
+                            {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}
+                          </div>
+                        ) : (
+                          <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>No active job{t.notes ? ` · ${t.notes}` : ""}</div>
+                        )}
                       </div>
-                      <span className="flex items-center gap-2 shrink-0">
-                        {s.order && <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>{s.order}</span>}
+                      <span className="shrink-0">
                         <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
                       </span>
                     </div>
