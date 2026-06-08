@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
@@ -13,6 +13,7 @@ const ORANGE_HOT = "#FB7013";
 const NAVY = "#1e2939";
 const NAVY_DEEP = "#161d27";
 const GREEN = "#27c08a";
+const WARN = "#f5a524";   // amber — double-booked slot warning on the dispatch board
 
 const FONT = `
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap');
@@ -1745,8 +1746,27 @@ function BatchTicketForm({ o, onEdited }) {
   );
 }
 
+// Flag any active orders that share the same delivery date AND time as another
+// active order. This DOESN'T block anything — customers still book freely — it
+// just tags each clashing order with `clash` (the other orders in that slot) so
+// the dispatch board can highlight it and staff can call/reschedule.
+function annotateClashes(orders) {
+  const slots = {};
+  for (const o of orders) {
+    if (o.status === "complete" || !o.when || !o.time) continue;
+    (slots[`${o.when}|${o.time}`] ||= []).push(o);
+  }
+  return orders.map((o) => {
+    const group = slots[`${o.when}|${o.time}`];
+    if (!group || group.length < 2) return o;
+    const others = group.filter((x) => x.ref !== o.ref).map((x) => ({ ref: x.ref, customer: x.customer }));
+    return { ...o, clash: others };
+  });
+}
+
 function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver }) {
   const canFinance = useContext(FinanceContext);   // workers don't see COD/payment bits
+  const clash = o.clash && o.clash.length ? o.clash : null;   // shares a date+time with another order
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
   // load-carrying stage with no truck → 409). Track per-row busy/error so one
@@ -1788,7 +1808,15 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   };
 
   return (
-    <div className="rounded-2xl p-4 mb-3" style={{ background: o.status === "requested" ? ORANGE + "1f" : NAVY, border: `1px solid ${o.status === "requested" ? ORANGE : "rgba(255,255,255,0.06)"}`, borderLeft: o.status === "requested" ? `4px solid ${ORANGE}` : (o.prepay_required ? "3px solid #6aa9ff" : undefined) }}>
+    <div className="rounded-2xl p-4 mb-3" style={{ background: clash ? "rgba(245,165,36,0.10)" : (o.status === "requested" ? ORANGE + "1f" : NAVY), border: `1px solid ${clash ? WARN : (o.status === "requested" ? ORANGE : "rgba(255,255,255,0.06)")}`, borderLeft: clash ? `4px solid ${WARN}` : (o.status === "requested" ? `4px solid ${ORANGE}` : (o.prepay_required ? "3px solid #6aa9ff" : undefined)) }}>
+      {clash && (
+        <div className="mb-2.5 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5" style={{ background: "rgba(245,165,36,0.14)", border: `1px solid ${WARN}` }}>
+          <AlertTriangle size={13} color={WARN} className="mt-0.5 shrink-0" />
+          <span className="text-[11px] font-semibold" style={{ color: WARN, fontFamily: C.body }}>
+            Double-booked — same slot ({o.time}) as {clash.map((c) => `${c.ref} (${c.customer})`).join(", ")}. Call or reschedule.
+          </span>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -2803,9 +2831,11 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
               const y = yardsFor(key);
               const isToday = key === todayKey;
               const isSel = key === selected;
+              const hasClash = (byDay[key] || []).some((o) => o.clash && o.clash.length);
               return (
-                <button key={i} onClick={() => setSelected(key)} className="aspect-square rounded-lg p-1 flex flex-col items-center active:scale-95 transition-transform overflow-hidden"
-                  style={{ background: isSel ? ORANGE + "26" : NAVY, border: `1px solid ${isSel ? ORANGE : isToday ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.05)"}` }}>
+                <button key={i} onClick={() => setSelected(key)} className="relative aspect-square rounded-lg p-1 flex flex-col items-center active:scale-95 transition-transform overflow-hidden"
+                  style={{ background: isSel ? ORANGE + "26" : NAVY, border: `1px solid ${isSel ? ORANGE : hasClash ? WARN : isToday ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.05)"}` }}>
+                  {hasClash && <AlertTriangle size={11} color={WARN} className="absolute top-0.5 right-0.5" />}
                   <span className="text-xs font-semibold self-start px-0.5" style={{ color: isToday ? ORANGE : "#fff", fontFamily: C.body }}>{d}</span>
                   {y > 0 && (
                     <span className="mt-auto mb-0.5 text-[11px] sm:text-sm font-bold leading-none" style={{ color: ORANGE, fontFamily: C.cond }}>{fmtYards(y)}<span className="text-[8px] text-white/40"> CY</span></span>
@@ -3197,8 +3227,9 @@ function DispatchApp({ email, role, onLogout }) {
     setOrders((os) => os.filter((o) => o.ref !== ref));      // drop it from the board
   };
 
-  const activeOrders = orders.filter((o) => o.status !== "complete");
-  const allCompleted = orders.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  const annotated = annotateClashes(orders);   // tag orders that share a date+time so the board can flag double-bookings
+  const activeOrders = annotated.filter((o) => o.status !== "complete");
+  const allCompleted = annotated.filter((o) => o.status === "complete").slice().sort((a, b) => String(b.when).localeCompare(String(a.when)));
   const completedOrders = allCompleted.filter((o) => !o.archived);
   const archivedOrders = allCompleted.filter((o) => o.archived);
   const today = localToday();
@@ -3230,7 +3261,7 @@ function DispatchApp({ email, role, onLogout }) {
     <div className="h-screen w-full" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
-        <CalendarModal orders={orders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} onClose={() => setShowCal(false)} />
+        <CalendarModal orders={annotated} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} onClose={() => setShowCal(false)} />
       )}
       {showPast && (
         <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} onClose={() => setShowPast(false)} />
