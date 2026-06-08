@@ -68,7 +68,7 @@ const STAGES = ["Batched", "En route", "On site", "Pouring", "Complete"];
 const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun7-v58";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun7-v59";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -2048,7 +2048,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
     try {
       const r = await setCustomerLogin(sel, emailVal.trim(), password);
       const appUrl = window.location.origin;
-      const text = `Hi ${cust.name} — Aussieblock has an app for ordering and tracking your concrete deliveries, and paying invoices online. You can place orders, track the trucks live, and view your account. Open ${appUrl} and sign in — email: ${r.email}, password: ${password}. Call or text us at ${DISPATCH_PHONE}.`;
+      const text = `Hi ${cust.name} — Aussieblock has an app for ordering and tracking your concrete deliveries, and paying invoices online. You can place orders, track the trucks live, and view your account. Open ${appUrl} and sign in — email: ${r.email}, password: ${password}. Call or text us at ${DISPATCH_PHONE}. Add it to your phone's home screen (quick steps): ${appUrl}/add-to-home-screen.pdf`;
       setInvite({ id: cust.id, name: cust.name, phone: cust.contact, sms: toSmsNumber(cust.contact), text });
       setSent(false);
       setMsg({ ok: true, text: `Login ${r.action} for ${cust.name}. Send the invite below 👇` });
@@ -2410,11 +2410,12 @@ function ManageStaffModal({ onClose }) {
       if (pw) {
         // A password was set (new login or a reset) — offer the invite to send.
         const appUrl = window.location.origin;
-        const text = role === "staff"
+        const addHome = ` Add it to your phone's home screen (quick steps): ${appUrl}/add-to-home-screen.pdf`;
+        const text = (role === "staff"
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : role === "customer"
           ? `Hi — Aussieblock has an app for ordering and tracking concrete deliveries and managing your account. You can place orders, track the trucks live, and view invoices for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
-          : `Hi — Aussieblock has an app for ordering and tracking concrete deliveries. You can place orders, see the schedule, and track the trucks live for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`;
+          : `Hi — Aussieblock has an app for ordering and tracking concrete deliveries. You can place orders, see the schedule, and track the trucks live for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
         setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text });
         setSent(false); setCopied(false);
         setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
