@@ -161,9 +161,11 @@ export function saveBatchData(ref, data) {
 // Open an order's batch-ticket PDF (staff or owning customer). Fetches with the
 // auth token, then opens the PDF via a blob URL (works around no-auth <a href>).
 export async function openBatchTicket(ref, variant = 'view') {
-  const q = variant && variant !== 'view' ? `?variant=${encodeURIComponent(variant)}` : ''
+  // cache-bust so a freshly (re)converted ticket never shows a stale cached copy
+  const q = (variant && variant !== 'view' ? `?variant=${encodeURIComponent(variant)}&` : '?') + `t=${Date.now()}`
   const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket${q}`, {
     headers: { Authorization: `Bearer ${getToken()}` },
+    cache: 'no-store',
   })
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   const url = URL.createObjectURL(await res.blob())
