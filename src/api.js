@@ -247,6 +247,17 @@ export function requestPlusLoad(ref, note = '') {
   const qs = note ? `?note=${encodeURIComponent(note)}` : ''
   return request(`/orders/${ref}/plus-load${qs}`, { method: 'POST' })
 }
+// Per-order pricing: what we bill the customer + the delivery (haul) cost.
+export function getOrderPricing(ref) {
+  return request(`/orders/${ref}/pricing`)
+}
+export function setOrderDelivery(ref, { hauler, mileage }) {
+  return request(`/orders/${ref}/delivery`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hauler, mileage }),
+  })
+}
 // Price sheet (staff): rates that fill the batch-ticket pricing block.
 export function getPriceSheet() {
   return request('/price-sheet')

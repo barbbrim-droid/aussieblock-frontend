@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1702,43 +1702,45 @@ function mergeBatch(saved) {
   return b;
 }
 
+// "Ticket details" → per-order PRICING view: what we bill the customer (from the
+// price sheet) + the delivery (haul) cost (mileage auto from the job address,
+// haul $/yd by distance, staff-picked hauler). The mix design lives on the
+// uploaded batch ticket now, so this panel is pricing-only.
 function BatchTicketForm({ o, onEdited }) {
-  const [d, setD] = useState(() => {
-    const b = mergeBatch(o.batch_data);
-    if (!b.date) b.date = orderDateUS(o.when);   // default the batch Date to the order's delivery date (M/D/YYYY)
-    return b;
-  });
+  const [px, setPx] = useState(null);
+  const [hauler, setHauler] = useState(o.hauler || "");
+  const [mileage, setMileage] = useState(o.mileage != null ? String(o.mileage) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [savedOk, setSavedOk] = useState(false);
 
-  const set = (path, val) => {
-    setSavedOk(false);
-    setD((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      const parts = path.split("."); let t = next;
-      for (let i = 0; i < parts.length - 1; i++) t = t[parts[i]];
-      t[parts[parts.length - 1]] = val;
-      return next;
-    });
-  };
+  useEffect(() => {
+    let live = true;
+    getOrderPricing(o.ref).then((p) => {
+      if (!live) return;
+      setPx(p);
+      if (!hauler && p.delivery && p.delivery.hauler) setHauler(p.delivery.hauler);
+      if (mileage === "" && p.delivery && p.delivery.mileage) setMileage(String(p.delivery.mileage));
+    }).catch((e) => live && setErr(e.message));
+    return () => { live = false; };
+  }, [o.ref]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const save = async () => {
-    setBusy(true); setErr("");
-    try { onEdited && onEdited(await saveBatchData(o.ref, d)); setSavedOk(true); }
-    catch (e) { setErr(e.message || "Could not save"); }
+  const saveDelivery = async () => {
+    setBusy(true); setErr(""); setSavedOk(false);
+    try {
+      const dl = await setOrderDelivery(o.ref, { hauler: hauler || null, mileage: mileage === "" ? null : Number(mileage) });
+      setPx((p) => ({ ...(p || {}), delivery: dl }));
+      if (dl.mileage != null) setMileage(String(dl.mileage));
+      setSavedOk(true);
+      onEdited && onEdited({ ...o, hauler: dl.hauler, mileage: dl.mileage });
+    } catch (e) { setErr(e.message || "Could not save"); }
     finally { setBusy(false); }
   };
 
-  // plain render helper (NOT a component) so inputs keep focus while typing
-  const field = (label, path, cls = "") => (
-    <label className={`flex flex-col gap-1 ${cls}`}>
-      <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>{label}</span>
-      <input value={getAt(d, path) || ""} onChange={(e) => set(path, e.target.value)}
-        className="rounded-lg px-2 py-1.5 text-sm outline-none"
-        style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
-    </label>
-  );
+  const money = (v) => (v == null || v === "" ? "—" : `$${Number(v).toFixed(2)}`);
+  const cp = px && px.customer, dl = px && px.delivery;
+  const HAULERS = ["LGTZ", "P&L", "RAY"];
+
   const groupHead = (txt) => (
     <div className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1 pb-1" style={{ color: ORANGE, borderBottom: "1px solid rgba(255,255,255,0.08)", fontFamily: C.body }}>{txt}</div>
   );
@@ -1748,111 +1750,60 @@ function BatchTicketForm({ o, onEdited }) {
       <span className="text-white/80 text-sm truncate" style={{ fontFamily: C.body }}>{val || "—"}</span>
     </div>
   );
+  const Prow = ({ label, val, bold }) => (
+    <div className="flex items-center justify-between py-1" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <span className={`text-sm ${bold ? "font-bold text-white" : "text-white/70"}`} style={{ fontFamily: C.body }}>{label}</span>
+      <span className="text-sm" style={{ color: bold ? ORANGE : "#fff", fontWeight: bold ? 700 : 400, fontFamily: C.body }}>{val}</span>
+    </div>
+  );
 
   return (
     <div className="mt-2 rounded-xl p-3" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.08)" }}>
-      {/* identity — already on the order, shown for context */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2">
         {ro("Customer", o.customer)}
         {ro("Job", o.site)}
         {ro("Mix", o.mix)}
         {ro("Quantity", o.qty)}
-        {ro("Slump", o.slump)}
-        {ro("Truck", o.truck)}
-        {ro("Driver", o.driver)}
       </div>
 
-      {groupHead("Order")}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {field("Date", "date")}
-        {field("Cash / Charge", "cash_charge")}
-        {field("Customer Phone", "customer_phone")}
-        {field("Product Name", "product_name")}
-        {field("Ordered", "ordered")}
-        {field("Delivered", "delivered")}
-      </div>
-
-      {groupHead("Load / Delivery")}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {field("Plant", "plant")}
-        {field("Load #", "load")}
-        {field("Air", "air")}
-        {field("Water Reducer", "water_reducer")}
-        {field("Retarder", "retarder")}
-        {field("Inspector", "inspector")}
-      </div>
-
-      {groupHead("Times")}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {field("Left Plant", "times.left_plant")}
-        {field("A-Train PR", "times.a_train_pr")}
-        {field("Left Job", "times.left_job")}
-        {field("Return Plant", "times.return_plant")}
-      </div>
-
-      {groupHead("Mix Design (Design / Target / Actual)")}
-      <div className="flex flex-col gap-1.5">
-        <div className="grid gap-2 text-white/35 text-[10px] uppercase tracking-wide" style={{ gridTemplateColumns: "70px 1fr 1fr 1fr", fontFamily: C.body }}>
-          <span></span><span>Design</span><span>Target</span><span>Actual</span>
+      {groupHead("Customer pricing — what you bill")}
+      {!cp ? (
+        <div className="text-white/40 text-xs py-2 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Calculating…</div>
+      ) : (
+        <div>
+          <Prow label={`Concrete  (${o.qty} × ${money(cp.unit_price)}/yd)`} val={money(cp.extended)} />
+          {(cp.admixtures || []).map((a, i) => <Prow key={i} label={a.label} val={money(a.amount)} />)}
+          {cp.short_load ? <Prow label="Short-load fee" val={money(cp.short_load)} /> : null}
+          {cp.backhaul ? <Prow label="Back-haul fee" val={money(cp.backhaul)} /> : null}
+          <Prow label="Subtotal" val={money(cp.subtotal)} />
+          <Prow label={`Sales tax (${cp.tax_pct}%)`} val={money(cp.tax)} />
+          <Prow label="Total" val={money(cp.total)} bold />
         </div>
-        {["rock", "sand", "cement", "air", "water"].map((row) => (
-          <div key={row} className="grid gap-2 items-start" style={{ gridTemplateColumns: "70px 1fr 1fr 1fr" }}>
-            <span className="text-white/70 text-xs capitalize pt-1.5" style={{ fontFamily: C.body }}>{row}{row === "water" ? " (lb)" : ""}</span>
-            {["design", "target", "actual"].map((col) => {
-              const val = getAt(d, `mix_design.${row}.${col}`) || "";
-              return (
-                <div key={col}>
-                  <input value={val} onChange={(e) => set(`mix_design.${row}.${col}`, e.target.value)}
-                    className="rounded-lg px-2 py-1.5 text-sm outline-none w-full"
-                    style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
-                  {row === "water" && lbsToGal(val) && (
-                    <span className="block text-[10px] mt-0.5 px-1" style={{ color: "#6aa9ff", fontFamily: C.body }}>≈ {lbsToGal(val)}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      {/* Water/cement ratio vs TxDOT max for the order's class */}
-      {(() => {
-        const r = waterCementRatio(d);
-        if (!r) return null;
-        const max = wcMaxForMix(o.mix);
-        const over = max != null && r.wc > max + 1e-9;
-        const color = over ? "#ff8a85" : GREEN;
-        return (
-          <div className="mt-2 rounded-lg px-2.5 py-2 text-xs flex items-center gap-1.5" style={{ background: color + "1a", border: `1px solid ${color}55`, color, fontFamily: C.body }}>
-            {over ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
-            <span className="font-semibold">W/C ratio {r.wc.toFixed(2)}</span>
-            <span className="opacity-80">({r.col})</span>
-            {max != null
-              ? <span className="opacity-80">· max {max.toFixed(2)} for {o.mix}{over ? " — OVER MAX" : ""}</span>
-              : <span className="opacity-80">· no TxDOT max for this mix</span>}
-          </div>
-        );
-      })()}
+      )}
 
-      {groupHead("Pricing")}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {field("Unit Price", "pricing.unit_price")}
-        {field("Extended", "pricing.extended")}
-        {field("Subtotal", "pricing.subtotal")}
-        {field("Tax 1", "pricing.tax1")}
-        {field("Tax 2", "pricing.tax2")}
-        {field("Total", "pricing.total")}
-        {field("Job Running Total", "pricing.job_running_total", "sm:col-span-2")}
+      {groupHead("Delivery cost — haul (internal)")}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+        <label className="flex flex-col gap-1">
+          <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Hauler</span>
+          <select value={hauler} onChange={(e) => { setHauler(e.target.value); setSavedOk(false); }} className="rounded-lg px-2 py-1.5 text-sm outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+            <option value="">— pick —</option>
+            {HAULERS.map((h) => <option key={h} value={h}>{h}</option>)}
+            {hauler && !HAULERS.includes(hauler) && <option value={hauler}>{hauler}</option>}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Mileage (mi)</span>
+          <input value={mileage} onChange={(e) => { setMileage(e.target.value); setSavedOk(false); }} placeholder="auto" inputMode="decimal" className="rounded-lg px-2 py-1.5 text-sm outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+        </label>
+        {ro("Haul $/yd", dl ? money(dl.rate) : "…")}
+        {ro("Haul total", dl ? money(dl.total) : "…")}
       </div>
-
-      {groupHead("Signature")}
-      <div className="grid grid-cols-2 gap-2">
-        {field("Received By", "received_by")}
-      </div>
+      <div className="text-white/35 text-[11px] mt-1.5">Mileage auto-fills from the job address (Save to refresh); type a value to override. Rates come from the Price sheet.</div>
 
       {err && <div className="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
       <div className="mt-3 flex items-center gap-2">
-        <button onClick={save} disabled={busy} className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: GREEN, fontFamily: C.body }}>
-          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save ticket
+        <button onClick={saveDelivery} disabled={busy} className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: GREEN, fontFamily: C.body }}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save delivery
         </button>
         {savedOk && <span className="text-xs flex items-center gap-1" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={13} /> Saved</span>}
       </div>
