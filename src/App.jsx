@@ -3888,7 +3888,10 @@ function DispatchApp({ email, role, onLogout }) {
   // big column; they're pulled out of Today's/Upcoming so each shows in one place.
   // A pour still sitting at Scheduled stays in the schedule until it goes live.
   const LIVE_POUR_STATUS = ["batched", "enroute", "onsite", "pouring", "returning"];
-  const isLivePour = (o) => o.is_pour && LIVE_POUR_STATUS.includes(o.status);
+  // A pour is "current" once it's in flight: its umbrella status is "ongoing"
+  // (set when the pour starts), or it carries a stray truck stage. Scheduled /
+  // requested / complete pours are not current.
+  const isLivePour = (o) => o.is_pour && (o.status === "ongoing" || LIVE_POUR_STATUS.includes(o.status));
   const currentPours = activeOrders.filter(isLivePour).sort(byTimeAsc);
   const todayOrders = activeOrders.filter((o) => !isLivePour(o) && orderDay(o.when, today) === "today").sort(byTimeAsc);
   const upcomingOrders = activeOrders.filter((o) => !isLivePour(o) && orderDay(o.when, today) === "upcoming");
@@ -4080,7 +4083,7 @@ function DispatchApp({ email, role, onLogout }) {
               load-by-load); Today's is next; the map and Upcoming are reference
               columns. Completed orders aren't a column — they drop straight into the
               "Past orders" tab above. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,2.5fr)_minmax(0,1.6fr)_minmax(0,1.1fr)] gap-3">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1fr)] gap-3">
             <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
