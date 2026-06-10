@@ -2814,11 +2814,12 @@ function ManageDocsModal({ onClose }) {
   useEffect(() => { load(); }, []);
 
   const upload = async () => {
-    if (!title.trim() || !file) { setMsg({ ok: false, text: "Add a title and choose a PDF." }); return; }
+    if (!file) { setMsg({ ok: false, text: "Choose a PDF first." }); return; }
+    const t = title.trim() || file.name.replace(/\.pdf$/i, "");   // default the title to the file name
     setBusy(true); setMsg(null);
     try {
-      await uploadDoc(title.trim(), file);
-      setMsg({ ok: true, text: `Uploaded "${title.trim()}".` });
+      await uploadDoc(t, file);
+      setMsg({ ok: true, text: `Uploaded "${t}".` });
       setTitle(""); setFile(null); if (fileRef.current) fileRef.current.value = "";
       await load();
     } catch (e) { setMsg({ ok: false, text: e.message }); }
@@ -2861,9 +2862,9 @@ function ManageDocsModal({ onClose }) {
           )}
           <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
             <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Add a document (PDF)</div>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Concrete Safety Sheet)" className={inCls + " mb-2"} style={inSt} />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional — defaults to file name)" className={inCls + " mb-2"} style={inSt} />
             <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full text-xs text-white/70 mb-2 file:mr-3 file:rounded-lg file:border-0 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:bg-white/10 file:text-white" style={{ fontFamily: C.body }} />
-            <button onClick={upload} disabled={busy || !title.trim() || !file} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Upload</button>
+            <button onClick={upload} disabled={busy || !file} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Upload</button>
           </div>
           {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
         </div>
