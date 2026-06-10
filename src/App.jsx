@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1881,6 +1881,29 @@ function LoadsPanel({ o, trucks, onEdited }) {
     return r;
   });
 
+  // Each load carries its own batch ticket (one truck-load = one paper ticket).
+  // One hidden picker, shared across rows; `ticketSeq` records which load it's for.
+  const ticketRef = useRef(null);
+  const [ticketSeq, setTicketSeq] = useState(null);
+  const [tBusy, setTBusy] = useState(null);   // seq currently uploading/removing a ticket
+  const pickTicket = (seq) => { setTicketSeq(seq); setErr(""); ticketRef.current?.click(); };
+  const onTicketFile = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = "";
+    if (!file || ticketSeq == null) return;
+    const seq = ticketSeq;
+    setTBusy(seq); setErr("");
+    try { onEdited && onEdited(await uploadLoadBatchTicket(o.ref, seq, file)); }
+    catch (ex) { setErr(ex.message || "Upload failed"); }
+    finally { setTBusy(null); setTicketSeq(null); }
+  };
+  const delTicket = async (seq) => {
+    if (!window.confirm(`Remove the batch ticket for load #${seq}?`)) return;
+    setTBusy(seq); setErr("");
+    try { onEdited && onEdited(await deleteLoadBatchTicket(o.ref, seq)); }
+    catch (ex) { setErr(ex.message); }
+    finally { setTBusy(null); }
+  };
+
   const selSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
   const setStatus = (status) => wrap("status", () => setOrderStatus(o.ref, status));
   const ordMeta = STATUS_META[o.status] || STATUS_META.scheduled;
@@ -1909,23 +1932,49 @@ function LoadsPanel({ o, trucks, onEdited }) {
           <Plus size={12} /> Add load
         </button>
       </div>
+      <input ref={ticketRef} type="file" accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.heic" onChange={onTicketFile} className="hidden" />
       {(o.loads || []).map((ld) => {
         const meta = STATUS_META[ld.status] || STATUS_META.scheduled;
         const dot = ld.truck && ld.truck !== "—" ? colors[ld.truck] : "rgba(255,255,255,0.2)";
         return (
-          <div key={ld.seq} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "54px 1fr 1fr 20px" }}>
-            <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
-              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
-              #{ld.seq}·{ld.qty}y
-            </span>
-            <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
-              <option value="—">Unassigned</option>
-              {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
-            </select>
-            <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
-              {ORDER_STATUSES.filter((sx) => sx !== "requested" && sx !== "ongoing").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
-            </select>
-            <button onClick={() => del(ld.seq)} disabled={busy === ld.seq} title="Remove load" className="p-1 rounded active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}><X size={12} color="#ff8a85" /></button>
+          <div key={ld.seq} className="mb-1.5">
+            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "54px 1fr 1fr 20px" }}>
+              <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
+                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
+                #{ld.seq}·{ld.qty}y
+              </span>
+              <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
+                <option value="—">Unassigned</option>
+                {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+              </select>
+              <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
+                {ORDER_STATUSES.filter((sx) => sx !== "requested" && sx !== "ongoing").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
+              </select>
+              <button onClick={() => del(ld.seq)} disabled={busy === ld.seq} title="Remove load" className="p-1 rounded active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}><X size={12} color="#ff8a85" /></button>
+            </div>
+            {/* this load's own batch ticket */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-1" style={{ paddingLeft: 60 }}>
+              {ld.has_batch_ticket ? (
+                <>
+                  <button onClick={() => openLoadBatchTicket(o.ref, ld.seq).catch((e) => setErr(e.message))} className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95" style={{ color: GREEN, background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
+                    <FileText size={11} /> Ticket
+                  </button>
+                  {ld.has_original && (
+                    <button onClick={() => openLoadBatchTicket(o.ref, ld.seq, "original").catch((e) => setErr(e.message))} title="Open the original scan/photo" className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+                      <FileText size={11} /> Original
+                    </button>
+                  )}
+                  <button onClick={() => pickTicket(ld.seq)} disabled={tBusy === ld.seq} className="text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95 disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
+                    {tBusy === ld.seq ? <Loader2 size={11} className="animate-spin" /> : "Replace"}
+                  </button>
+                  <button onClick={() => delTicket(ld.seq)} disabled={tBusy === ld.seq} title="Remove this load's ticket" className="p-1 rounded-md active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.1)" }}><Trash2 size={11} color="#ff8a85" /></button>
+                </>
+              ) : (
+                <button onClick={() => pickTicket(ld.seq)} disabled={tBusy === ld.seq} className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95 disabled:opacity-50" style={{ color: "#fff", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
+                  {tBusy === ld.seq ? <><Loader2 size={11} className="animate-spin" /> Converting…</> : <><Plus size={11} /> Add ticket</>}
+                </button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -1980,9 +2029,11 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
     catch (e) { setErr(e.message || "Could not cancel"); setBusy(false); }
   };
 
-  // Batch ticket (PDF) upload — allowed on any order, at any stage.
+  // Batch ticket (PDF) upload — allowed on any single delivery, at any stage.
+  // Pours don't use an order-level ticket: each load carries its own (see
+  // LoadsPanel), so one paper ticket per truck-load.
   const fileRef = useRef(null);
-  const batchable = true;
+  const batchable = !o.is_pour;
   const onPickTicket = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";   // let them re-pick the same file later

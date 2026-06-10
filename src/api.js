@@ -175,6 +175,39 @@ export async function openBatchTicket(ref, variant = 'view') {
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
+// Upload a batch ticket for ONE load of a pour (staff). Returns the updated order.
+export async function uploadLoadBatchTicket(ref, seq, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/loads/${seq}/batch-ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },   // browser sets the multipart boundary
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+
+// Open a load's batch-ticket PDF (staff or owning customer), via an auth'd blob.
+export async function openLoadBatchTicket(ref, seq, variant = 'view') {
+  const q = (variant && variant !== 'view' ? `?variant=${encodeURIComponent(variant)}&` : '?') + `t=${Date.now()}`
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/loads/${seq}/batch-ticket${q}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url; a.target = '_blank'; a.rel = 'noopener'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
+// Remove one load's batch-ticket PDF (staff). Returns the updated order.
+export function deleteLoadBatchTicket(ref, seq) {
+  return request(`/orders/${encodeURIComponent(ref)}/loads/${seq}/batch-ticket`, { method: 'DELETE' })
+}
+
 // Flag every customer with an unpaid balance >= `days` days old as COD (staff).
 export function codFromAging(days = 30) {
   return request(`/customers/cod-from-aging?days=${days}`, { method: 'POST' })
