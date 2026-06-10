@@ -356,7 +356,11 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       </div>
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.project || order.site}</h2>
       {order.project && <p className="text-white/50 text-sm flex items-center gap-1"><MapPin size={13} /> {order.site}</p>}
-      <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
+      {order.is_pour ? (
+        <p className="text-white/50 text-sm">{order.mix} · Ordered {order.qty} · Delivered {fmtYards(order.yards_loaded || 0)} yd</p>
+      ) : (
+        <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
+      )}
       {orderExtras(order) && <p className="text-white/40 text-xs mt-0.5">{orderExtras(order)}</p>}
 
       {canFinance && order.prepay_required && !order.prepaid && (
@@ -408,7 +412,23 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
 
       <button onClick={() => setShowReorder(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Plus size={18} /> Order again</button>
 
-      {order.has_batch_ticket ? (
+      {order.is_pour ? (
+        // Continuous pour: one batch ticket per truck-load.
+        (order.loads || []).some((ld) => ld.has_batch_ticket) ? (
+          <div className="mt-3 rounded-2xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)" }}>
+            <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: C.body }}>Batch tickets</div>
+            <div className="flex flex-col gap-2">
+              {(order.loads || []).filter((ld) => ld.has_batch_ticket).map((ld) => (
+                <button key={ld.seq} onClick={() => openLoadBatchTicket(order.ref, ld.seq).catch((e) => alert(e.message))} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
+                  <FileText size={16} /> Load #{ld.seq} · {ld.qty} yd
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : isLive ? (
+          <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch tickets will appear here as each load is delivered.</div>
+        ) : null
+      ) : order.has_batch_ticket ? (
         <button onClick={() => openBatchTicket(order.ref).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
       ) : isLive ? (
         <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch ticket will appear here once it's uploaded.</div>
