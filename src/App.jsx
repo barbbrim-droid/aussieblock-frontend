@@ -1413,6 +1413,7 @@ function GoogleFleetMap({ trucks, sites = [] }) {
   const sitesRef = useRef(sites); sitesRef.current = sites;
   const siteMarkersRef = useRef([]);
   const geocodeRef = useRef({});   // address -> {lat,lng} | null (geocode failed)
+  const lastFitKeyRef = useRef("");   // which jobs we last framed — refit only when it changes
   const [failed, setFailed] = useState(false);
 
   const drawTrucks = (maps) => {
@@ -1429,6 +1430,22 @@ function GoogleFleetMap({ trucks, sites = [] }) {
       }));
   };
 
+  // Frame the yard + every geocoded job site so both are always in view; with
+  // several sites this zooms out to fit them all. Only refit when the set of
+  // mappable jobs changes, so it doesn't fight a manual zoom/pan between updates.
+  const fitToYardAndSites = (maps) => {
+    if (!mapRef.current) return;
+    const located = sitesRef.current.filter((s) => geocodeRef.current[s.site]);
+    const key = located.map((s) => s.ref).sort().join(",");
+    if (key === lastFitKeyRef.current) return;
+    lastFitKeyRef.current = key;
+    if (located.length === 0) return;   // nothing but the yard — keep the default view
+    const b = new maps.LatLngBounds();
+    b.extend({ lat: PLANT.lat, lng: PLANT.lng });
+    located.forEach((s) => b.extend(geocodeRef.current[s.site]));
+    mapRef.current.fitBounds(b, 70);   // 70px padding around the markers
+  };
+
   // A dot at each job site (geocoded from the order's address) so staff can eyeball
   // that the address on the card actually lands where the job is. Cached per address.
   const drawSites = (maps) => {
@@ -1443,12 +1460,14 @@ function GoogleFleetMap({ trucks, sites = [] }) {
       }));
     };
     const seen = new Set();
+    let pending = 0;
     for (const s of sitesRef.current) {
       if (!s.site || seen.has(s.ref)) continue;
       seen.add(s.ref);
       const cached = geocodeRef.current[s.site];
       if (cached) { place(cached, s); continue; }
       if (cached === null) continue;   // known-bad address — skip re-geocoding
+      pending++;
       new maps.Geocoder().geocode({ address: s.site }, (res, status) => {
         if (status === "OK" && res && res[0]) {
           const ll = res[0].geometry.location;
@@ -1458,8 +1477,10 @@ function GoogleFleetMap({ trucks, sites = [] }) {
         } else {
           geocodeRef.current[s.site] = null;
         }
+        if (--pending === 0) fitToYardAndSites(maps);   // refit once all geocodes resolve
       });
     }
+    fitToYardAndSites(maps);   // fit immediately for the already-cached sites
   };
 
   useEffect(() => {
