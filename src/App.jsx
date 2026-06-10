@@ -3884,13 +3884,18 @@ function DispatchApp({ email, role, onLogout }) {
   const completedOrders = allCompleted.filter((o) => !o.archived);
   const archivedOrders = allCompleted.filter((o) => o.archived);
   const today = localToday();
-  const todayOrders = activeOrders.filter((o) => orderDay(o.when, today) === "today").sort(byTimeAsc);
-  const upcomingOrders = activeOrders.filter((o) => orderDay(o.when, today) === "upcoming");
+  // Live pours (>10 yd continuous pours actively being delivered) get their own
+  // big column; they're pulled out of Today's/Upcoming so each shows in one place.
+  // A pour still sitting at Scheduled stays in the schedule until it goes live.
+  const LIVE_POUR_STATUS = ["batched", "enroute", "onsite", "pouring", "returning"];
+  const isLivePour = (o) => o.is_pour && LIVE_POUR_STATUS.includes(o.status);
+  const currentPours = activeOrders.filter(isLivePour).sort(byTimeAsc);
+  const todayOrders = activeOrders.filter((o) => !isLivePour(o) && orderDay(o.when, today) === "today").sort(byTimeAsc);
+  const upcomingOrders = activeOrders.filter((o) => !isLivePour(o) && orderDay(o.when, today) === "upcoming");
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
 
   // Each truck's status, derived from the order it's assigned to. (Later, GPS
   // geofences for the yard / job site will drive At yard vs On site automatically.)
-  const LIVE_TRUCK = ["batched", "enroute", "onsite", "pouring", "returning"];
   const statusToTruck = (status, ref, job) => {
     if (status === "returning") return { label: "Returning", color: "#4da3ff", order: ref, job };
     if (status === "pouring") return { label: "Pouring", color: GREEN, order: ref, job };
@@ -3900,12 +3905,12 @@ function DispatchApp({ email, role, onLogout }) {
   };
   const truckStatus = (t) => {
     // Single delivery: the truck is assigned to the order itself.
-    const o = activeOrders.find((x) => !x.is_pour && x.truck === t.label && LIVE_TRUCK.includes(x.status));
+    const o = activeOrders.find((x) => !x.is_pour && x.truck === t.label && LIVE_POUR_STATUS.includes(x.status));
     if (o) return statusToTruck(o.status, o.ref, o);
     // Continuous pour: the truck is assigned to a load, not the umbrella order.
     for (const p of activeOrders) {
       if (!p.is_pour) continue;
-      const ld = (p.loads || []).find((l) => l.truck === t.label && LIVE_TRUCK.includes(l.status));
+      const ld = (p.loads || []).find((l) => l.truck === t.label && LIVE_POUR_STATUS.includes(l.status));
       if (ld) return statusToTruck(ld.status, p.ref, p);
     }
     return { label: "At yard", color: "#7c8794" };
@@ -3913,6 +3918,10 @@ function DispatchApp({ email, role, onLogout }) {
 
   // Yard totals for planning: today's total, and upcoming grouped by day.
   const todayYards = todayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
+  // Live pour progress: how many yards have actually been produced (batched into
+  // trucks) so far vs the ordered total, across every live pour.
+  const pourProducedYards = currentPours.reduce((sum, o) => sum + (parseFloat(o.yards_loaded) || 0), 0);
+  const pourTotalYards = currentPours.reduce((sum, o) => sum + parseYards(o.qty), 0);
   // Yards poured today = completed orders scheduled for today.
   const completedTodayYards = allCompleted.filter((o) => o.when === today).reduce((sum, o) => sum + parseYards(o.qty), 0);
   const upcomingByDay = {};
@@ -4062,9 +4071,11 @@ function DispatchApp({ email, role, onLogout }) {
           )}
 
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
-              Today's orders gets the most room (it's where the day's work happens);
-              Completed + Upcoming are kept narrow as reference columns. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.5fr)_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              Current pours gets the most room (the big continuous pours staff watch
+              load-by-load); Today's is next; the map and Upcoming are reference
+              columns. Completed orders aren't a column — they drop straight into the
+              "Past orders" tab above. */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,2.5fr)_minmax(0,1.6fr)_minmax(0,1.1fr)] gap-3">
             <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
@@ -4106,6 +4117,20 @@ function DispatchApp({ email, role, onLogout }) {
                 </div>
               </div>
             </Panel>
+            <Panel title="Current pours" icon={Droplets} count={currentPours.length} fill>
+              {currentPours.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No pours running right now. A continuous pour (&gt;10 yd) appears here once it goes live.</div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3 rounded-lg px-3 py-2" style={{ background: NAVY }}>
+                    <Droplets size={15} color={GREEN} />
+                    <span className="text-white text-sm font-semibold" style={{ fontFamily: C.body }}>{fmtYards(pourProducedYards)} / {fmtYards(pourTotalYards)} CY produced</span>
+                    <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {currentPours.length} pour{currentPours.length === 1 ? "" : "s"} live</span>
+                  </div>
+                  {currentPours.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} />)}
+                </>
+              )}
+            </Panel>
             <Panel title="Today's orders" icon={List} count={todayOrders.length} fill>
               {todayOrders.length === 0 ? (
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No orders scheduled for today.</div>
@@ -4117,18 +4142,6 @@ function DispatchApp({ email, role, onLogout }) {
                     <span className="text-white/40 text-xs" style={{ fontFamily: C.body }}>· {todayOrders.length} order{todayOrders.length === 1 ? "" : "s"}</span>
                   </div>
                   {todayOrders.map((o) => <OrderRow key={o.ref} o={o} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onDriver={setDriver} />)}
-                </>
-              )}
-            </Panel>
-            <Panel title="Completed" icon={CheckCircle2} count={completedOrders.length} fill>
-              {completedOrders.length === 0 ? (
-                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No completed orders. Set an order to “complete” and it lands here to review or archive.</div>
-              ) : (
-                <>
-                  {completedOrders.slice(0, 50).map((o) => <CompletedRow key={o.ref} o={o} onArchived={applyOrder} />)}
-                  {completedOrders.length > 50 && (
-                    <div className="text-white/40 text-xs text-center py-2" style={{ fontFamily: C.body }}>+{completedOrders.length - 50} more — archive to clear, or open “Past orders”.</div>
-                  )}
                 </>
               )}
             </Panel>
