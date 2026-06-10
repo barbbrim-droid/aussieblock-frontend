@@ -1602,33 +1602,28 @@ function WeatherBar() {
   const cur = wxIcon(wx.text, wx.day);
   const shortDay = (n) => (/^(today|tonight|this)/i.test(n) ? "Today" : n.split(" ")[0].slice(0, 3));
   return (
-    <div className="shrink-0 flex items-center rounded-2xl px-4 py-2.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="shrink-0 self-end w-fit max-w-full flex items-center rounded-2xl px-3 py-1.5 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
       {/* current */}
-      <div className="flex items-center gap-3 pr-5 mr-4 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
-        <cur.Icon size={38} color={cur.color} strokeWidth={1.75} />
+      <div className="flex items-center gap-2 pr-3 mr-3 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+        <cur.Icon size={26} color={cur.color} strokeWidth={1.75} />
         <div>
           <div className="flex items-start gap-0.5">
-            <span className="text-white text-3xl font-bold leading-none" style={{ fontFamily: C.cond }}>{wx.tempF}</span>
-            <span className="text-white/50 text-sm font-semibold mt-0.5">°F</span>
+            <span className="text-white text-xl font-bold leading-none" style={{ fontFamily: C.cond }}>{wx.tempF}</span>
+            <span className="text-white/50 text-[11px] font-semibold mt-0.5">°F</span>
           </div>
-          <div className="text-white/55 text-xs mt-1" style={{ fontFamily: C.body }}>{wx.text}</div>
-        </div>
-        <div className="ml-1 self-end">
-          <div className="text-white/35 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>San Angelo</div>
+          <div className="text-white/35 text-[10px] uppercase tracking-wide mt-0.5" style={{ fontFamily: C.body }}>San Angelo</div>
         </div>
       </div>
-      {/* forecast */}
-      <div className="flex items-center gap-5 overflow-x-auto">
-        {wx.days.map((d) => {
+      {/* forecast — next 3 days, compact */}
+      <div className="flex items-center gap-3.5">
+        {wx.days.slice(0, 3).map((d) => {
           const ic = wxIcon(d.text, true);
           return (
-            <div key={d.name} className="flex flex-col items-center shrink-0" title={d.text}>
-              <span className="text-white/45 text-[11px] font-semibold mb-1" style={{ fontFamily: C.body }}>{shortDay(d.name)}</span>
-              <ic.Icon size={22} color={ic.color} strokeWidth={1.75} />
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-white text-sm font-bold" style={{ fontFamily: C.cond }}>{d.hi}°</span>
-                {d.lo != null && <span className="text-white/40 text-xs" style={{ fontFamily: C.cond }}>{d.lo}°</span>}
-              </div>
+            <div key={d.name} className="flex items-center gap-1.5 shrink-0" title={d.text}>
+              <span className="text-white/45 text-[11px] font-semibold" style={{ fontFamily: C.body }}>{shortDay(d.name)}</span>
+              <ic.Icon size={16} color={ic.color} strokeWidth={1.75} />
+              <span className="text-white text-xs font-bold" style={{ fontFamily: C.cond }}>{d.hi}°</span>
+              {d.lo != null && <span className="text-white/40 text-[11px]" style={{ fontFamily: C.cond }}>{d.lo}°</span>}
             </div>
           );
         })}
