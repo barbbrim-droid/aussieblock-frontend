@@ -2016,6 +2016,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [nTruck, setNTruck] = useState("—");
+  const [nDriver, setNDriver] = useState("");
   const [nQty, setNQty] = useState("10");
   const colors = truckColorMap(trucks);
   const total = parseFloat(o.qty) || 0;
@@ -2029,8 +2030,8 @@ function LoadsPanel({ o, trucks, onEdited }) {
   const upd = (seq, patch) => wrap(seq, () => updateLoad(o.ref, seq, patch));
   const del = (seq) => wrap(seq, () => removeLoad(o.ref, seq));
   const add = () => wrap("add", async () => {
-    const r = await addLoad(o.ref, { truck: nTruck === "—" ? null : nTruck, qty: nQty || "10" });
-    setAdding(false); setNTruck("—"); setNQty("10");
+    const r = await addLoad(o.ref, { truck: nTruck === "—" ? null : nTruck, driver: nDriver || null, qty: nQty || "10" });
+    setAdding(false); setNTruck("—"); setNDriver(""); setNQty("10");
     return r;
   });
 
@@ -2091,7 +2092,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
         const dot = ld.truck && ld.truck !== "—" ? colors[ld.truck] : "rgba(255,255,255,0.2)";
         return (
           <div key={ld.seq} className="mb-1.5">
-            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "30px 46px minmax(0,110px) minmax(0,1fr) 20px", maxWidth: 380 }}>
+            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "26px 44px minmax(0,82px) minmax(0,82px) minmax(0,1fr) 18px", maxWidth: 460 }}>
               <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
                 <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
                 #{ld.seq}
@@ -2100,6 +2101,11 @@ function LoadsPanel({ o, trucks, onEdited }) {
               <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
                 <option value="—">Unassigned</option>
                 {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+              </select>
+              {/* Each load carries its own driver (one truck-load = one driver). Send "" to clear (the backend only clears on empty). */}
+              <select value={ld.driver && ld.driver !== "—" ? ld.driver : ""} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { driver: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
+                <option value="">Driver</option>
+                {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
               <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
                 {ORDER_STATUSES.filter((sx) => sx !== "requested" && sx !== "ongoing").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
@@ -2133,10 +2139,14 @@ function LoadsPanel({ o, trucks, onEdited }) {
         );
       })}
       {adding && (
-        <div className="grid gap-1.5 mb-1 items-center" style={{ gridTemplateColumns: "minmax(0,110px) 56px auto", maxWidth: 380 }}>
+        <div className="grid gap-1.5 mb-1 items-center" style={{ gridTemplateColumns: "minmax(0,100px) minmax(0,100px) 50px auto", maxWidth: 460 }}>
           <select value={nTruck} onChange={(e) => setNTruck(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
             <option value="—">Pick truck…</option>
             {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+          </select>
+          <select value={nDriver} onChange={(e) => setNDriver(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
+            <option value="">Driver…</option>
+            {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
           <input value={nQty} onChange={(e) => setNQty(e.target.value)} inputMode="decimal" placeholder="yd" className="rounded-lg px-1.5 py-1 text-xs outline-none w-full" style={selSt} />
           <button onClick={add} disabled={busy === "add"} className="text-xs font-bold px-2.5 py-1 rounded-lg active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{busy === "add" ? "…" : "Add"}</button>
