@@ -1856,6 +1856,28 @@ function annotateClashes(orders) {
   });
 }
 
+// Editable yards for one pour load. A pour bills the SUM of its loads, so staff
+// correct each load to what the truck actually poured. Commits on blur / Enter.
+function LoadQtyInput({ qty, disabled, style, onSave }) {
+  const [v, setV] = useState(String(qty ?? ""));
+  useEffect(() => { setV(String(qty ?? "")); }, [qty]);
+  const commit = () => {
+    const t = v.trim();
+    if (!t || t === String(qty)) { setV(String(qty ?? "")); return; }   // unchanged/blank — revert
+    onSave(t);
+  };
+  return (
+    <input
+      value={v} disabled={disabled} inputMode="decimal" placeholder="yd"
+      onChange={(e) => setV(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      title="Yards on this load — edit to the actual poured amount"
+      className="rounded-lg px-1.5 py-1 text-xs outline-none w-full text-center disabled:opacity-50"
+      style={style}
+    />
+  );
+}
+
 // The loads inside a continuous pour (>10 yd). Loads are added one at a time as
 // each truck is batched/loaded; the card rolls them up. Keeps a big pour to one card.
 function LoadsPanel({ o, trucks, onEdited }) {
@@ -1938,11 +1960,12 @@ function LoadsPanel({ o, trucks, onEdited }) {
         const dot = ld.truck && ld.truck !== "—" ? colors[ld.truck] : "rgba(255,255,255,0.2)";
         return (
           <div key={ld.seq} className="mb-1.5">
-            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "54px 1fr 1fr 20px" }}>
+            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "30px 46px 1fr 1fr 20px" }}>
               <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
                 <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
-                #{ld.seq}·{ld.qty}y
+                #{ld.seq}
               </span>
+              <LoadQtyInput qty={ld.qty} disabled={busy === ld.seq} style={selSt} onSave={(q) => upd(ld.seq, { qty: q })} />
               <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
                 <option value="—">Unassigned</option>
                 {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
