@@ -247,13 +247,25 @@ export function requestPlusLoad(ref, note = '') {
   const qs = note ? `?note=${encodeURIComponent(note)}` : ''
   return request(`/orders/${ref}/plus-load${qs}`, { method: 'POST' })
 }
-// Continuous pour: update one load (assign truck/driver or advance status).
+// Continuous pour: add a load (each time a truck is batched/loaded).
+export function addLoad(ref, body) {
+  return request(`/orders/${encodeURIComponent(ref)}/loads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+// Update one load (assign truck/driver or advance status).
 export function updateLoad(ref, seq, patch) {
   return request(`/orders/${encodeURIComponent(ref)}/loads/${seq}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   })
+}
+// Remove a load from a pour.
+export function removeLoad(ref, seq) {
+  return request(`/orders/${encodeURIComponent(ref)}/loads/${seq}`, { method: 'DELETE' })
 }
 // Per-order pricing: what we bill the customer + the delivery (haul) cost.
 export function getOrderPricing(ref) {

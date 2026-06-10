@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, updateLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1829,41 +1829,75 @@ function annotateClashes(orders) {
   });
 }
 
-// The loads inside a continuous pour (>10 yd). Each load gets its own truck +
-// status; the pour card rolls them up. Keeps a big pour to one card.
+// The loads inside a continuous pour (>10 yd). Loads are added one at a time as
+// each truck is batched/loaded; the card rolls them up. Keeps a big pour to one card.
 function LoadsPanel({ o, trucks, onEdited }) {
-  const [busy, setBusy] = useState(null);   // seq currently saving
+  const [busy, setBusy] = useState(null);   // seq (or "add") currently saving
   const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [nTruck, setNTruck] = useState("—");
+  const [nQty, setNQty] = useState("10");
   const colors = truckColorMap(trucks);
-  const upd = async (seq, patch) => {
-    setBusy(seq); setErr("");
-    try { onEdited && onEdited(await updateLoad(o.ref, seq, patch)); }
-    catch (e) { setErr(e.message || "Could not update load"); }
+  const total = parseFloat(o.qty) || 0;
+
+  const wrap = async (key, fn) => {
+    setBusy(key); setErr("");
+    try { onEdited && onEdited(await fn()); }
+    catch (e) { setErr(e.message || "Could not update"); }
     finally { setBusy(null); }
   };
+  const upd = (seq, patch) => wrap(seq, () => updateLoad(o.ref, seq, patch));
+  const del = (seq) => wrap(seq, () => removeLoad(o.ref, seq));
+  const add = () => wrap("add", async () => {
+    const r = await addLoad(o.ref, { truck: nTruck === "—" ? null : nTruck, qty: nQty || "10" });
+    setAdding(false); setNTruck("—"); setNQty("10");
+    return r;
+  });
+
   const selSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
   return (
     <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="text-white/40 text-[10px] uppercase tracking-wide mb-1.5" style={{ fontFamily: C.body }}>Loads · {o.loads_done}/{o.loads_total} complete</div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>
+          Loads · {o.yards_loaded || 0}/{total} yd{o.loads_total ? ` · ${o.loads_done}/${o.loads_total} done` : ""}
+        </span>
+        <button onClick={() => { setAdding((a) => !a); setErr(""); }} className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full active:scale-95" style={{ background: ORANGE + "22", color: ORANGE, fontFamily: C.body }}>
+          <Plus size={12} /> Add load
+        </button>
+      </div>
       {(o.loads || []).map((ld) => {
         const meta = STATUS_META[ld.status] || STATUS_META.scheduled;
         const dot = ld.truck && ld.truck !== "—" ? colors[ld.truck] : "rgba(255,255,255,0.2)";
         return (
-          <div key={ld.seq} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "58px 1fr 1fr" }}>
+          <div key={ld.seq} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "54px 1fr 1fr 20px" }}>
             <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
-              <span className="inline-block w-2 h-2 rounded-full" style={{ background: dot }} />
-              #{ld.seq} · {ld.qty}y
+              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
+              #{ld.seq}·{ld.qty}y
             </span>
-            <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-2 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
+            <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
               <option value="—">Unassigned</option>
               {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
             </select>
-            <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-2 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
+            <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
               {ORDER_STATUSES.filter((sx) => sx !== "requested").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
             </select>
+            <button onClick={() => del(ld.seq)} disabled={busy === ld.seq} title="Remove load" className="p-1 rounded active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}><X size={12} color="#ff8a85" /></button>
           </div>
         );
       })}
+      {adding && (
+        <div className="grid gap-1.5 mb-1 items-center" style={{ gridTemplateColumns: "1fr 56px auto" }}>
+          <select value={nTruck} onChange={(e) => setNTruck(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
+            <option value="—">Pick truck…</option>
+            {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+          </select>
+          <input value={nQty} onChange={(e) => setNQty(e.target.value)} inputMode="decimal" placeholder="yd" className="rounded-lg px-1.5 py-1 text-xs outline-none w-full" style={selSt} />
+          <button onClick={add} disabled={busy === "add"} className="text-xs font-bold px-2.5 py-1 rounded-lg active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{busy === "add" ? "…" : "Add"}</button>
+        </div>
+      )}
+      {(o.loads || []).length === 0 && !adding && (
+        <div className="text-white/30 text-xs py-0.5" style={{ fontFamily: C.body }}>No loads yet — tap “Add load” as each truck is batched.</div>
+      )}
       {err && <div className="text-[11px] mt-1" style={{ color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
     </div>
   );
