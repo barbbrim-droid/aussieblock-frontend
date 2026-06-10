@@ -3135,8 +3135,7 @@ function CostsModal({ orders, onClose }) {
   .r{text-align:right;white-space:nowrap;}
   .job{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   tfoot td{border-top:2px solid #c9ced4;font-weight:bold;padding-top:8px;}
-  .cust{page-break-inside:avoid;margin-bottom:6px;}
-  #detail{page-break-before:always;}
+  .cust{page-break-inside:avoid;page-break-before:always;margin-bottom:6px;}
   thead{display:table-header-group;}
   button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:26px;}
   @media print{button{display:none;}body{margin:0;}}
@@ -3157,10 +3156,7 @@ function CostsModal({ orders, onClose }) {
     <tbody>${summaryRows}</tbody>
     <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
   </table>
-  <div id="detail">
-    <div class="sec-title">Detail by customer</div>
-    ${sections}
-  </div>`}
+  ${sections}`}
   <div class="muted" style="margin-top:10px;font-size:11px;">“To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
   <button onclick="window.print()">Print / Save as PDF</button>
   <button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
