@@ -1960,7 +1960,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
         const dot = ld.truck && ld.truck !== "—" ? colors[ld.truck] : "rgba(255,255,255,0.2)";
         return (
           <div key={ld.seq} className="mb-1.5">
-            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "30px 46px 1fr 1fr 20px" }}>
+            <div className="grid gap-1.5 items-center" style={{ gridTemplateColumns: "30px 46px minmax(0,110px) minmax(0,1fr) 20px", maxWidth: 380 }}>
               <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
                 <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
                 #{ld.seq}
@@ -2002,7 +2002,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
         );
       })}
       {adding && (
-        <div className="grid gap-1.5 mb-1 items-center" style={{ gridTemplateColumns: "1fr 56px auto" }}>
+        <div className="grid gap-1.5 mb-1 items-center" style={{ gridTemplateColumns: "minmax(0,110px) 56px auto", maxWidth: 380 }}>
           <select value={nTruck} onChange={(e) => setNTruck(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
             <option value="—">Pick truck…</option>
             {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
@@ -4157,7 +4157,7 @@ function DispatchApp({ email, role, onLogout }) {
               load-by-load); Today's is next; the map and Upcoming are reference
               columns. Completed orders aren't a column — they drop straight into the
               "Past orders" tab above. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1fr)] gap-3">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.9fr)_minmax(0,1.9fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
             <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
