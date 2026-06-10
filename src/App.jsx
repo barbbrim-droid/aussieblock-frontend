@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3277,6 +3277,105 @@ function desktopNotify(o) {
   } catch { /* ignore */ }
 }
 
+// Staff price sheet: rates that fill the batch-ticket pricing block. Base $/yd by
+// mix (+ internal haul), per-customer overrides, and the fee/tax settings.
+function PriceSheetModal({ onClose }) {
+  const [sheet, setSheet] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => { getPriceSheet().then(setSheet).catch((e) => setMsg({ ok: false, text: e.message })); }, []);
+
+  const set = (k, v) => setSheet((s) => ({ ...s, [k]: v }));
+  const setRow = (list, i, k, v) => setSheet((s) => ({ ...s, [list]: s[list].map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
+  const addRow = (list, blank) => setSheet((s) => ({ ...s, [list]: [...(s[list] || []), blank] }));
+  const delRow = (list, i) => setSheet((s) => ({ ...s, [list]: s[list].filter((_, j) => j !== i) }));
+
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const clean = {
+        tax_pct: Number(sheet.tax_pct) || 0,
+        short_load_fee: Number(sheet.short_load_fee) || 0,
+        short_load_under_yd: Number(sheet.short_load_under_yd) || 0,
+        backhaul_per_yd: Number(sheet.backhaul_per_yd) || 0,
+        backhaul_under_yd: Number(sheet.backhaul_under_yd) || 0,
+        mixes: (sheet.mixes || []).filter((m) => (m.mix || "").trim()).map((m) => ({ mix: m.mix.trim(), price: Number(m.price) || 0, haul: Number(m.haul) || 0 })),
+        overrides: (sheet.overrides || []).filter((o) => (o.customer || "").trim()).map((o) => ({ customer: o.customer.trim(), mix: (o.mix || "").trim(), price: Number(o.price) || 0 })),
+      };
+      setSheet(await savePriceSheet(clean));
+      setMsg({ ok: true, text: "Price sheet saved." });
+    } catch (e) { setMsg({ ok: false, text: e.message }); } finally { setBusy(false); }
+  };
+
+  const inCls = "rounded-lg px-2 py-1.5 text-sm text-white outline-none w-full";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const lbl = "text-white/50 text-[11px] uppercase tracking-wide";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 shrink-0" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Calculator size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Price sheet</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        {!sheet ? (
+          <div className="p-8 text-center text-white/50" style={{ fontFamily: C.body }}>Loading…</div>
+        ) : (
+          <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+            {/* settings */}
+            <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Settings</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              <label><span className={lbl}>Sales tax %</span><input type="number" step="0.01" value={sheet.tax_pct} onChange={(e) => set("tax_pct", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>Short-load fee $</span><input type="number" value={sheet.short_load_fee} onChange={(e) => set("short_load_fee", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>…when order under (yd)</span><input type="number" value={sheet.short_load_under_yd} onChange={(e) => set("short_load_under_yd", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>Back-haul $/yd</span><input type="number" value={sheet.backhaul_per_yd} onChange={(e) => set("backhaul_per_yd", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>…when load under (yd)</span><input type="number" value={sheet.backhaul_under_yd} onChange={(e) => set("backhaul_under_yd", e.target.value)} className={inCls} style={inSt} /></label>
+            </div>
+
+            {/* mixes */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white/50 text-xs uppercase tracking-wide">Mix prices ($/yd)</div>
+              <button onClick={() => addRow("mixes", { mix: "", price: "", haul: "" })} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: ORANGE + "22", color: ORANGE }}>+ Add mix</button>
+            </div>
+            <div className="grid gap-1.5 mb-1 text-white/40 text-[10px] uppercase" style={{ gridTemplateColumns: "1fr 90px 90px 28px" }}><span>Mix / product</span><span>Price/yd</span><span>Haul/yd</span><span></span></div>
+            {(sheet.mixes || []).map((m, i) => (
+              <div key={i} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "1fr 90px 90px 28px" }}>
+                <input value={m.mix} onChange={(e) => setRow("mixes", i, "mix", e.target.value)} placeholder="e.g. 3000 PSI" className={inCls} style={inSt} />
+                <input type="number" value={m.price} onChange={(e) => setRow("mixes", i, "price", e.target.value)} className={inCls} style={inSt} />
+                <input type="number" value={m.haul} onChange={(e) => setRow("mixes", i, "haul", e.target.value)} title="Haul portion (tracked, not printed)" className={inCls} style={inSt} />
+                <button onClick={() => delRow("mixes", i)} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(239,83,80,0.12)" }}><Trash2 size={13} color="#ff8a85" /></button>
+              </div>
+            ))}
+            {(sheet.mixes || []).length === 0 && <div className="text-white/30 text-xs py-1">No mixes yet — add one.</div>}
+            <div className="text-white/35 text-[11px] mt-1 mb-4">Haul is the portion built into the price — tracked for your records, not printed on the ticket.</div>
+
+            {/* overrides */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white/50 text-xs uppercase tracking-wide">Customer overrides</div>
+              <button onClick={() => addRow("overrides", { customer: "", mix: "", price: "" })} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#6aa9ff22", color: "#6aa9ff" }}>+ Add override</button>
+            </div>
+            <div className="grid gap-1.5 mb-1 text-white/40 text-[10px] uppercase" style={{ gridTemplateColumns: "1fr 1fr 90px 28px" }}><span>Customer</span><span>Mix (blank = any)</span><span>Price/yd</span><span></span></div>
+            {(sheet.overrides || []).map((o, i) => (
+              <div key={i} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "1fr 1fr 90px 28px" }}>
+                <input value={o.customer} onChange={(e) => setRow("overrides", i, "customer", e.target.value)} placeholder="Customer name" className={inCls} style={inSt} />
+                <input value={o.mix} onChange={(e) => setRow("overrides", i, "mix", e.target.value)} placeholder="any mix" className={inCls} style={inSt} />
+                <input type="number" value={o.price} onChange={(e) => setRow("overrides", i, "price", e.target.value)} className={inCls} style={inSt} />
+                <button onClick={() => delRow("overrides", i)} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(239,83,80,0.12)" }}><Trash2 size={13} color="#ff8a85" /></button>
+              </div>
+            ))}
+
+            {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+            <button onClick={save} disabled={busy} className="w-full mt-4 rounded-xl py-2.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save price sheet
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DispatchApp({ email, role, onLogout }) {
   const canFinance = role !== "worker";   // full staff see financials/account info; workers don't
   const [orders, setOrders] = useState([]);
@@ -3288,6 +3387,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [showPast, setShowPast] = useState(false);   // "Past orders" modal
   const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
+  const [showPrices, setShowPrices] = useState(false);   // "Price sheet" modal
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
   const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
@@ -3455,6 +3555,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showPast && (
         <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} onClose={() => setShowPast(false)} />
       )}
+      {showPrices && <PriceSheetModal onClose={() => setShowPrices(false)} />}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
           <div className="w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -3535,6 +3636,11 @@ function DispatchApp({ email, role, onLogout }) {
               {canFinance && (
                 <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                   <KeyRound size={16} color={ORANGE} /> Customers
+                </button>
+              )}
+              {canFinance && (
+                <button onClick={() => setShowPrices(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                  <Calculator size={16} color={ORANGE} /> Price sheet
                 </button>
               )}
               {canFinance && (

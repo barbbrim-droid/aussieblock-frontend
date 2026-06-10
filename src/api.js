@@ -247,6 +247,17 @@ export function requestPlusLoad(ref, note = '') {
   const qs = note ? `?note=${encodeURIComponent(note)}` : ''
   return request(`/orders/${ref}/plus-load${qs}`, { method: 'POST' })
 }
+// Price sheet (staff): rates that fill the batch-ticket pricing block.
+export function getPriceSheet() {
+  return request('/price-sheet')
+}
+export function savePriceSheet(sheet) {
+  return request('/price-sheet', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sheet),
+  })
+}
 
 // ── Dispatch (staff only) ──
 // The office side of the plus-load loop. getPlusLoads() returns the queue of
