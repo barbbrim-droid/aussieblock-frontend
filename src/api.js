@@ -247,6 +247,14 @@ export function requestPlusLoad(ref, note = '') {
   const qs = note ? `?note=${encodeURIComponent(note)}` : ''
   return request(`/orders/${ref}/plus-load${qs}`, { method: 'POST' })
 }
+// Continuous pour: update one load (assign truck/driver or advance status).
+export function updateLoad(ref, seq, patch) {
+  return request(`/orders/${encodeURIComponent(ref)}/loads/${seq}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+}
 // Per-order pricing: what we bill the customer + the delivery (haul) cost.
 export function getOrderPricing(ref) {
   return request(`/orders/${ref}/pricing`)

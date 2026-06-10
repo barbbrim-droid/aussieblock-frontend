@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, updateLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1829,6 +1829,46 @@ function annotateClashes(orders) {
   });
 }
 
+// The loads inside a continuous pour (>10 yd). Each load gets its own truck +
+// status; the pour card rolls them up. Keeps a big pour to one card.
+function LoadsPanel({ o, trucks, onEdited }) {
+  const [busy, setBusy] = useState(null);   // seq currently saving
+  const [err, setErr] = useState("");
+  const colors = truckColorMap(trucks);
+  const upd = async (seq, patch) => {
+    setBusy(seq); setErr("");
+    try { onEdited && onEdited(await updateLoad(o.ref, seq, patch)); }
+    catch (e) { setErr(e.message || "Could not update load"); }
+    finally { setBusy(null); }
+  };
+  const selSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  return (
+    <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="text-white/40 text-[10px] uppercase tracking-wide mb-1.5" style={{ fontFamily: C.body }}>Loads · {o.loads_done}/{o.loads_total} complete</div>
+      {(o.loads || []).map((ld) => {
+        const meta = STATUS_META[ld.status] || STATUS_META.scheduled;
+        const dot = ld.truck && ld.truck !== "—" ? colors[ld.truck] : "rgba(255,255,255,0.2)";
+        return (
+          <div key={ld.seq} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "58px 1fr 1fr" }}>
+            <span className="text-xs flex items-center gap-1" style={{ color: "#fff", fontFamily: C.body }}>
+              <span className="inline-block w-2 h-2 rounded-full" style={{ background: dot }} />
+              #{ld.seq} · {ld.qty}y
+            </span>
+            <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-2 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
+              <option value="—">Unassigned</option>
+              {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+            </select>
+            <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-2 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
+              {ORDER_STATUSES.filter((sx) => sx !== "requested").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
+            </select>
+          </div>
+        );
+      })}
+      {err && <div className="text-[11px] mt-1" style={{ color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
+    </div>
+  );
+}
+
 function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onArchived, onDriver, compact }) {
   // `compact` (Upcoming column): a leaner card for future orders — keep Status,
   // Truck, Edit and Cancel; drop the Driver picker, "Order again" and "Ticket
@@ -1940,7 +1980,10 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
         </div>
       )}
 
-      {/* staff controls — set the delivery stage and put a truck on the job */}
+      {/* staff controls — a pour shows its loads; a single delivery shows one set */}
+      {o.is_pour ? (
+        <LoadsPanel o={o} trucks={trucks} onEdited={onEdited} />
+      ) : (
       <div className={`mt-2 pt-2 grid ${onDriver && !compact ? "grid-cols-3" : "grid-cols-2"} gap-1.5`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <label className="flex flex-col gap-0.5">
           <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Status</span>
@@ -1980,6 +2023,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           </label>
         )}
       </div>
+      )}
       {canFinance && o.prepay_required && <CodControls o={o} />}
       {batchable && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
