@@ -3014,15 +3014,18 @@ function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCance
   );
 }
 
-// Per-customer COST TRACKING (finance only). For every completed order it pulls
-// the same pricing the Ticket-details panel shows — what we billed the customer
-// (customer.total) and our internal haul cost (delivery.total) — and groups it by
-// customer with per-customer + grand totals. "Export CSV" downloads the whole
-// sheet for Excel/QuickBooks. Completed orders only (that's when pricing is final).
+// Per-customer COST TRACKING (finance only). For every completed order — including
+// archived ones, so the history stays complete — it pulls the same pricing the
+// Ticket-details panel shows: what we billed the customer (customer.total) and our
+// internal haul cost (delivery.total). Groups it by customer with per-customer +
+// grand totals, filterable by a From/To date range, and "Export CSV" downloads the
+// (filtered) sheet for Excel/QuickBooks.
 function CostsModal({ orders, onClose }) {
   const [px, setPx] = useState({});        // ref -> { billed, haul, yards, error }
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");    // date range (ISO yyyy-mm-dd), inclusive
+  const [to, setTo] = useState("");
   const [openCust, setOpenCust] = useState(null);
 
   useEffect(() => {
@@ -3047,8 +3050,16 @@ function CostsModal({ orders, onClose }) {
   const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
 
   const needle = q.trim().toLowerCase();
-  const filtered = (orders || []).filter((o) => !needle ||
-    [o.customer, o.ref, o.site, o.project, o.mix].some((v) => String(v || "").toLowerCase().includes(needle)));
+  const inText = (o) => !needle ||
+    [o.customer, o.ref, o.site, o.project, o.mix, orderDateUS(o.when), o.when]
+      .some((v) => String(v || "").toLowerCase().includes(needle));
+  const inRange = (o) => {
+    const d = (o.when || "").trim();   // ISO yyyy-mm-dd → string compare is chronological
+    if (from && (!d || d < from)) return false;
+    if (to && (!d || d > to)) return false;
+    return true;
+  };
+  const filtered = (orders || []).filter((o) => inText(o) && inRange(o));
 
   // group by customer (alphabetical), each list earliest order first
   const groups = {};
@@ -3105,6 +3116,14 @@ function CostsModal({ orders, onClose }) {
             <button onClick={exportCsv} disabled={loading || filtered.length === 0} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform disabled:opacity-40" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
               <Download size={15} /> CSV
             </button>
+          </div>
+          {/* date range filter */}
+          <div className="flex items-center gap-2 mb-2.5">
+            <CalendarDays size={14} className="shrink-0" style={{ color: ORANGE }} />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            <span className="text-white/40 text-xs shrink-0" style={{ fontFamily: C.body }}>to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            {(from || to) && <button onClick={() => { setFrom(""); setTo(""); }} className="text-white/45 text-xs px-2 py-1 rounded-lg active:scale-95 shrink-0" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>Clear</button>}
           </div>
           {/* grand totals */}
           <div className="flex items-center gap-3 rounded-xl px-3 py-2 mb-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -3819,7 +3838,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showPast && (
         <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} onClose={() => setShowPast(false)} />
       )}
-      {showCosts && <CostsModal orders={completedOrders} onClose={() => setShowCosts(false)} />}
+      {showCosts && <CostsModal orders={allCompleted} onClose={() => setShowCosts(false)} />}
       {showPrices && <PriceSheetModal onClose={() => setShowPrices(false)} />}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
