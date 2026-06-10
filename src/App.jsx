@@ -305,8 +305,15 @@ function Timeline({ stageIdx }) {
 // "At yard" while it's still loading, "On site"/"Done" once it has arrived.
 function etaFor(status, pos, siteLatLng, progress) {
   if (["onsite", "pouring"].includes(status)) return "On site";
-  if (["returning", "complete"].includes(status)) return "Done";
+  if (status === "complete") return "Done";
   if (status === "batched") return "At yard";   // still loading; ETA starts once en route
+  if (status === "returning") {
+    // Heading back to the yard — ETA to the plant so dispatch knows when it'll reload.
+    const rem = milesBetween(pos, PLANT);
+    if (rem == null) return "To yard";
+    const min = Math.round((rem * 1.3) / 30 * 60);
+    return rem < 0.2 || min <= 0 ? "At yard" : `${min} min to yard`;
+  }
   const rem = milesBetween(pos, siteLatLng);
   const min = rem != null ? Math.round((rem * 1.3) / 30 * 60) : Math.max(0, Math.round((1 - (progress || 0)) * 22));
   return (rem != null && rem < 0.2) || min <= 0 ? "Arriving" : `${min} min`;
@@ -369,7 +376,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   // ETA to the job site for the tracked truck. Per-load ETA (shown per row) is
   // only meaningful once a truck is en route — before that it's "Loading at yard".
   const etaText = etaFor(trackStatus, trackPos, siteLatLng, trackProgress);
-  const loadEta = (ld) => ld.status === "enroute" ? etaFor(ld.status, ld.truck_position, siteLatLng, ld.progress) : null;
+  const loadEta = (ld) => ["enroute", "returning"].includes(ld.status) ? etaFor(ld.status, ld.truck_position, siteLatLng, ld.progress) : null;
   const arrived = ["onsite", "pouring", "returning", "complete"].includes(trackStatus);
   const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
   const isLive = ["batched", "ongoing", "enroute", "onsite", "pouring", "returning", "complete"].includes(live.status);
@@ -467,7 +474,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
                       <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Load #{ld.seq} · {ld.qty} yd</div>
                       <div className="text-[11px] font-semibold mt-0.5" style={{ color: meta.color, fontFamily: C.body }}>
                         {meta.label || ld.status}
-                        {eta && <span className="text-white/45">{` · ETA ${eta}`}</span>}
+                        {eta && <span className="text-white/45">{` · ${eta}`}</span>}
                       </div>
                     </div>
                     {ld.has_batch_ticket && (
