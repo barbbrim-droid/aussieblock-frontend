@@ -76,6 +76,7 @@ function Roo({ size = 32, variant = "tile" }) {
 const STATUS_META = {
   requested: { label: "Requested", color: "#6aa9ff" },   // customer-placed, awaiting confirm
   scheduled: { label: "Scheduled", color: "#7c8794" },
+  ongoing: { label: "Pour ongoing", color: ORANGE_HOT },   // umbrella status for a continuous pour in flight
   batched: { label: "Loading at yard", color: ORANGE },
   enroute: { label: "En route", color: ORANGE_HOT },
   onsite: { label: "On site", color: GREEN },
@@ -86,7 +87,11 @@ const STATUS_META = {
 const STAGES = ["Loading at yard", "En route", "On site", "Pouring", "Returning", "Complete"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
-const ORDER_STATUSES = ["requested", "scheduled", "batched", "enroute", "onsite", "pouring", "returning", "complete"];
+const ORDER_STATUSES = ["requested", "scheduled", "ongoing", "batched", "enroute", "onsite", "pouring", "returning", "complete"];
+// A continuous pour rolls up to one of these umbrella states (the per-load rows
+// carry the individual truck stages). "ongoing" is set automatically by the
+// backend while loads are in flight; staff can also set scheduled/complete.
+const POUR_STATUSES = ["scheduled", "ongoing", "complete"];
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
 const BUILD_TAG = "build Jun8-v64";   // bump on each deploy to verify clients aren't cached
@@ -335,8 +340,8 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const etaText = arrived ? "Arrived" : ((remMi != null && remMi < 0.2) || etaMin <= 0 ? "Arriving" : `${etaMin} min`);
   // Drive the status pill + timeline from the order's REAL status, so a scheduled
   // or requested order doesn't look like it's already en route.
-  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
-  const isLive = ["batched", "enroute", "onsite", "pouring", "returning", "complete"].includes(order.status);
+  const STATUS_STAGE = { batched: 0, ongoing: 3, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
+  const isLive = ["batched", "ongoing", "enroute", "onsite", "pouring", "returning", "complete"].includes(order.status);
   // Customer live truck map only while it's coming or just arrived; once it's
   // pouring/heading back/done they don't need to watch the truck return to the yard.
   const tracking = ["batched", "enroute", "onsite"].includes(order.status);
@@ -1892,7 +1897,8 @@ function LoadsPanel({ o, trucks, onEdited }) {
           className="rounded-lg px-2 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer"
           style={{ ...selSt, color: ordMeta.color || "#fff" }}
         >
-          {ORDER_STATUSES.filter((sx) => sx !== "requested").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
+          {/* keep the order's current status selectable even if not an umbrella one (e.g. a stray "batched") */}
+          {[...POUR_STATUSES, ...(POUR_STATUSES.includes(o.status) ? [] : [o.status])].map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
         </select>
       </label>
       <div className="flex items-center justify-between mb-1.5">
@@ -1917,7 +1923,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
               {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
             </select>
             <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
-              {ORDER_STATUSES.filter((sx) => sx !== "requested").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
+              {ORDER_STATUSES.filter((sx) => sx !== "requested" && sx !== "ongoing").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
             </select>
             <button onClick={() => del(ld.seq)} disabled={busy === ld.seq} title="Remove load" className="p-1 rounded active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}><X size={12} color="#ff8a85" /></button>
           </div>
@@ -2065,7 +2071,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             className="rounded-lg px-2 py-1 text-sm outline-none disabled:opacity-50 cursor-pointer"
             style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
           >
-            {ORDER_STATUSES.map((s) => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}
+            {ORDER_STATUSES.filter((s) => s !== "ongoing").map((s) => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}
           </select>
         </label>
         <label className="flex flex-col gap-0.5">
