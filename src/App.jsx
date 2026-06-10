@@ -1407,9 +1407,12 @@ function loadGoogleMaps() {
 
 // Real Google map of the fleet. Falls back to the stylized SVG map if Maps JS
 // isn't available (no key, or the Maps JavaScript API isn't enabled yet).
-function GoogleFleetMap({ trucks }) {
+function GoogleFleetMap({ trucks, sites = [] }) {
   const elRef = useRef(null), mapRef = useRef(null), markersRef = useRef([]);
   const trucksRef = useRef(trucks); trucksRef.current = trucks;
+  const sitesRef = useRef(sites); sitesRef.current = sites;
+  const siteMarkersRef = useRef([]);
+  const geocodeRef = useRef({});   // address -> {lat,lng} | null (geocode failed)
   const [failed, setFailed] = useState(false);
 
   const drawTrucks = (maps) => {
@@ -1424,6 +1427,39 @@ function GoogleFleetMap({ trucks }) {
                 fillColor: isStale(t.updated_at) ? "#7c8794" : (colors[t.label] || "#ff7a3d"), fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 },
         label: { text: t.label, color: "#fff", fontSize: "10px", fontWeight: "600" },
       }));
+  };
+
+  // A dot at each job site (geocoded from the order's address) so staff can eyeball
+  // that the address on the card actually lands where the job is. Cached per address.
+  const drawSites = (maps) => {
+    if (!mapRef.current) return;
+    siteMarkersRef.current.forEach((m) => m.setMap(null));
+    siteMarkersRef.current = [];
+    const place = (loc, s) => {
+      siteMarkersRef.current.push(new maps.Marker({
+        position: loc, map: mapRef.current, title: `${s.label} — ${s.site}`,
+        icon: { path: maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#6aa9ff", fillOpacity: 0.9, strokeColor: "#fff", strokeWeight: 2 },
+        label: { text: s.label, color: "#cfe0ff", fontSize: "10px", fontWeight: "600" },
+      }));
+    };
+    const seen = new Set();
+    for (const s of sitesRef.current) {
+      if (!s.site || seen.has(s.ref)) continue;
+      seen.add(s.ref);
+      const cached = geocodeRef.current[s.site];
+      if (cached) { place(cached, s); continue; }
+      if (cached === null) continue;   // known-bad address — skip re-geocoding
+      new maps.Geocoder().geocode({ address: s.site }, (res, status) => {
+        if (status === "OK" && res && res[0]) {
+          const ll = res[0].geometry.location;
+          const loc = { lat: ll.lat(), lng: ll.lng() };
+          geocodeRef.current[s.site] = loc;
+          if (mapRef.current) place(loc, s);
+        } else {
+          geocodeRef.current[s.site] = null;
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -1442,6 +1478,7 @@ function GoogleFleetMap({ trucks }) {
         label: { text: "Yard", color: "#e7732a", fontSize: "11px", fontWeight: "700" },
       });
       drawTrucks(maps);
+      drawSites(maps);
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
   }, []);
@@ -1450,6 +1487,11 @@ function GoogleFleetMap({ trucks }) {
     const maps = window.google?.maps;
     if (maps && mapRef.current) drawTrucks(maps);
   }, [trucks]);
+
+  useEffect(() => {
+    const maps = window.google?.maps;
+    if (maps && mapRef.current) drawSites(maps);
+  }, [sites]);
 
   if (failed || !GOOGLE_PLACES_KEY) return <FleetMap trucks={trucks} />;
   return <div ref={elRef} className="w-full h-full rounded-2xl" style={{ minHeight: 340, background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }} />;
@@ -1602,7 +1644,7 @@ function WeatherBar() {
   const cur = wxIcon(wx.text, wx.day);
   const shortDay = (n) => (/^(today|tonight|this)/i.test(n) ? "Today" : n.split(" ")[0].slice(0, 3));
   return (
-    <div className="shrink-0 self-end w-fit max-w-full flex items-center rounded-2xl px-3 py-1.5 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="shrink-0 w-fit max-w-full flex items-center rounded-2xl px-3 py-1.5 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
       {/* current */}
       <div className="flex items-center gap-2 pr-3 mr-3 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
         <cur.Icon size={26} color={cur.color} strokeWidth={1.75} />
@@ -2113,7 +2155,21 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           {o.notes && <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#6aa9ff" }}><FileText size={11} /> {o.notes}</div>}
         </div>
         <div className="text-right shrink-0">
-          <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-xl font-bold leading-none">{o.qty}</div>
+          {o.is_pour ? (
+            // Pour: requested (ordered) vs actual (yards loaded so far / delivered).
+            <div className="leading-none">
+              <div className="flex items-baseline justify-end gap-1">
+                <span className="text-white/40 text-[9px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Req</span>
+                <span style={{ color: "rgba(255,255,255,0.85)", fontFamily: C.cond }} className="text-base font-bold">{o.qty}</span>
+              </div>
+              <div className="flex items-baseline justify-end gap-1 mt-0.5">
+                <span className="text-white/40 text-[9px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Actual</span>
+                <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-xl font-bold">{fmtYards(o.yards_loaded || 0)}</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-xl font-bold leading-none">{o.qty}</div>
+          )}
           <div className="mt-1"><StatusPill status={o.status} /></div>
         </div>
       </div>
@@ -4005,6 +4061,11 @@ function DispatchApp({ email, role, onLogout }) {
   for (const o of upcomingOrders) (upcomingByDay[o.when || "—"] ||= []).push(o);
   for (const day of Object.keys(upcomingByDay)) upcomingByDay[day].sort(byTimeAsc);   // earliest first within each day
   const upcomingDays = Object.keys(upcomingByDay).sort();
+  // Job-site dots for the map — today's deliveries + live pours, so staff can
+  // eyeball that each address lands where the job actually is.
+  const mapSites = [...currentPours, ...todayOrders]
+    .filter((o) => o.site)
+    .map((o) => ({ ref: o.ref, site: o.site, label: o.customer || o.ref }));
 
   if (loading) return <Splash label="Loading dispatch…" />;
 
@@ -4083,15 +4144,16 @@ function DispatchApp({ email, role, onLogout }) {
               <button onClick={() => setAlerts([])} className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95" style={{ background: "#6aa9ff", color: NAVY_DEEP, fontFamily: C.body }}>Got it</button>
             </div>
           )}
-          {/* title + actions */}
+          {/* title + actions (weather centered between them) */}
           <div className="flex items-center justify-between shrink-0 gap-2">
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
               <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight">Dispatch board</h1>
               <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><Package size={14} color={ORANGE} /><span className="text-white/55">Today</span><span className="text-white font-bold">{todayOrders.length}</span></span>
               <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><CalendarPlus size={14} color={ORANGE_HOT} /><span className="text-white/55">Scheduled</span><span className="text-white font-bold">{upcomingOrders.length}</span></span>
               <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm" style={{ background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}><CheckCircle2 size={14} color={GREEN} /><span className="text-white/55">Poured today</span><span className="font-bold" style={{ color: GREEN }}>{fmtYards(completedTodayYards)} CY</span></span>
             </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="shrink-0 hidden md:flex"><WeatherBar /></div>
+            <div className="flex items-center gap-2 flex-wrap justify-end flex-1">
               {installPrompt && (
                 <button onClick={promptInstall} title="Install the dispatch board as an app so order alerts sound without a click" className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
                   <Download size={16} /> Install app
@@ -4155,7 +4217,7 @@ function DispatchApp({ email, role, onLogout }) {
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.9fr)_minmax(0,1.9fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
             <Panel fill>
               <div className="h-full flex flex-col">
-                <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
+                <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} sites={mapSites} /></div>
                 <div className="shrink-0 overflow-y-auto flex flex-col gap-1 mt-2" style={{ maxHeight: "30%" }}>
                 {trucks.length === 0 ? (
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
@@ -4248,8 +4310,6 @@ function DispatchApp({ email, role, onLogout }) {
               )}
             </Panel>
           </div>
-
-          <WeatherBar />
         </div>
       </div>
     </div>
