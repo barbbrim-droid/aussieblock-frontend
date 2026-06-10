@@ -1877,8 +1877,24 @@ function LoadsPanel({ o, trucks, onEdited }) {
   });
 
   const selSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const setStatus = (status) => wrap("status", () => setOrderStatus(o.ref, status));
+  const ordMeta = STATUS_META[o.status] || STATUS_META.scheduled;
   return (
     <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      {/* Overall pour status — a pour rolls up its loads, but staff still need to
+          set the order's own stage (e.g. step it back to Scheduled). The per-load
+          rows below track each truck separately. */}
+      <label className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-white/45 text-[10px] uppercase tracking-wide shrink-0" style={{ fontFamily: C.body }}>Pour status</span>
+        <select
+          value={o.status} disabled={busy === "status"}
+          onChange={(e) => setStatus(e.target.value)}
+          className="rounded-lg px-2 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer"
+          style={{ ...selSt, color: ordMeta.color || "#fff" }}
+        >
+          {ORDER_STATUSES.filter((sx) => sx !== "requested").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
+        </select>
+      </label>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-white/45 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>
           Loads · {o.yards_loaded || 0}/{total} yd{o.loads_total ? ` · ${o.loads_done}/${o.loads_total} done` : ""}
