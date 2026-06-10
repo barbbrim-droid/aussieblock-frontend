@@ -3302,6 +3302,7 @@ function PriceSheetModal({ onClose }) {
         backhaul_under_yd: Number(sheet.backhaul_under_yd) || 0,
         mixes: (sheet.mixes || []).filter((m) => (m.mix || "").trim()).map((m) => ({ mix: m.mix.trim(), price: Number(m.price) || 0, haul: Number(m.haul) || 0 })),
         overrides: (sheet.overrides || []).filter((o) => (o.customer || "").trim()).map((o) => ({ customer: o.customer.trim(), mix: (o.mix || "").trim(), price: Number(o.price) || 0 })),
+        admixtures: (sheet.admixtures || []).filter((a) => (a.name || "").trim()).map((a) => ({ name: a.name.trim(), rate: Number(a.rate) || 0, per: a.per === "lb" ? "lb" : "yard" })),
       };
       setSheet(await savePriceSheet(clean));
       setMsg({ ok: true, text: "Price sheet saved." });
@@ -3364,6 +3365,25 @@ function PriceSheetModal({ onClose }) {
                 <button onClick={() => delRow("overrides", i)} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(239,83,80,0.12)" }}><Trash2 size={13} color="#ff8a85" /></button>
               </div>
             ))}
+
+            {/* admixtures */}
+            <div className="flex items-center justify-between mb-2 mt-4">
+              <div className="text-white/50 text-xs uppercase tracking-wide">Admixture add-ons</div>
+              <button onClick={() => addRow("admixtures", { name: "", rate: "", per: "yard" })} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>+ Add admixture</button>
+            </div>
+            <div className="grid gap-1.5 mb-1 text-white/40 text-[10px] uppercase" style={{ gridTemplateColumns: "1fr 90px 90px 28px" }}><span>Name (as on protocol)</span><span>Rate $</span><span>Per</span><span></span></div>
+            {(sheet.admixtures || []).map((a, i) => (
+              <div key={i} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "1fr 90px 90px 28px" }}>
+                <input value={a.name} onChange={(e) => setRow("admixtures", i, "name", e.target.value)} placeholder="e.g. Fiber" className={inCls} style={inSt} />
+                <input type="number" step="0.01" value={a.rate} onChange={(e) => setRow("admixtures", i, "rate", e.target.value)} className={inCls} style={inSt} />
+                <select value={a.per} onChange={(e) => setRow("admixtures", i, "per", e.target.value)} className={inCls} style={inSt}>
+                  <option value="yard">per yard</option>
+                  <option value="lb">per lb</option>
+                </select>
+                <button onClick={() => delRow("admixtures", i)} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(239,83,80,0.12)" }}><Trash2 size={13} color="#ff8a85" /></button>
+              </div>
+            ))}
+            <div className="text-white/35 text-[11px] mt-1">Charged when the admixture is on the order. "Per lb" uses the fiber lbs/yd from the order. Name it to match how it reads on the dornerBatch protocol.</div>
 
             {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
             <button onClick={save} disabled={busy} className="w-full mt-4 rounded-xl py-2.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
