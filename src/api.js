@@ -311,6 +311,15 @@ export function setOrderDelivery(ref, { hauler, mileage }) {
     body: JSON.stringify({ hauler, mileage }),
   })
 }
+// Set (or clear, with null) a custom $/yd unit price on an order. Works on
+// completed orders too. Returns the updated order.
+export function setOrderPrice(ref, price_override) {
+  return request(`/orders/${encodeURIComponent(ref)}/price`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ price_override }),
+  })
+}
 // Price sheet (staff): rates that fill the batch-ticket pricing block.
 export function getPriceSheet() {
   return request('/price-sheet')

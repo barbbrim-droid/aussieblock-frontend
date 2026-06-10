@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1819,6 +1819,7 @@ function BatchTicketForm({ o, onEdited }) {
   const [px, setPx] = useState(null);
   const [hauler, setHauler] = useState(o.hauler || "");
   const [mileage, setMileage] = useState(o.mileage != null ? String(o.mileage) : "");
+  const [priceOv, setPriceOv] = useState(o.price_override != null ? String(o.price_override) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [savedOk, setSavedOk] = useState(false);
@@ -1845,6 +1846,21 @@ function BatchTicketForm({ o, onEdited }) {
       setSavedOk(true);
       onEdited && onEdited({ ...o, hauler: dl.hauler, mileage: dl.mileage });
     } catch (e) { setErr(e.message || "Could not save"); }
+    finally { setBusy(false); }
+  };
+
+  // Custom $/yd unit price for this order (blank = use the price sheet). Works on
+  // completed orders too. Re-pulls pricing so the totals reflect the new rate.
+  const savePrice = async () => {
+    setBusy(true); setErr(""); setSavedOk(false);
+    try {
+      const val = priceOv.trim() === "" ? null : Number(priceOv);
+      const updated = await setOrderPrice(o.ref, val);
+      const p = await getOrderPricing(o.ref);
+      setPx(p);
+      onEdited && onEdited(updated);
+      setSavedOk(true);
+    } catch (e) { setErr(e.message || "Could not save price"); }
     finally { setBusy(false); }
   };
 
@@ -1900,6 +1916,20 @@ function BatchTicketForm({ o, onEdited }) {
           <Prow label="Total" val={money(cp.total)} bold />
         </div>
       )}
+      {/* custom $/yd unit price — overrides the sheet, works on completed orders */}
+      <div className="mt-2 flex items-end gap-2 flex-wrap">
+        <label className="flex flex-col gap-1">
+          <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Custom $/yd</span>
+          <input value={priceOv} onChange={(e) => { setPriceOv(e.target.value); setSavedOk(false); }} placeholder={cp ? String(cp.unit_price) : "sheet price"} inputMode="decimal" className="rounded-lg px-2 py-1.5 text-sm outline-none w-28" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+        </label>
+        <button onClick={savePrice} disabled={busy} className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Apply price
+        </button>
+        {o.price_override != null && (
+          <button onClick={() => { setPriceOv(""); setTimeout(savePrice, 0); }} disabled={busy} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>Clear</button>
+        )}
+      </div>
+      <div className="text-white/35 text-[11px] mt-1">Overrides the price-sheet $/yd for this order only (blank = sheet price). Applies to completed orders too.</div>
 
       {groupHead("Delivery cost — haul (internal)")}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
@@ -2245,6 +2275,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       {o.is_pour ? (
         <LoadsPanel o={o} trucks={trucks} onEdited={onEdited} />
       ) : (
+      <>
       <div className={`mt-2 pt-2 grid ${onDriver && !compact ? "grid-cols-3" : "grid-cols-2"} gap-1.5`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <label className="flex flex-col gap-0.5">
           <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Status</span>
@@ -2284,6 +2315,18 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           </label>
         )}
       </div>
+      {!compact && (
+        <button
+          onClick={async () => { setBusy(true); setErr(""); try { onEdited && onEdited(await addLoad(o.ref, { truck: o.truck && o.truck !== "—" ? o.truck : null })); } catch (e) { setErr(e.message); } finally { setBusy(false); } }}
+          disabled={busy}
+          title="Track this delivery as loads — splits it into per-truck loads with their own GPS, status and batch ticket"
+          className="mt-1.5 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50"
+          style={{ color: ORANGE, background: ORANGE + "1a", border: `1px solid ${ORANGE}55`, fontFamily: C.body }}
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Start loading (split into loads)
+        </button>
+      )}
+      </>
       )}
       {canFinance && o.prepay_required && <CodControls o={o} />}
       {batchable && (
