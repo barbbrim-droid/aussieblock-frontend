@@ -3304,6 +3304,7 @@ function PriceSheetModal({ onClose }) {
         mixes: (sheet.mixes || []).filter((m) => (m.mix || "").trim()).map((m) => ({ mix: m.mix.trim(), price: Number(m.price) || 0, haul: Number(m.haul) || 0 })),
         overrides: (sheet.overrides || []).filter((o) => (o.customer || "").trim()).map((o) => ({ customer: o.customer.trim(), mix: (o.mix || "").trim(), price: Number(o.price) || 0 })),
         admixtures: (sheet.admixtures || []).filter((a) => (a.name || "").trim()).map((a) => ({ name: a.name.trim(), rate: Number(a.rate) || 0, per: a.per === "lb" ? "lb" : "yard" })),
+        self_haul_customers: (sheet.self_haul_customers || []).filter((c) => (c || "").trim()).map((c) => c.trim()),
       };
       setSheet(await savePriceSheet(clean));
       setMsg({ ok: true, text: "Price sheet saved." });
@@ -3385,6 +3386,19 @@ function PriceSheetModal({ onClose }) {
               </div>
             ))}
             <div className="text-white/35 text-[11px] mt-1">Charged when the admixture is on the order. "Per lb" uses the fiber lbs/yd from the order. Name it to match how it reads on the dornerBatch protocol.</div>
+
+            {/* self-haul / pickup customers */}
+            <div className="flex items-center justify-between mb-2 mt-4">
+              <div className="text-white/50 text-xs uppercase tracking-wide">Self-haul / pickup customers</div>
+              <button onClick={() => setSheet((s) => ({ ...s, self_haul_customers: [...(s.self_haul_customers || []), ""] }))} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "#6aa9ff22", color: "#6aa9ff" }}>+ Add customer</button>
+            </div>
+            {(sheet.self_haul_customers || []).map((c, i) => (
+              <div key={i} className="grid gap-1.5 mb-1.5 items-center" style={{ gridTemplateColumns: "1fr 28px" }}>
+                <input value={c} onChange={(e) => setSheet((s) => ({ ...s, self_haul_customers: s.self_haul_customers.map((x, j) => (j === i ? e.target.value : x)) }))} placeholder="Customer name (exact)" className={inCls} style={inSt} />
+                <button onClick={() => setSheet((s) => ({ ...s, self_haul_customers: s.self_haul_customers.filter((_, j) => j !== i) }))} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(239,83,80,0.12)" }}><Trash2 size={13} color="#ff8a85" /></button>
+              </div>
+            ))}
+            <div className="text-white/35 text-[11px] mt-1">They buy concrete and haul it themselves — no delivery, short-load, or back-haul fees (concrete + admixtures + tax only).</div>
 
             {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
             <button onClick={save} disabled={busy} className="w-full mt-4 rounded-xl py-2.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
