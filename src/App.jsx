@@ -3210,12 +3210,13 @@ function CostsModal({ orders, onClose }) {
           ) : custNames.length === 0 ? (
             <div className="text-white/40 text-sm py-8 text-center">{needle ? "No matches." : "No completed orders yet."}</div>
           ) : (
-            custNames.map((name) => {
+            custNames.map((name, ci) => {
               const list = groups[name];
               const open = openCust === name || autoOpen;
               const t = sumFor(list);
+              const last = ci === custNames.length - 1;
               return (
-                <div key={name} className="mb-2">
+                <div key={name} className={last ? "mb-2" : "mb-4 pb-4"} style={last ? undefined : { borderBottom: "2px solid rgba(255,255,255,0.12)" }}>
                   <button onClick={() => setOpenCust(open && openCust === name ? null : name)} className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                     <span className="flex items-center gap-2 min-w-0">
                       <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />
