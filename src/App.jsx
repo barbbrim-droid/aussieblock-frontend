@@ -337,6 +337,9 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   // or requested order doesn't look like it's already en route.
   const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
   const isLive = ["batched", "enroute", "onsite", "pouring", "returning", "complete"].includes(order.status);
+  // Customer live truck map only while it's coming or just arrived; once it's
+  // pouring/heading back/done they don't need to watch the truck return to the yard.
+  const tracking = ["batched", "enroute", "onsite"].includes(order.status);
   const stageIdx = STATUS_STAGE[order.status] ?? -1;
 
   return (
@@ -363,7 +366,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
         <div className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={14} /> Payment received — your delivery is confirmed</div>
       )}
 
-      {isLive ? (
+      {tracking ? (
         <>
           <div className="mt-4"><GoogleTrackMap site={order.site} truckPosition={pos} truckLabel={order.truck} progress={progress} onSite={setSiteLatLng} /></div>
           {arrived && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck on site — proof of delivery logged</div>}
@@ -373,6 +376,12 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
           </div>
           <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
         </>
+      ) : isLive ? (
+        <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
+          <CheckCircle2 size={30} color={GREEN} className="mx-auto mb-2" />
+          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{order.status === "pouring" ? "Pouring on site" : "Delivered"}</div>
+          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>{order.status === "pouring" ? "Your concrete is being placed on site." : "Your concrete has been delivered — thank you!"}</div>
+        </div>
       ) : (
         <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
           <Clock size={30} color={ORANGE} className="mx-auto mb-2" />
