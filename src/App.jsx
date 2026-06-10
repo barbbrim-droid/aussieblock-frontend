@@ -4056,7 +4056,10 @@ function DispatchApp({ email, role, onLogout }) {
   const pourProducedYards = currentPours.reduce((sum, o) => sum + (parseFloat(o.yards_loaded) || 0), 0);
   const pourTotalYards = currentPours.reduce((sum, o) => sum + parseYards(o.qty), 0);
   // Yards poured today = completed orders scheduled for today.
-  const completedTodayYards = allCompleted.filter((o) => o.when === today).reduce((sum, o) => sum + parseYards(o.qty), 0);
+  // Poured today = actual yards delivered: for a pour that's the sum of its loads
+  // (yards_loaded), for a single delivery it's the order quantity.
+  const completedTodayYards = allCompleted.filter((o) => o.when === today)
+    .reduce((sum, o) => sum + (o.is_pour && o.yards_loaded ? o.yards_loaded : parseYards(o.qty)), 0);
   const upcomingByDay = {};
   for (const o of upcomingOrders) (upcomingByDay[o.when || "—"] ||= []).push(o);
   for (const day of Object.keys(upcomingByDay)) upcomingByDay[day].sort(byTimeAsc);   // earliest first within each day
