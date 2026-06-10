@@ -4314,7 +4314,7 @@ function DispatchApp({ email, role, onLogout }) {
           )}
 
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
-              Current pours gets the most room (the big continuous pours staff watch
+              All pours gets the most room (the big continuous pours staff watch
               load-by-load); Today's is next; the map and Upcoming are reference
               columns. Completed orders aren't a column — they drop straight into the
               "Past orders" tab above. */}
@@ -4360,9 +4360,9 @@ function DispatchApp({ email, role, onLogout }) {
                 </div>
               </div>
             </Panel>
-            <Panel title="Current pours" icon={Droplets} count={currentPours.length} fill>
+            <Panel title="All pours" icon={Droplets} count={currentPours.length} fill>
               {currentPours.length === 0 ? (
-                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No pours running right now. A continuous pour (&gt;10 yd) appears here once it goes live.</div>
+                <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No pours right now. A continuous pour (&gt;10 yd) appears here once it goes live.</div>
               ) : (
                 <>
                   <div className="flex items-center gap-2 mb-3 rounded-lg px-3 py-2" style={{ background: NAVY }}>
