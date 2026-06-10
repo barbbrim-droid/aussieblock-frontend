@@ -436,6 +436,10 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
               })}
             </div>
           </div>
+        ) : order.has_batch_ticket ? (
+          // Legacy order: a pour with no loads but an order-level ticket (uploaded
+          // before load-tracking). Show the order-level ticket so it stays reachable.
+          <button onClick={() => openBatchTicket(order.ref).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
         ) : isLive ? (
           <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Loads will appear here as each truck is delivered.</div>
         ) : null
@@ -2184,6 +2188,10 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   // LoadsPanel), so one paper ticket per truck-load.
   const fileRef = useRef(null);
   const batchable = !o.is_pour;
+  // Legacy order: a pour (every order is one now) with no loads but an order-level
+  // ticket uploaded before load-tracking. Surface it so staff can still open it —
+  // but don't offer order-level upload on pours (new tickets go on each load).
+  const showLegacyTicket = o.is_pour && (o.loads || []).length === 0 && o.has_batch_ticket;
   const onPickTicket = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";   // let them re-pick the same file later
@@ -2331,7 +2339,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       </>
       )}
       {canFinance && o.prepay_required && <CodControls o={o} />}
-      {batchable && (
+      {(batchable || showLegacyTicket) && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
           <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.heic" onChange={onPickTicket} className="hidden" />
           {o.has_batch_ticket ? (
