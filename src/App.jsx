@@ -2998,6 +2998,165 @@ function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCance
   );
 }
 
+// Per-customer COST TRACKING (finance only). For every completed order it pulls
+// the same pricing the Ticket-details panel shows — what we billed the customer
+// (customer.total) and our internal haul cost (delivery.total) — and groups it by
+// customer with per-customer + grand totals. "Export CSV" downloads the whole
+// sheet for Excel/QuickBooks. Completed orders only (that's when pricing is final).
+function CostsModal({ orders, onClose }) {
+  const [px, setPx] = useState({});        // ref -> { billed, haul, yards, error }
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [openCust, setOpenCust] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const entries = await Promise.all((orders || []).map(async (o) => {
+        try {
+          const p = await getOrderPricing(o.ref);
+          const billed = p && p.customer && p.customer.total != null ? Number(p.customer.total) : null;
+          const haul = p && p.delivery && p.delivery.total != null ? Number(p.delivery.total) : null;
+          const yards = p && p.billed_qty != null ? p.billed_qty : o.qty;
+          return [o.ref, { billed, haul, yards }];
+        } catch {
+          return [o.ref, { billed: null, haul: null, yards: o.qty, error: true }];
+        }
+      }));
+      if (live) { setPx(Object.fromEntries(entries)); setLoading(false); }
+    })();
+    return () => { live = false; };
+  }, [orders]);
+
+  const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
+
+  const needle = q.trim().toLowerCase();
+  const filtered = (orders || []).filter((o) => !needle ||
+    [o.customer, o.ref, o.site, o.project, o.mix].some((v) => String(v || "").toLowerCase().includes(needle)));
+
+  // group by customer (alphabetical), each list earliest order first
+  const groups = {};
+  filtered.forEach((o) => { (groups[o.customer || "—"] = groups[o.customer || "—"] || []).push(o); });
+  Object.values(groups).forEach((list) => list.sort((a, b) => String(a.when).localeCompare(String(b.when))));
+  const custNames = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+  const autoOpen = needle && custNames.length <= 4;
+
+  const sumFor = (list) => list.reduce((acc, o) => {
+    const r = px[o.ref] || {};
+    if (r.billed != null) acc.billed += r.billed;
+    if (r.haul != null) acc.haul += r.haul;
+    return acc;
+  }, { billed: 0, haul: 0 });
+  const grand = sumFor(filtered);
+
+  const exportCsv = () => {
+    const rows = [["Customer", "Date", "Ticket #", "Job", "Mix", "Yards billed", "Amount billed", "Haul cost"]];
+    custNames.forEach((name) => {
+      groups[name].forEach((o) => {
+        const r = px[o.ref] || {};
+        rows.push([name, orderDateUS(o.when) || o.when || "", o.ref, o.site || "", o.mix || "",
+          r.yards != null ? r.yards : "", r.billed != null ? r.billed.toFixed(2) : "", r.haul != null ? r.haul.toFixed(2) : ""]);
+      });
+    });
+    rows.push([], ["TOTAL", "", "", "", "", "", grand.billed.toFixed(2), grand.haul.toFixed(2)]);
+    const csv = rows.map((row) => row.map((c) => {
+      const s = String(c ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `aussieblock-costs-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><ClipboardList size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Customer costs · {filtered.length}</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+
+        <div className="px-4 pt-3 pb-1 shrink-0">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>
+              <Search size={15} className="text-white/40 shrink-0" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customer, ticket #, job, mix…" className="bg-transparent outline-none text-sm text-white w-full" style={{ fontFamily: C.body }} />
+              {q && <button onClick={() => setQ("")} className="text-white/40 active:scale-90 shrink-0"><X size={14} /></button>}
+            </div>
+            <button onClick={exportCsv} disabled={loading || filtered.length === 0} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform disabled:opacity-40" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+              <Download size={15} /> CSV
+            </button>
+          </div>
+          {/* grand totals */}
+          <div className="flex items-center gap-3 rounded-xl px-3 py-2 mb-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+            <span className="text-white/45 text-[11px] uppercase tracking-wide" style={{ fontFamily: C.body }}>All shown</span>
+            <span className="ml-auto text-xs" style={{ fontFamily: C.body }}>
+              <span className="text-white/45">Billed </span><span className="font-bold" style={{ color: ORANGE }}>{money(grand.billed)}</span>
+            </span>
+            <span className="text-xs" style={{ fontFamily: C.body }}>
+              <span className="text-white/45">Haul </span><span className="font-bold text-white">{money(grand.haul)}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 pt-2 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {loading ? (
+            <div className="text-white/45 text-sm py-8 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Pulling pricing for {orders.length} order{orders.length === 1 ? "" : "s"}…</div>
+          ) : custNames.length === 0 ? (
+            <div className="text-white/40 text-sm py-8 text-center">{needle ? "No matches." : "No completed orders yet."}</div>
+          ) : (
+            custNames.map((name) => {
+              const list = groups[name];
+              const open = openCust === name || autoOpen;
+              const t = sumFor(list);
+              return (
+                <div key={name} className="mb-2">
+                  <button onClick={() => setOpenCust(open && openCust === name ? null : name)} className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />
+                      <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{name}</span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: ORANGE + "22", color: ORANGE }}>{list.length}</span>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-right leading-tight">
+                        <span className="block text-xs font-bold" style={{ color: ORANGE }}>{money(t.billed)}</span>
+                        <span className="block text-[10px] text-white/45">haul {money(t.haul)}</span>
+                      </span>
+                      <ChevronRight size={16} className="text-white/40" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+                    </span>
+                  </button>
+                  {open && (
+                    <div className="mt-1.5 mb-1">
+                      {list.map((o) => {
+                        const r = px[o.ref] || {};
+                        return (
+                          <div key={o.ref} className="grid items-center gap-2 px-3 py-1.5" style={{ gridTemplateColumns: "1fr auto", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <div className="min-w-0">
+                              <div className="text-white/85 text-xs font-semibold truncate" style={{ fontFamily: C.body }}>{orderDateUS(o.when) || o.when || "—"} · {o.ref}</div>
+                              <div className="text-white/40 text-[11px] truncate" style={{ fontFamily: C.body }}>{o.mix || "—"} · {r.yards != null ? `${r.yards} yd` : o.qty}{o.site ? ` · ${o.site}` : ""}</div>
+                            </div>
+                            <div className="text-right shrink-0 leading-tight">
+                              <span className="block text-sm font-bold" style={{ color: r.error ? "#ff8a85" : "#fff", fontFamily: C.body }}>{r.error ? "error" : money(r.billed)}</span>
+                              <span className="block text-[10px] text-white/45" style={{ fontFamily: C.body }}>haul {money(r.haul)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited, onCreated, onDriver, onClose }) {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
@@ -3474,6 +3633,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [showPast, setShowPast] = useState(false);   // "Past orders" modal
+  const [showCosts, setShowCosts] = useState(false);   // "Customer costs" tracking modal
   const [showLogins, setShowLogins] = useState(false);   // "Customer logins" modal
   const [showPrices, setShowPrices] = useState(false);   // "Price sheet" modal
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
@@ -3643,6 +3803,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showPast && (
         <PastOrdersModal orders={completedOrders} archived={archivedOrders} trucks={trucks} onStatus={changeStatus} onAssign={assign} onCancel={cancelOrder} onEdited={applyOrder} onCreated={addOrder} onArchived={applyOrder} onDriver={setDriver} onClose={() => setShowPast(false)} />
       )}
+      {showCosts && <CostsModal orders={completedOrders} onClose={() => setShowCosts(false)} />}
       {showPrices && <PriceSheetModal onClose={() => setShowPrices(false)} />}
       {showLogins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowLogins(false)}>
@@ -3729,6 +3890,11 @@ function DispatchApp({ email, role, onLogout }) {
               {canFinance && (
                 <button onClick={() => setShowPrices(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                   <Calculator size={16} color={ORANGE} /> Price sheet
+                </button>
+              )}
+              {canFinance && (
+                <button onClick={() => setShowCosts(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                  <ClipboardList size={16} color={ORANGE} /> Costs
                 </button>
               )}
               {canFinance && (
