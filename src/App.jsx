@@ -2233,6 +2233,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   const [showEdit, setShowEdit] = useState(false);   // staff "Edit order" modal
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
   const [showBatch, setShowBatch] = useState(false);       // "Ticket details" — full batch-ticket form panel
+  const [expanded, setExpanded] = useState(false);   // compact (Upcoming) rows: collapsed to just client + yardage; "Manage" reveals the controls
 
   // The selects are *controlled* by o.status / o.truck (server truth). On a
   // rejected change the parent state never updates, so the select snaps back to
@@ -2293,6 +2294,17 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           </button>
         </div>
       )}
+      {compact ? (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div style={{ fontFamily: C.cond }} className="text-white text-lg font-bold leading-tight truncate">{o.customer}</div>
+            <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-0.5 text-[11px] font-semibold flex items-center gap-0.5 active:scale-95" style={{ color: ORANGE, fontFamily: C.body }}>
+              {expanded ? "Hide details" : "Manage"} <ChevronRight size={11} style={{ transform: expanded ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+            </button>
+          </div>
+          <div style={{ color: ORANGE, fontFamily: C.cond }} className="text-2xl font-bold leading-none shrink-0">{o.qty}<span className="text-white/40 text-sm font-semibold ml-0.5">yd</span></div>
+        </div>
+      ) : (
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -2339,6 +2351,9 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           <div className="mt-1"><StatusPill status={o.status} /></div>
         </div>
       </div>
+      )}
+      {(!compact || expanded) && (
+      <>
       {/* progress bar — only meaningful once a truck is rolling */}
       {(o.status === "enroute" || o.status === "batched" || o.status === "onsite") && (
         <div className="mt-2">
@@ -2467,6 +2482,8 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           <X size={12} /> Cancel order
         </button>
       </div>
+      </>
+      )}
       {showBatch && <BatchTicketForm o={o} onEdited={onEdited} />}
       {showEdit && (
         <EditOrderModal
@@ -3108,8 +3125,9 @@ function ManageStaffModal({ onClose }) {
               <div className="mb-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}`, fontFamily: C.body }}>Operator — full office access (all companies + billing)</div>
             ) : (
               <div className="flex items-center gap-2 mb-2">
-                <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker — no billing</button>
-                <button onClick={() => setRole("customer")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "customer" ? GREEN + "22" : NAVY_DEEP, color: role === "customer" ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${role === "customer" ? GREEN : "rgba(255,255,255,0.12)"}` }}>Admin — + billing</button>
+                <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Operator — full office</button>
+                <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker</button>
+                <button onClick={() => setRole("customer")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "customer" ? GREEN + "22" : NAVY_DEEP, color: role === "customer" ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${role === "customer" ? GREEN : "rgba(255,255,255,0.12)"}` }}>Admin</button>
               </div>
             )}
             {role === "worker" && !editing && (
