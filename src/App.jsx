@@ -1665,28 +1665,28 @@ function WeatherBar() {
   const cur = wxIcon(wx.text, wx.day);
   const shortDay = (n) => (/^(today|tonight|this)/i.test(n) ? "Today" : n.split(" ")[0].slice(0, 3));
   return (
-    <div className="shrink-0 w-fit max-w-full flex items-center rounded-2xl px-3 py-1.5 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="shrink-0 w-fit max-w-full flex items-center rounded-2xl px-4 py-2 overflow-x-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
       {/* current */}
-      <div className="flex items-center gap-2 pr-3 mr-3 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
-        <cur.Icon size={26} color={cur.color} strokeWidth={1.75} />
+      <div className="flex items-center gap-2.5 pr-4 mr-4 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+        <cur.Icon size={32} color={cur.color} strokeWidth={1.75} />
         <div>
           <div className="flex items-start gap-0.5">
-            <span className="text-white text-xl font-bold leading-none" style={{ fontFamily: C.cond }}>{wx.tempF}</span>
-            <span className="text-white/50 text-[11px] font-semibold mt-0.5">°F</span>
+            <span className="text-white text-2xl font-bold leading-none" style={{ fontFamily: C.cond }}>{wx.tempF}</span>
+            <span className="text-white/50 text-xs font-semibold mt-0.5">°F</span>
           </div>
-          <div className="text-white/35 text-[10px] uppercase tracking-wide mt-0.5" style={{ fontFamily: C.body }}>San Angelo</div>
+          <div className="text-white/35 text-[11px] uppercase tracking-wide mt-0.5" style={{ fontFamily: C.body }}>San Angelo</div>
         </div>
       </div>
       {/* forecast — next 3 days, compact */}
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-4">
         {wx.days.slice(0, 3).map((d) => {
           const ic = wxIcon(d.text, true);
           return (
             <div key={d.name} className="flex items-center gap-1.5 shrink-0" title={d.text}>
-              <span className="text-white/45 text-[11px] font-semibold" style={{ fontFamily: C.body }}>{shortDay(d.name)}</span>
-              <ic.Icon size={16} color={ic.color} strokeWidth={1.75} />
-              <span className="text-white text-xs font-bold" style={{ fontFamily: C.cond }}>{d.hi}°</span>
-              {d.lo != null && <span className="text-white/40 text-[11px]" style={{ fontFamily: C.cond }}>{d.lo}°</span>}
+              <span className="text-white/45 text-xs font-semibold" style={{ fontFamily: C.body }}>{shortDay(d.name)}</span>
+              <ic.Icon size={20} color={ic.color} strokeWidth={1.75} />
+              <span className="text-white text-sm font-bold" style={{ fontFamily: C.cond }}>{d.hi}°</span>
+              {d.lo != null && <span className="text-white/40 text-xs" style={{ fontFamily: C.cond }}>{d.lo}°</span>}
             </div>
           );
         })}
