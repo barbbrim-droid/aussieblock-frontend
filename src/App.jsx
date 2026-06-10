@@ -3751,7 +3751,7 @@ function DispatchApp({ email, role, onLogout }) {
             <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
-                <div className="shrink-0 overflow-y-auto flex flex-col gap-1.5 mt-3" style={{ maxHeight: "22%" }}>
+                <div className="shrink-0 overflow-y-auto flex flex-col gap-1 mt-2" style={{ maxHeight: "30%" }}>
                 {trucks.length === 0 ? (
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
                 ) : trucks.map((t) => {
@@ -3761,7 +3761,7 @@ function DispatchApp({ email, role, onLogout }) {
                   const yardMi = s.job?.status === "returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
                   const yardEta = yardMi != null ? Math.max(1, Math.round((yardMi * 1.3) / 30 * 60)) : null;
                   return (
-                    <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
+                    <div key={t.label} className="flex items-center justify-between rounded-lg px-2.5 py-1" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <Truck size={14} color={tColor} />
