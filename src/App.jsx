@@ -4226,6 +4226,21 @@ function DispatchApp({ email, role, onLogout }) {
     return { label: "At yard", color: "#7c8794" };
   };
 
+  // Trucks heading back to the yard, with a clear ETA so dispatch can plan the next
+  // load. Sorted soonest-first. (~30 mph, 1.3x straight-line for roads.) Keys off the
+  // derived "Returning" stage, so it catches pour loads too (their order stays "ongoing").
+  const _truckColors = truckColorMap(trucks);
+  const returningTrucks = trucks
+    .map((t) => {
+      const s = truckStatus(t);
+      if (s.label !== "Returning" || t.lat == null) return null;
+      const mi = milesBetween({ lat: t.lat, lng: t.lng }, PLANT);
+      const eta = mi != null ? Math.max(1, Math.round((mi * 1.3) / 30 * 60)) : null;
+      return { label: t.label, eta, color: _truckColors[t.label] || ORANGE, ref: s.order };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.eta ?? 9999) - (b.eta ?? 9999));
+
   // Yard totals for planning: today's total, and upcoming grouped by day.
   const todayYards = todayOrders.reduce((sum, o) => sum + parseYards(o.qty), 0);
   // Live pour progress: how many yards have actually been produced (batched into
@@ -4389,6 +4404,23 @@ function DispatchApp({ email, role, onLogout }) {
             </div>
           )}
 
+          {/* Returning to yard — at-a-glance reload planning. Big ETA per truck, soonest first. */}
+          {returningTrucks.length > 0 && (
+            <div className="mb-3 rounded-xl px-3 py-2 flex items-center gap-3 flex-wrap" style={{ background: "rgba(77,163,255,0.10)", border: "1px solid rgba(77,163,255,0.45)" }}>
+              <span className="flex items-center gap-1.5 text-sm font-bold shrink-0 uppercase tracking-wide" style={{ color: "#4da3ff", fontFamily: C.cond }}>
+                <Navigation size={16} /> Returning to yard
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {returningTrucks.map((t) => (
+                  <span key={t.label} className="flex items-center gap-2 rounded-lg px-2.5 py-1" style={{ background: NAVY, border: `1px solid ${t.color}66`, borderLeft: `4px solid ${t.color}` }}>
+                    <span className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{t.label}</span>
+                    <span className="text-xl font-bold leading-none" style={{ color: "#4da3ff", fontFamily: C.cond }}>{t.eta != null ? `${t.eta} min` : "—"}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               All pours gets the most room (the big continuous pours staff watch
               load-by-load); Today's is next; the map and Upcoming are reference
@@ -4405,7 +4437,8 @@ function DispatchApp({ email, role, onLogout }) {
                   const s = truckStatus(t);
                   const tColor = truckColorMap(trucks)[t.label] || ORANGE;
                   // ETA back to the yard while returning (straight-line ~30mph, 1.3x roads).
-                  const yardMi = s.job?.status === "returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
+                  // Key off the derived stage so pour loads count too (their order stays "ongoing").
+                  const yardMi = s.label === "Returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
                   const yardEta = yardMi != null ? Math.max(1, Math.round((yardMi * 1.3) / 30 * 60)) : null;
                   return (
                     <div key={t.label} className="flex items-center justify-between rounded-lg px-2.5 py-1" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
