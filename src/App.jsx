@@ -3908,10 +3908,15 @@ function DispatchApp({ email, role, onLogout }) {
     const o = activeOrders.find((x) => !x.is_pour && x.truck === t.label && LIVE_POUR_STATUS.includes(x.status));
     if (o) return statusToTruck(o.status, o.ref, o);
     // Continuous pour: the truck is assigned to a load, not the umbrella order.
+    // Use the load's own stage if staff advanced it; otherwise fall back to the
+    // pour's overall stage (so setting just "Pour status" still flips the truck).
     for (const p of activeOrders) {
       if (!p.is_pour) continue;
-      const ld = (p.loads || []).find((l) => l.truck === t.label && LIVE_POUR_STATUS.includes(l.status));
-      if (ld) return statusToTruck(ld.status, p.ref, p);
+      const ld = (p.loads || []).find((l) => l.truck === t.label);
+      if (!ld) continue;
+      const st = LIVE_POUR_STATUS.includes(ld.status) ? ld.status
+        : (LIVE_POUR_STATUS.includes(p.status) ? p.status : null);
+      if (st) return statusToTruck(st, p.ref, p);
     }
     return { label: "At yard", color: "#7c8794" };
   };
