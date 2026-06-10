@@ -3024,8 +3024,8 @@ function CostsModal({ orders, onClose }) {
   const [px, setPx] = useState({});        // ref -> { billed, haul, yards, error }
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [from, setFrom] = useState("");    // date range (ISO yyyy-mm-dd), inclusive
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(() => monthBounds().first);   // default range: this month
+  const [to, setTo] = useState(() => monthBounds().last);
   const [openCust, setOpenCust] = useState(null);
 
   useEffect(() => {
@@ -3421,6 +3421,15 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
 function localToday() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+// First and last calendar day of the current local month, as ISO yyyy-mm-dd.
+// Used to default the Costs date range to "this month".
+function monthBounds() {
+  const d = new Date();
+  const y = d.getFullYear(), m = d.getMonth();   // m is 0-based
+  const p = (n) => String(n).padStart(2, "0");
+  const last = new Date(y, m + 1, 0).getDate();   // day 0 of next month = last day of this one
+  return { first: `${y}-${p(m + 1)}-01`, last: `${y}-${p(m + 1)}-${p(last)}` };
 }
 // Classify an order by its scheduled date: "today" (today or overdue) vs
 // "upcoming" (a future date). Handles legacy "today"/"tomorrow"; unknown → today
