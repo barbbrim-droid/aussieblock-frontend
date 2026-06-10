@@ -300,15 +300,26 @@ function Timeline({ stageIdx }) {
   );
 }
 
+// Short ETA-to-site label for a tracked truck: real distance when we have its GPS
+// and the geocoded job site, else a rough estimate from delivery progress.
+// "At yard" while it's still loading, "On site"/"Done" once it has arrived.
+function etaFor(status, pos, siteLatLng, progress) {
+  if (["onsite", "pouring"].includes(status)) return "On site";
+  if (["returning", "complete"].includes(status)) return "Done";
+  if (status === "batched") return "At yard";   // still loading; ETA starts once en route
+  const rem = milesBetween(pos, siteLatLng);
+  const min = rem != null ? Math.round((rem * 1.3) / 30 * 60) : Math.max(0, Math.round((1 - (progress || 0)) * 22));
+  return (rem != null && rem < 0.2) || min <= 0 ? "Arriving" : `${min} min`;
+}
+
 function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
-  const [progress, setProgress] = useState(order.progress || 0.05);
-  const [pos, setPos] = useState(order.truck_position || null);   // live truck position for the map
+  const [live, setLive] = useState(order);                        // full order, refreshed live
   const [siteLatLng, setSiteLatLng] = useState(null);             // job site coords (from the map's geocode) — for a real ETA
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
   // Workers manage orders like a customer; only billing (canFinance) is hidden.
-  const editable = ["requested", "scheduled"].includes(order.status);
+  const editable = ["requested", "scheduled"].includes(live.status);
   const cancelOrder = async () => {
     if (!window.confirm(`Cancel order ${order.ref}? This can't be undone.`)) return;
     try { await deleteOrder(order.ref); onChanged && onChanged(); onBack(); }
@@ -326,52 +337,58 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
     } catch (e) { if (w) w.close(); setPayErr(e.message); }
   };
 
-  // LIVE: poll the backend for this order's real progress every few seconds.
-  // The backend's GPS poller advances it (mock movement now, real One Step GPS
-  // later), so the map + ETA reflect actual backend state — not a local animation.
+  // LIVE: poll the whole order every few seconds so the map, the per-truck
+  // statuses and the ETAs reflect real backend state (the GPS poller advances
+  // each load — mock movement now, real One Step GPS later).
+  useEffect(() => { setLive(order); }, [order.ref]);   // reset when switching orders
   useEffect(() => {
     let alive = true;
     const tick = async () => {
-      try {
-        const fresh = await getOrder(order.ref);
-        if (alive && fresh && typeof fresh.progress === "number") setProgress(fresh.progress);
-        if (alive && fresh && fresh.truck_position) setPos(fresh.truck_position);
-      } catch { /* ignore transient errors; keep last value */ }
+      try { const fresh = await getOrder(order.ref); if (alive && fresh) setLive(fresh); }
+      catch { /* ignore transient errors; keep last value */ }
     };
     tick();
     const iv = setInterval(tick, 4000);
     return () => { alive = false; clearInterval(iv); };
   }, [order.ref]);
 
-  // Real ETA from the truck's live distance to the job site (~30 mph avg, 1.3x for
-  // roads vs straight line). Falls back to the rough progress estimate only until
-  // the site address has geocoded. "Arriving" once it's essentially there.
-  const remMi = milesBetween(pos, siteLatLng);
-  const arrived = ["onsite", "pouring", "returning", "complete"].includes(order.status);
-  const etaMin = remMi != null
-    ? Math.round((remMi * 1.3) / 30 * 60)
-    : Math.max(0, Math.round((1 - progress) * 22));
-  const etaText = arrived ? "Arrived" : ((remMi != null && remMi < 0.2) || etaMin <= 0 ? "Arriving" : `${etaMin} min`);
-  // Drive the status pill + timeline from the order's REAL status, so a scheduled
-  // or requested order doesn't look like it's already en route.
-  const STATUS_STAGE = { batched: 0, ongoing: 3, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
-  const isLive = ["batched", "ongoing", "enroute", "onsite", "pouring", "returning", "complete"].includes(order.status);
-  // Customer live truck map only while it's coming or just arrived; once it's
-  // pouring/heading back/done they don't need to watch the truck return to the yard.
-  const tracking = ["batched", "enroute", "onsite"].includes(order.status);
-  const stageIdx = STATUS_STAGE[order.status] ?? -1;
+  // Every order is load-tracked. The truck the customer cares about right now is
+  // the one en route, then on site/pouring, else the first load still in flight.
+  const loads = live.loads || [];
+  const activeLoad = loads.find((l) => l.status === "enroute")
+    || loads.find((l) => ["onsite", "pouring"].includes(l.status)) || null;
+  const repLoad = activeLoad || loads.find((l) => l.status !== "complete") || loads[0] || null;
+  // The map, headline ETA and status pill follow that truck (fall back to the
+  // order itself for an order that isn't load-tracked yet).
+  const trackPos = (repLoad && repLoad.truck_position) || live.truck_position || null;
+  const trackTruck = repLoad ? repLoad.truck : live.truck;
+  const trackDriver = repLoad ? repLoad.driver : live.driver;
+  const trackProgress = repLoad ? repLoad.progress : (live.progress || 0.05);
+  const trackStatus = repLoad ? repLoad.status : live.status;
+
+  // ETA to the job site for the tracked truck. Per-load ETA (shown per row) is
+  // only meaningful once a truck is en route — before that it's "Loading at yard".
+  const etaText = etaFor(trackStatus, trackPos, siteLatLng, trackProgress);
+  const loadEta = (ld) => ld.status === "enroute" ? etaFor(ld.status, ld.truck_position, siteLatLng, ld.progress) : null;
+  const arrived = ["onsite", "pouring", "returning", "complete"].includes(trackStatus);
+  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
+  const isLive = ["batched", "ongoing", "enroute", "onsite", "pouring", "returning", "complete"].includes(live.status);
+  // Customer live truck map only while a truck is actually heading over or just
+  // arrived; once it's pouring/heading back/done they don't watch it leave.
+  const tracking = ["enroute", "onsite"].includes(trackStatus);
+  const stageIdx = STATUS_STAGE[trackStatus] ?? -1;
 
   return (
     <div className="px-4 pb-6 pt-2">
       <button onClick={onBack} className="flex items-center gap-1 text-white/60 text-sm mb-3 active:opacity-60"><ChevronLeft size={18} /> Back</button>
       <div className="flex items-baseline justify-between">
         <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{order.ref}</span>
-        <StatusPill status={order.status} />
+        <StatusPill status={trackStatus} />
       </div>
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.project || order.site}</h2>
       {order.project && <p className="text-white/50 text-sm flex items-center gap-1"><MapPin size={13} /> {order.site}</p>}
       {order.is_pour ? (
-        <p className="text-white/50 text-sm">{order.mix} · Ordered {order.qty} · Delivered {fmtYards(order.yards_loaded || 0)} yd</p>
+        <p className="text-white/50 text-sm">{order.mix} · Ordered {order.qty} · Delivered {fmtYards(live.yards_loaded || 0)} yd</p>
       ) : (
         <p className="text-white/50 text-sm">{order.mix} · {order.qty}</p>
       )}
@@ -391,15 +408,15 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
 
       {tracking ? (
         <>
-          <div className="mt-4"><GoogleTrackMap site={order.site} truckPosition={pos} truckLabel={order.truck} progress={progress} onSite={setSiteLatLng} /></div>
+          <div className="mt-4"><GoogleTrackMap site={order.site} truckPosition={trackPos} truckLabel={trackTruck} progress={trackProgress} onSite={setSiteLatLng} /></div>
           {arrived && <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: GREEN, fontFamily: C.body }}><MapPin size={13} /> Truck on site — proof of delivery logged</div>}
           <div className="grid grid-cols-2 gap-3 mt-3">
             <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Clock size={13} /> ETA</div><div style={{ color: ORANGE, fontFamily: C.cond }} className="text-3xl font-bold mt-1">{etaText}</div></div>
-            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{order.truck}</div>{order.driver && order.driver !== "—" && <div className="text-white/55 text-xs mt-1 flex items-center gap-1" style={{ fontFamily: C.body }}><User size={12} /> {order.driver}</div>}</div>
+            <div className="rounded-2xl p-4" style={{ background: NAVY }}><div className="flex items-center gap-1.5 text-white/50 text-xs uppercase tracking-wide"><Truck size={13} /> Vehicle</div><div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold mt-1">{trackTruck}</div>{trackDriver && trackDriver !== "—" && <div className="text-white/55 text-xs mt-1 flex items-center gap-1" style={{ fontFamily: C.body }}><User size={12} /> {trackDriver}</div>}</div>
           </div>
           <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
         </>
-      ) : order.status === "ongoing" ? (
+      ) : live.status === "ongoing" ? (
         // Continuous pour in progress: the order has no single status — each truck
         // has its own. Point to the per-truck list below (Loading at yard, En
         // route, …) instead of the misleading "Delivered" box.
@@ -411,17 +428,17 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       ) : isLive ? (
         <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
           <CheckCircle2 size={30} color={GREEN} className="mx-auto mb-2" />
-          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{order.status === "pouring" ? "Pouring on site" : "Delivered"}</div>
-          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>{order.status === "pouring" ? "Your concrete is being placed on site." : "Your concrete has been delivered — thank you!"}</div>
+          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{live.status === "pouring" ? "Pouring on site" : "Delivered"}</div>
+          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>{live.status === "pouring" ? "Your concrete is being placed on site." : "Your concrete has been delivered — thank you!"}</div>
         </div>
       ) : (
         <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
           <Clock size={30} color={ORANGE} className="mx-auto mb-2" />
-          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{order.status === "requested" ? "Awaiting confirmation" : "Scheduled"}</div>
+          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{live.status === "requested" ? "Awaiting confirmation" : "Scheduled"}</div>
           <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>
-            {order.status === "requested"
+            {live.status === "requested"
               ? "Aussieblock will confirm this delivery shortly."
-              : `Scheduled for ${[formatOrderDate(order.when), order.time].filter(Boolean).join(" · ") || "a date to be confirmed"}.`}
+              : `Scheduled for ${[formatOrderDate(live.when), live.time].filter(Boolean).join(" · ") || "a date to be confirmed"}.`}
           </div>
           <div className="text-white/40 text-xs mt-2" style={{ fontFamily: C.body }}>Live truck tracking appears here once your delivery is on its way.</div>
         </div>
@@ -437,17 +454,21 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
 
       {order.is_pour ? (
         // Continuous pour: show each truck-load delivered, its yards, status, and ticket.
-        (order.loads || []).length > 0 ? (
+        loads.length > 0 ? (
           <div className="mt-3 rounded-2xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)" }}>
-            <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: C.body }}>Loads · {fmtYards(order.yards_loaded || 0)} of {order.qty} yd delivered</div>
+            <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: C.body }}>Loads · {fmtYards(live.yards_loaded || 0)} of {order.qty} yd delivered</div>
             <div className="flex flex-col gap-2">
-              {(order.loads || []).map((ld) => {
+              {loads.map((ld) => {
                 const meta = STATUS_META[ld.status] || STATUS_META.scheduled;
+                const eta = loadEta(ld);
                 return (
                   <div key={ld.seq} className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }}>
                     <div className="min-w-0">
                       <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Load #{ld.seq} · {ld.qty} yd</div>
-                      <div className="text-[11px] font-semibold mt-0.5" style={{ color: meta.color, fontFamily: C.body }}>{meta.label || ld.status}</div>
+                      <div className="text-[11px] font-semibold mt-0.5" style={{ color: meta.color, fontFamily: C.body }}>
+                        {meta.label || ld.status}
+                        {eta && <span className="text-white/45">{` · ETA ${eta}`}</span>}
+                      </div>
                     </div>
                     {ld.has_batch_ticket && (
                       <button onClick={() => openLoadBatchTicket(order.ref, ld.seq).catch((e) => alert(e.message))} className="shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-lg active:scale-95 transition-transform" style={{ color: "#fff", background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
