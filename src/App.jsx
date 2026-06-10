@@ -1857,7 +1857,9 @@ function BatchTicketForm({ o, onEdited }) {
       const val = priceOv.trim() === "" ? null : Number(priceOv);
       const updated = await setOrderPrice(o.ref, val);
       const p = await getOrderPricing(o.ref);
-      setPx(p);
+      // Only the concrete pricing changes — the haul (delivery) is mileage × volume,
+      // never the price, so we keep the existing delivery figure exactly as-is.
+      setPx((prev) => ({ ...p, delivery: (prev && prev.delivery) ? prev.delivery : p.delivery }));
       onEdited && onEdited(updated);
       setSavedOk(true);
     } catch (e) { setErr(e.message || "Could not save price"); }
@@ -4133,14 +4135,12 @@ function DispatchApp({ email, role, onLogout }) {
     return { label: "Loading", color: ORANGE, order: ref, job };   // batched
   };
   const truckStatus = (t) => {
-    // Single delivery: the truck is assigned to the order itself.
-    const o = activeOrders.find((x) => !x.is_pour && x.truck === t.label && LIVE_POUR_STATUS.includes(x.status));
+    // Order-level truck (a delivery assigned directly, no loads yet): match the order's own truck.
+    const o = activeOrders.find((x) => (!x.loads || x.loads.length === 0) && x.truck === t.label && LIVE_POUR_STATUS.includes(x.status));
     if (o) return statusToTruck(o.status, o.ref, o);
-    // Continuous pour: the truck is assigned to a load, not the umbrella order.
-    // Use the load's own stage if staff advanced it; otherwise fall back to the
-    // pour's overall stage (so setting just "Pour status" still flips the truck).
+    // Loads: the truck is assigned to a load, not the umbrella order. Use the load's
+    // own stage if staff advanced it; otherwise fall back to the pour's overall stage.
     for (const p of activeOrders) {
-      if (!p.is_pour) continue;
       const ld = (p.loads || []).find((l) => l.truck === t.label);
       if (!ld) continue;
       const st = LIVE_POUR_STATUS.includes(ld.status) ? ld.status
