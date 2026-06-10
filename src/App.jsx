@@ -3082,49 +3082,88 @@ function CostsModal({ orders, onClose }) {
   }, { billed: 0, toHauler: 0 });
   const grand = sumFor(filtered);
 
-  // Open a clean, printable PDF (new tab → "Print / Save as PDF") of the filtered
-  // sheet, grouped by customer, matching the account-statement house style.
+  // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
+  // customer SUMMARY page, then a page break and the per-customer DETAIL tables.
   const exportPdf = () => {
     const w = window.open("", "_blank");
     if (!w) { setErr("Allow pop-ups to open the PDF."); return; }
     setErr("");
     const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    const m = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
+    const m = (v) => (v == null ? "—" : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
     const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     const period = (from || to)
       ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}`
       : "All dates";
+
+    // Page 1 — summary: one row per customer.
+    const summaryRows = custNames.map((name) => {
+      const t = sumFor(groups[name]);
+      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
+    }).join("");
+
+    // Detail — per-customer tables (kept whole, won't split across a page).
     const sections = custNames.map((name) => {
       const list = groups[name];
       const t = sumFor(list);
       const rows = list.map((o) => {
         const r = px[o.ref] || {};
-        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td>${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
       }).join("");
-      return `<h2>${esc(name)} <span class="ct">${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
-<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th>Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">To hauler</th></tr></thead>
+      return `<section class="cust"><h2>${esc(name)} <span class="ct">· ${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">To hauler</th></tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="5" class="r"><strong>Subtotal</strong></td><td class="r"><strong>${m(t.billed)}</strong></td><td class="r"><strong>${m(t.toHauler)}</strong></td></tr></tfoot></table>`;
+<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${m(t.billed)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
     }).join("");
+
+    const empty = custNames.length === 0;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aussieblock costs — ${esc(period)}</title>
-<style>body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:24px;}h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
-h2{font-size:15px;margin:22px 0 4px;color:#161d27;}h2 .ct{color:#889;font-size:12px;font-weight:normal;}
-.muted{color:#667;font-size:13px;}.sum{display:flex;gap:30px;background:#f6f7f9;border-radius:10px;padding:14px 16px;margin-top:16px;}
-.lab{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.big{font-size:20px;font-weight:bold;margin-top:2px;}
-table{width:100%;border-collapse:collapse;margin-top:4px;font-size:12.5px;}th,td{text-align:left;padding:6px 6px;border-bottom:1px solid #e2e6ea;}
-th{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.r{text-align:right;}
-tfoot td{border-top:2px solid #c9ced4;border-bottom:none;}thead{display:table-header-group;}tr{page-break-inside:avoid;}
-button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:24px;}
-@media print{button{display:none;}}</style></head>
-<body><h1>AUSSIEBLOCK READY MIX</h1><div class="muted">Customer cost tracking &middot; Generated ${stamp}</div>
-<div class="sum"><div><div class="lab">Period</div><div class="big" style="font-size:15px;">${esc(period)}</div></div>
-<div><div class="lab">Total billed</div><div class="big">${m(grand.billed)}</div></div>
-<div><div class="lab">Total to hauler</div><div class="big">${m(grand.toHauler)}</div></div>
-<div><div class="lab">Orders</div><div class="big">${filtered.length}</div></div></div>
-${sections || `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>`}
-<div class="muted" style="margin-top:8px;font-size:11px;">“To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
-<button onclick="window.print()">Print / Save as PDF</button>
-<button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:28px;font-size:13px;line-height:1.4;}
+  h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
+  h2{font-size:15px;margin:20px 0 6px;color:#161d27;border-left:4px solid #e7732a;padding-left:8px;}
+  h2 .ct{color:#889;font-size:12px;font-weight:normal;}
+  .muted{color:#667;font-size:12px;}
+  .sum{display:flex;flex-wrap:wrap;gap:26px;background:#f6f7f9;border-radius:10px;padding:14px 18px;margin-top:16px;}
+  .lab{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .big{font-size:19px;font-weight:bold;margin-top:2px;}
+  .sec-title{font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#889;margin:22px 0 6px;}
+  table{width:100%;border-collapse:collapse;margin-top:4px;}
+  th,td{text-align:left;padding:7px 8px;}
+  thead th{color:#667;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid #c9ced4;}
+  tbody td{border-bottom:1px solid #eceef1;}
+  tbody tr:nth-child(even){background:#f7f8fa;}
+  .r{text-align:right;white-space:nowrap;}
+  .job{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tfoot td{border-top:2px solid #c9ced4;font-weight:bold;padding-top:8px;}
+  .cust{page-break-inside:avoid;margin-bottom:6px;}
+  #detail{page-break-before:always;}
+  thead{display:table-header-group;}
+  button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:26px;}
+  @media print{button{display:none;}body{margin:0;}}
+</style></head>
+<body>
+  <h1>AUSSIEBLOCK READY MIX</h1>
+  <div class="muted">Customer cost tracking &middot; Generated ${stamp}</div>
+  <div class="sum">
+    <div><div class="lab">Period</div><div class="big" style="font-size:15px;">${esc(period)}</div></div>
+    <div><div class="lab">Total billed</div><div class="big">${m(grand.billed)}</div></div>
+    <div><div class="lab">Total to hauler</div><div class="big">${m(grand.toHauler)}</div></div>
+    <div><div class="lab">Orders</div><div class="big">${filtered.length}</div></div>
+  </div>
+  ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
+  <div class="sec-title">Summary by customer</div>
+  <table>
+    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">To hauler</th></tr></thead>
+    <tbody>${summaryRows}</tbody>
+    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
+  </table>
+  <div id="detail">
+    <div class="sec-title">Detail by customer</div>
+    ${sections}
+  </div>`}
+  <div class="muted" style="margin-top:10px;font-size:11px;">“To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
+  <button onclick="window.print()">Print / Save as PDF</button>
+  <button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
 </body></html>`);
     w.document.close();
   };
