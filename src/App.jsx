@@ -2173,11 +2173,13 @@ function StatTile({ icon: Icon, label, value, accent }) {
 function Panel({ title, icon: Icon, count, children, fill = false }) {
   return (
     <div className={"rounded-2xl p-4 min-w-0" + (fill ? " flex flex-col min-h-0 h-full" : "")} style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center gap-2 mb-3 shrink-0">
-        <Icon size={16} color={ORANGE} />
-        <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold">{title}</h2>
-        {count != null && <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({count})</span>}
-      </div>
+      {title && (
+        <div className="flex items-center gap-2 mb-3 shrink-0">
+          <Icon size={16} color={ORANGE} />
+          <h2 style={{ fontFamily: C.cond }} className="text-white text-lg font-bold">{title}</h2>
+          {count != null && <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({count})</span>}
+        </div>
+      )}
       {fill ? <div className="overflow-y-auto min-h-0 flex-1 -mr-1 pr-1">{children}</div> : children}
     </div>
   );
@@ -3745,11 +3747,11 @@ function DispatchApp({ email, role, onLogout }) {
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               Today's orders gets the most room (it's where the day's work happens);
               Completed + Upcoming are kept narrow as reference columns. */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
-            <Panel title="Fleet" icon={MapPin} count={trucks.length} fill>
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.5fr)_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
+            <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} /></div>
-                <div className="shrink-0 overflow-y-auto flex flex-col gap-1.5 mt-3" style={{ maxHeight: "32%" }}>
+                <div className="shrink-0 overflow-y-auto flex flex-col gap-1.5 mt-3" style={{ maxHeight: "22%" }}>
                 {trucks.length === 0 ? (
                   <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
                 ) : trucks.map((t) => {
