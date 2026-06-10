@@ -1713,8 +1713,10 @@ function BatchTicketForm({ o, onEdited }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [savedOk, setSavedOk] = useState(false);
+  const done = o.status === "complete";   // pricing populates only once the order is complete
 
   useEffect(() => {
+    if (!done) return undefined;   // don't calculate until the end (final actual yards)
     let live = true;
     getOrderPricing(o.ref).then((p) => {
       if (!live) return;
@@ -1723,7 +1725,7 @@ function BatchTicketForm({ o, onEdited }) {
       if (mileage === "" && p.delivery && p.delivery.mileage) setMileage(String(p.delivery.mileage));
     }).catch((e) => live && setErr(e.message));
     return () => { live = false; };
-  }, [o.ref]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [o.ref, done]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveDelivery = async () => {
     setBusy(true); setErr(""); setSavedOk(false);
@@ -1766,12 +1768,21 @@ function BatchTicketForm({ o, onEdited }) {
         {ro("Quantity", o.qty)}
       </div>
 
+      {!done ? (
+        <div className="text-white/45 text-xs py-4 flex items-center gap-1.5" style={{ fontFamily: C.body }}>
+          <Clock size={13} /> Pricing populates when this order is marked <b style={{ color: "#fff" }}>Complete</b> — it bills the actual yards delivered.
+        </div>
+      ) : (
+      <>
       {groupHead("Customer pricing — what you bill")}
       {!cp ? (
         <div className="text-white/40 text-xs py-2 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Calculating…</div>
       ) : (
         <div>
-          <Prow label={`Concrete  (${o.qty} × ${money(cp.unit_price)}/yd)`} val={money(cp.extended)} />
+          <Prow label={`Concrete  (${px.billed_qty} yd × ${money(cp.unit_price)}/yd)`} val={money(cp.extended)} />
+          {px.billed_qty && px.ordered_qty && parseFloat(px.billed_qty) !== parseFloat(px.ordered_qty) && (
+            <div className="text-[11px] py-0.5" style={{ color: "#6aa9ff", fontFamily: C.body }}>Billed actual {px.billed_qty} yd (ordered {px.ordered_qty})</div>
+          )}
           {(cp.admixtures || []).map((a, i) => <Prow key={i} label={a.label} val={money(a.amount)} />)}
           {cp.short_load ? <Prow label="Short-load fee" val={money(cp.short_load)} /> : null}
           {cp.backhaul ? <Prow label="Back-haul fee" val={money(cp.backhaul)} /> : null}
@@ -1807,6 +1818,8 @@ function BatchTicketForm({ o, onEdited }) {
         </button>
         {savedOk && <span className="text-xs flex items-center gap-1" style={{ color: GREEN, fontFamily: C.body }}><CheckCircle2 size={13} /> Saved</span>}
       </div>
+      </>
+      )}
     </div>
   );
 }
