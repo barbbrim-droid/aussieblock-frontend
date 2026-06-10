@@ -1489,6 +1489,12 @@ function GoogleFleetMap({ trucks, sites = [] }) {
         icon: { path: maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#6aa9ff", fillOpacity: 0.9, strokeColor: "#fff", strokeWeight: 2 },
         label: { text: s.label, color: "#cfe0ff", fontSize: "10px", fontWeight: "600" },
       }));
+      // 300 m radius around the site — a visual geofence to track trucks arriving.
+      siteMarkersRef.current.push(new maps.Circle({
+        center: loc, radius: 300, map: mapRef.current, clickable: false,
+        strokeColor: "#6aa9ff", strokeOpacity: 0.6, strokeWeight: 1.5,
+        fillColor: "#6aa9ff", fillOpacity: 0.1,
+      }));
     };
     const seen = new Set();
     let pending = 0;
