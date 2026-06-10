@@ -1980,9 +1980,9 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
     catch (e) { setErr(e.message || "Could not cancel"); setBusy(false); }
   };
 
-  // Batch ticket (PDF) upload — allowed once the order is batched+.
+  // Batch ticket (PDF) upload — allowed on any order, at any stage.
   const fileRef = useRef(null);
-  const batchable = ["batched", "enroute", "onsite", "pouring", "returning", "complete"].includes(o.status);
+  const batchable = true;
   const onPickTicket = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";   // let them re-pick the same file later
@@ -3890,14 +3890,25 @@ function DispatchApp({ email, role, onLogout }) {
 
   // Each truck's status, derived from the order it's assigned to. (Later, GPS
   // geofences for the yard / job site will drive At yard vs On site automatically.)
+  const LIVE_TRUCK = ["batched", "enroute", "onsite", "pouring", "returning"];
+  const statusToTruck = (status, ref, job) => {
+    if (status === "returning") return { label: "Returning", color: "#4da3ff", order: ref, job };
+    if (status === "pouring") return { label: "Pouring", color: GREEN, order: ref, job };
+    if (status === "onsite") return { label: "On site", color: GREEN, order: ref, job };
+    if (status === "enroute") return { label: "En route", color: ORANGE_HOT, order: ref, job };
+    return { label: "Loading", color: ORANGE, order: ref, job };   // batched
+  };
   const truckStatus = (t) => {
-    const o = activeOrders.find((x) => x.truck === t.label && ["batched", "enroute", "onsite", "pouring", "returning"].includes(x.status));
-    if (!o) return { label: "At yard", color: "#7c8794" };
-    if (o.status === "returning") return { label: "Returning", color: "#4da3ff", order: o.ref, job: o };
-    if (o.status === "pouring") return { label: "Pouring", color: GREEN, order: o.ref, job: o };
-    if (o.status === "onsite") return { label: "On site", color: GREEN, order: o.ref, job: o };
-    if (o.status === "enroute") return { label: "En route", color: ORANGE_HOT, order: o.ref, job: o };
-    return { label: "Loading", color: ORANGE, order: o.ref, job: o };   // batched
+    // Single delivery: the truck is assigned to the order itself.
+    const o = activeOrders.find((x) => !x.is_pour && x.truck === t.label && LIVE_TRUCK.includes(x.status));
+    if (o) return statusToTruck(o.status, o.ref, o);
+    // Continuous pour: the truck is assigned to a load, not the umbrella order.
+    for (const p of activeOrders) {
+      if (!p.is_pour) continue;
+      const ld = (p.loads || []).find((l) => l.truck === t.label && LIVE_TRUCK.includes(l.status));
+      if (ld) return statusToTruck(ld.status, p.ref, p);
+    }
+    return { label: "At yard", color: "#7c8794" };
   };
 
   // Yard totals for planning: today's total, and upcoming grouped by day.
