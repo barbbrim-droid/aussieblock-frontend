@@ -92,6 +92,20 @@ const ORDER_STATUSES = ["requested", "scheduled", "ongoing", "batched", "enroute
 // carry the individual truck stages). "ongoing" is set automatically by the
 // backend while loads are in flight; staff can also set scheduled/complete.
 const POUR_STATUSES = ["scheduled", "ongoing", "complete"];
+// Statuses that mean a delivery is actively happening (truck in flight or pouring).
+const LIVE_STATUSES = ["batched", "ongoing", "enroute", "onsite", "pouring", "returning"];
+// The order a customer means by "Track": the one in progress, else the next
+// upcoming/scheduled delivery, else (nothing pending) the most recent. Never an old
+// completed order by default — that was the bug where Track opened a finished order.
+function pickCurrentOrder(orders) {
+  if (!orders || !orders.length) return null;
+  const byWhenAsc = (a, b) => String(a.when).localeCompare(String(b.when));
+  const live = orders.filter((o) => LIVE_STATUSES.includes(o.status));
+  if (live.length) return live.slice().sort(byWhenAsc)[0];
+  const upcoming = orders.filter((o) => o.status === "scheduled" || o.status === "requested");
+  if (upcoming.length) return upcoming.slice().sort(byWhenAsc)[0];
+  return orders.slice().sort((a, b) => String(b.when).localeCompare(String(a.when)))[0];
+}
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
 const BUILD_TAG = "build Jun8-v64";   // bump on each deploy to verify clients aren't cached
@@ -385,6 +399,15 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
           </div>
           <div className="rounded-2xl p-4 mt-3" style={{ background: NAVY }}><div className="text-white/50 text-xs uppercase tracking-wide">Delivery progress</div><Timeline stageIdx={stageIdx} /></div>
         </>
+      ) : order.status === "ongoing" ? (
+        // Continuous pour in progress: the order has no single status — each truck
+        // has its own. Point to the per-truck list below (Loading at yard, En
+        // route, …) instead of the misleading "Delivered" box.
+        <div className="rounded-2xl p-5 mt-4 text-center" style={{ background: NAVY }}>
+          <Truck size={28} color={ORANGE_HOT} className="mx-auto mb-2" />
+          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>Pour in progress</div>
+          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>Each truck's status is shown below.</div>
+        </div>
       ) : isLive ? (
         <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
           <CheckCircle2 size={30} color={GREEN} className="mx-auto mb-2" />
@@ -4613,7 +4636,7 @@ export default function App() {
           {nav.map(({ k, icon: Icon, label }) => {
             const on = screen === k;
             return (
-              <button key={k} onClick={() => { if (k === "track") { if (orders.length) { setActive(orders[0]); setScreen("track"); } } else setScreen(k); }} className="flex flex-col items-center gap-1">
+              <button key={k} onClick={() => { if (k === "track") { const cur = pickCurrentOrder(orders); if (cur) { setActive(cur); setScreen("track"); } } else setScreen(k); }} className="flex flex-col items-center gap-1">
                 <Icon size={20} color={on ? ORANGE : "rgba(255,255,255,0.45)"} />
                 <span className="text-[10px]" style={{ color: on ? ORANGE : "rgba(255,255,255,0.45)" }}>{label}</span>
               </button>
