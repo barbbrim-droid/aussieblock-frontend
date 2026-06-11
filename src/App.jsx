@@ -50,10 +50,13 @@ body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavi
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
+// Exact Aussieblock vector paths extracted from the official logo PDF. Module-level
+// so the printable PDFs (cost report etc.) can embed the same mark as the on-screen UI.
+const LOGO_TILE = "M98.76 54.72 L526.70 54.72 C528.14 54.72 529.57 54.79 531.00 54.93 C532.43 55.07 533.85 55.28 535.26 55.56 C536.67 55.84 538.06 56.19 539.44 56.61 C540.82 57.03 542.17 57.51 543.50 58.06 C544.82 58.61 546.12 59.23 547.39 59.90 C548.66 60.58 549.89 61.32 551.08 62.12 C552.28 62.92 553.43 63.77 554.54 64.69 C555.65 65.60 556.72 66.56 557.73 67.58 C558.75 68.60 559.72 69.66 560.63 70.77 C561.54 71.89 562.39 73.04 563.19 74.24 C563.99 75.43 564.73 76.66 565.41 77.93 C566.08 79.20 566.70 80.50 567.25 81.83 C567.80 83.16 568.28 84.51 568.70 85.89 C569.12 87.26 569.47 88.66 569.75 90.07 C570.03 91.48 570.24 92.90 570.38 94.33 C570.52 95.76 570.59 97.20 570.59 98.64 L570.59 384.11 C570.59 385.54 570.52 386.98 570.38 388.41 C570.24 389.84 570.03 391.26 569.75 392.67 C569.47 394.08 569.12 395.48 568.70 396.85 C568.28 398.23 567.80 399.58 567.25 400.91 C566.70 402.24 566.08 403.54 565.41 404.81 C564.73 406.08 563.99 407.31 563.19 408.51 C562.39 409.70 561.54 410.86 560.63 411.97 C559.72 413.08 558.75 414.14 557.73 415.16 C556.72 416.18 555.65 417.14 554.54 418.06 C553.43 418.97 552.28 419.82 551.08 420.62 C549.89 421.42 548.66 422.16 547.39 422.84 C546.12 423.52 544.82 424.13 543.50 424.68 C542.17 425.23 540.82 425.72 539.44 426.13 C538.06 426.55 536.67 426.90 535.26 427.18 C533.85 427.46 532.43 427.67 531.00 427.81 C529.57 427.95 528.14 428.02 526.70 428.02 L98.76 428.02 C97.32 428.02 95.89 427.95 94.46 427.81 C93.03 427.67 91.61 427.46 90.20 427.18 C88.79 426.90 87.40 426.55 86.02 426.13 C84.64 425.72 83.29 425.23 81.96 424.68 C80.64 424.13 79.34 423.52 78.07 422.84 C76.80 422.16 75.57 421.42 74.38 420.62 C73.18 419.82 72.03 418.97 70.92 418.06 C69.81 417.14 68.74 416.18 67.73 415.16 C66.71 414.14 65.75 413.08 64.83 411.97 C63.92 410.86 63.07 409.70 62.27 408.51 C61.47 407.31 60.73 406.08 60.05 404.81 C59.38 403.54 58.76 402.24 58.21 400.91 C57.66 399.58 57.18 398.23 56.76 396.85 C56.34 395.48 55.99 394.08 55.71 392.67 C55.43 391.26 55.22 389.84 55.08 388.41 C54.94 386.98 54.87 385.54 54.87 384.11 L54.87 98.64 C54.87 97.20 54.94 95.76 55.08 94.33 C55.22 92.90 55.43 91.48 55.71 90.07 C55.99 88.66 56.34 87.26 56.76 85.89 C57.18 84.51 57.66 83.16 58.21 81.83 C58.76 80.50 59.38 79.20 60.05 77.93 C60.73 76.66 61.47 75.43 62.27 74.24 C63.07 73.04 63.92 71.89 64.83 70.77 C65.75 69.66 66.71 68.60 67.73 67.58 C68.74 66.56 69.81 65.60 70.92 64.69 C72.03 63.77 73.18 62.92 74.38 62.12 C75.57 61.32 76.80 60.58 78.07 59.90 C79.34 59.23 80.64 58.61 81.96 58.06 C83.29 57.51 84.64 57.03 86.02 56.61 C87.40 56.19 88.79 55.84 90.20 55.56 C91.61 55.28 93.03 55.07 94.46 54.93 C95.89 54.79 97.32 54.72 98.76 54.72 Z";
+const LOGO_ROO = "M458.01 178.78 L443.12 167.86 L439.48 161.24 L427.90 154.95 C425.59 153.96 423.27 153.63 420.96 153.96 L420.30 148.00 C419.97 145.68 418.97 143.37 417.32 142.04 L413.02 138.07 C412.03 137.08 410.37 136.75 409.05 137.41 L408.39 137.74 C408.06 138.07 407.40 138.40 407.07 138.73 C405.74 138.07 403.76 138.07 402.77 139.06 L402.10 139.40 C400.78 140.39 400.12 142.37 400.78 144.03 L404.09 152.97 C405.08 155.61 407.40 157.93 410.04 159.26 L411.37 159.92 C411.37 159.92 411.37 160.25 411.03 160.25 L401.11 183.09 C398.13 188.05 392.84 191.36 386.56 191.36 L384.90 191.36 L356.12 191.36 C307.17 191.36 267.14 231.08 267.14 280.40 L267.14 299.60 C267.14 318.46 251.93 333.36 233.40 333.36 L172.21 337.00 C167.91 337.00 164.60 340.31 164.60 344.61 L232.74 344.61 L244.65 344.61 C266.48 344.61 285.67 330.71 292.28 309.86 L298.24 291.65 C304.85 297.28 313.45 300.59 322.71 300.59 C324.70 300.59 326.68 300.59 328.67 300.26 L331.65 304.56 L331.65 317.47 L326.02 338.32 C325.36 341.30 327.68 344.28 330.98 344.28 L399.46 344.28 C399.46 342.63 398.80 341.30 397.80 340.31 L407.07 340.31 C407.07 338.65 406.40 337.33 405.41 336.34 C404.42 335.34 402.77 334.68 401.11 334.68 L395.82 334.68 L392.18 331.37 L356.45 331.37 C353.81 331.37 351.82 329.39 351.82 326.74 L351.82 298.60 L366.38 259.22 L388.87 246.31 L395.82 263.85 L395.82 291.32 C399.46 291.32 402.43 289.00 403.43 285.69 C406.73 284.70 409.38 281.72 409.38 278.08 L409.38 241.01 C409.38 238.36 409.71 235.71 410.04 233.07 C421.29 223.47 427.91 209.57 427.91 194.34 L427.91 192.69 C427.91 190.70 429.56 189.04 431.54 189.04 L441.14 189.04 L449.74 191.36 C451.72 192.02 453.71 191.03 454.70 189.38 L457.68 189.38 L459.33 185.73 C460.65 183.42 459.99 180.44 458.01 178.78 Z";
+
 function Roo({ size = 32, variant = "tile" }) {
-  // Exact Aussieblock vector paths extracted from the official logo PDF.
-  const TILE = "M98.76 54.72 L526.70 54.72 C528.14 54.72 529.57 54.79 531.00 54.93 C532.43 55.07 533.85 55.28 535.26 55.56 C536.67 55.84 538.06 56.19 539.44 56.61 C540.82 57.03 542.17 57.51 543.50 58.06 C544.82 58.61 546.12 59.23 547.39 59.90 C548.66 60.58 549.89 61.32 551.08 62.12 C552.28 62.92 553.43 63.77 554.54 64.69 C555.65 65.60 556.72 66.56 557.73 67.58 C558.75 68.60 559.72 69.66 560.63 70.77 C561.54 71.89 562.39 73.04 563.19 74.24 C563.99 75.43 564.73 76.66 565.41 77.93 C566.08 79.20 566.70 80.50 567.25 81.83 C567.80 83.16 568.28 84.51 568.70 85.89 C569.12 87.26 569.47 88.66 569.75 90.07 C570.03 91.48 570.24 92.90 570.38 94.33 C570.52 95.76 570.59 97.20 570.59 98.64 L570.59 384.11 C570.59 385.54 570.52 386.98 570.38 388.41 C570.24 389.84 570.03 391.26 569.75 392.67 C569.47 394.08 569.12 395.48 568.70 396.85 C568.28 398.23 567.80 399.58 567.25 400.91 C566.70 402.24 566.08 403.54 565.41 404.81 C564.73 406.08 563.99 407.31 563.19 408.51 C562.39 409.70 561.54 410.86 560.63 411.97 C559.72 413.08 558.75 414.14 557.73 415.16 C556.72 416.18 555.65 417.14 554.54 418.06 C553.43 418.97 552.28 419.82 551.08 420.62 C549.89 421.42 548.66 422.16 547.39 422.84 C546.12 423.52 544.82 424.13 543.50 424.68 C542.17 425.23 540.82 425.72 539.44 426.13 C538.06 426.55 536.67 426.90 535.26 427.18 C533.85 427.46 532.43 427.67 531.00 427.81 C529.57 427.95 528.14 428.02 526.70 428.02 L98.76 428.02 C97.32 428.02 95.89 427.95 94.46 427.81 C93.03 427.67 91.61 427.46 90.20 427.18 C88.79 426.90 87.40 426.55 86.02 426.13 C84.64 425.72 83.29 425.23 81.96 424.68 C80.64 424.13 79.34 423.52 78.07 422.84 C76.80 422.16 75.57 421.42 74.38 420.62 C73.18 419.82 72.03 418.97 70.92 418.06 C69.81 417.14 68.74 416.18 67.73 415.16 C66.71 414.14 65.75 413.08 64.83 411.97 C63.92 410.86 63.07 409.70 62.27 408.51 C61.47 407.31 60.73 406.08 60.05 404.81 C59.38 403.54 58.76 402.24 58.21 400.91 C57.66 399.58 57.18 398.23 56.76 396.85 C56.34 395.48 55.99 394.08 55.71 392.67 C55.43 391.26 55.22 389.84 55.08 388.41 C54.94 386.98 54.87 385.54 54.87 384.11 L54.87 98.64 C54.87 97.20 54.94 95.76 55.08 94.33 C55.22 92.90 55.43 91.48 55.71 90.07 C55.99 88.66 56.34 87.26 56.76 85.89 C57.18 84.51 57.66 83.16 58.21 81.83 C58.76 80.50 59.38 79.20 60.05 77.93 C60.73 76.66 61.47 75.43 62.27 74.24 C63.07 73.04 63.92 71.89 64.83 70.77 C65.75 69.66 66.71 68.60 67.73 67.58 C68.74 66.56 69.81 65.60 70.92 64.69 C72.03 63.77 73.18 62.92 74.38 62.12 C75.57 61.32 76.80 60.58 78.07 59.90 C79.34 59.23 80.64 58.61 81.96 58.06 C83.29 57.51 84.64 57.03 86.02 56.61 C87.40 56.19 88.79 55.84 90.20 55.56 C91.61 55.28 93.03 55.07 94.46 54.93 C95.89 54.79 97.32 54.72 98.76 54.72 Z";
-  const ROO = "M458.01 178.78 L443.12 167.86 L439.48 161.24 L427.90 154.95 C425.59 153.96 423.27 153.63 420.96 153.96 L420.30 148.00 C419.97 145.68 418.97 143.37 417.32 142.04 L413.02 138.07 C412.03 137.08 410.37 136.75 409.05 137.41 L408.39 137.74 C408.06 138.07 407.40 138.40 407.07 138.73 C405.74 138.07 403.76 138.07 402.77 139.06 L402.10 139.40 C400.78 140.39 400.12 142.37 400.78 144.03 L404.09 152.97 C405.08 155.61 407.40 157.93 410.04 159.26 L411.37 159.92 C411.37 159.92 411.37 160.25 411.03 160.25 L401.11 183.09 C398.13 188.05 392.84 191.36 386.56 191.36 L384.90 191.36 L356.12 191.36 C307.17 191.36 267.14 231.08 267.14 280.40 L267.14 299.60 C267.14 318.46 251.93 333.36 233.40 333.36 L172.21 337.00 C167.91 337.00 164.60 340.31 164.60 344.61 L232.74 344.61 L244.65 344.61 C266.48 344.61 285.67 330.71 292.28 309.86 L298.24 291.65 C304.85 297.28 313.45 300.59 322.71 300.59 C324.70 300.59 326.68 300.59 328.67 300.26 L331.65 304.56 L331.65 317.47 L326.02 338.32 C325.36 341.30 327.68 344.28 330.98 344.28 L399.46 344.28 C399.46 342.63 398.80 341.30 397.80 340.31 L407.07 340.31 C407.07 338.65 406.40 337.33 405.41 336.34 C404.42 335.34 402.77 334.68 401.11 334.68 L395.82 334.68 L392.18 331.37 L356.45 331.37 C353.81 331.37 351.82 329.39 351.82 326.74 L351.82 298.60 L366.38 259.22 L388.87 246.31 L395.82 263.85 L395.82 291.32 C399.46 291.32 402.43 289.00 403.43 285.69 C406.73 284.70 409.38 281.72 409.38 278.08 L409.38 241.01 C409.38 238.36 409.71 235.71 410.04 233.07 C421.29 223.47 427.91 209.57 427.91 194.34 L427.91 192.69 C427.91 190.70 429.56 189.04 431.54 189.04 L441.14 189.04 L449.74 191.36 C451.72 192.02 453.71 191.03 454.70 189.38 L457.68 189.38 L459.33 185.73 C460.65 183.42 459.99 180.44 458.01 178.78 Z";
+  const TILE = LOGO_TILE, ROO = LOGO_ROO;
   const ar = 517 / 374; // tile aspect ratio
   if (variant === "mark") {
     // kangaroo silhouette only (no tile); fills with currentColor
@@ -1124,22 +1127,33 @@ function AccountScreen({ account, customerId }) {
       return `<tr><td>${i.id}</td><td>${i.date || ""}</td><td>${i.order || ""}</td><td>${lbl}</td><td class="r">${usd(i.amount)}</td></tr>`;
     }).join("");
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Statement — ${account.company}</title>
-<style>body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:24px;}h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
+<style>body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
+.brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #e7732a;padding-bottom:14px;}
+.brand .logo{height:52px;width:auto;display:block;}.brand-words{flex:1;}
+.brand-name{font-size:22px;font-weight:bold;letter-spacing:.06em;color:#161d27;}
+.brand-sub{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#e7732a;font-weight:bold;margin-top:3px;}
+.brand-meta{text-align:right;font-size:11px;color:#667;line-height:1.7;}.brand-meta .ml{text-transform:uppercase;letter-spacing:.05em;color:#9aa1ab;font-size:9.5px;}
+.foot{margin-top:24px;border-top:1px solid #e2e6ea;padding-top:10px;color:#667;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}.foot .co{font-weight:bold;color:#161d27;}
 .muted{color:#667;font-size:13px;}.sum{display:flex;gap:30px;background:#f6f7f9;border-radius:10px;padding:14px 16px;margin-top:18px;}
 .lab{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.big{font-size:20px;font-weight:bold;margin-top:2px;}
 table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px;}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #e2e6ea;}
 th{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.r{text-align:right;}.pastdue{color:#c62828;}
 button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:22px;}@media print{button{display:none;}}</style></head>
-<body><h1>AUSSIEBLOCK READY MIX</h1><div class="muted">Account Statement &middot; ${stDate}</div>
+<body>
+<header class="brand">
+  <svg class="logo" viewBox="54 54 517 374" xmlns="http://www.w3.org/2000/svg"><path d="${LOGO_TILE}" fill="#161d27"/><path d="${LOGO_ROO}" fill="#e7732a"/></svg>
+  <div class="brand-words"><div class="brand-name">AUSSIEBLOCK READY MIX</div><div class="brand-sub">Account Statement</div></div>
+  <div class="brand-meta"><div><span class="ml">Generated</span> ${stDate}</div></div>
+</header>
 <div style="margin-top:14px;"><strong>${account.company}</strong><div class="muted">Account ${account.acctNo || ""} &middot; Terms ${account.terms || ""}</div></div>
 <div class="sum"><div><div class="lab">Current balance</div><div class="big">${usd(account.balance)}</div></div>
 ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class="big pastdue">${usd(account.pastDue)}</div></div>` : ""}</div>
 <table><thead><tr><th>Invoice</th><th>Date</th><th>Order</th><th>Status</th><th class="r">Amount</th></tr></thead>
 <tbody>${rows || `<tr><td colspan="5" class="muted">No invoices on file.</td></tr>`}</tbody>
 <tfoot><tr><td colspan="4" class="r"><strong>Total</strong></td><td class="r"><strong>${usd(total)}</strong></td></tr></tfoot></table>
+<div class="foot"><span class="co">Aussieblock Ready Mix</span><span>Billing questions? Office 325-213-5315 &middot; Dispatch 940-577-7475</span></div>
 <button onclick="window.print()">Print / Save as PDF</button>
-<button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
-<div class="muted" style="margin-top:22px;">Questions? Aussieblock office &middot; 325-213-5315</div></body></html>`);
+<button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button></body></html>`);
     w.document.close();
   };
 
@@ -3406,8 +3420,9 @@ function CostsModal({ orders, onClose }) {
     const r = px[o.ref] || {};
     if (r.billed != null) acc.billed += r.billed;
     if (r.toHauler != null) acc.toHauler += r.toHauler;
+    if (r.billed != null && r.yards != null && Number(r.yards) > 0) acc.yards += Number(r.yards);   // yards that have a billed total → blended $/yd
     return acc;
-  }, { billed: 0, toHauler: 0 });
+  }, { billed: 0, toHauler: 0, yards: 0 });
   const grand = sumFor(filtered);
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
@@ -3418,6 +3433,9 @@ function CostsModal({ orders, onClose }) {
     setErr("");
     const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const m = (v) => (v == null ? "—" : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    // All-in price per yard = billed total ÷ yards (the billed total already bundles
+    // concrete + admixtures/fiber + short-load/back-haul fees + tax).
+    const perYd = (billed, yards) => (billed == null || !(Number(yards) > 0)) ? "—" : `${m(billed / Number(yards))}/yd`;
     const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     const period = (from || to)
       ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}`
@@ -3426,7 +3444,7 @@ function CostsModal({ orders, onClose }) {
     // Page 1 — summary: one row per customer.
     const summaryRows = custNames.map((name) => {
       const t = sumFor(groups[name]);
-      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.billed, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
     }).join("");
 
     // Detail — per-customer tables (kept whole, won't split across a page).
@@ -3435,18 +3453,27 @@ function CostsModal({ orders, onClose }) {
       const t = sumFor(list);
       const rows = list.map((o) => {
         const r = px[o.ref] || {};
-        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : perYd(r.billed, r.yards)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
       }).join("");
       return `<section class="cust"><h2>${esc(name)} <span class="ct">· ${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
-<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">To hauler</th></tr></thead>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">$/yd all-in</th><th class="r">To hauler</th></tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${m(t.billed)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
+<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.billed, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
     }).join("");
 
     const empty = custNames.length === 0;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aussieblock costs — ${esc(period)}</title>
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:28px;font-size:13px;line-height:1.4;}
+  body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:28px;font-size:13px;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #e7732a;padding-bottom:14px;}
+  .brand .logo{height:52px;width:auto;display:block;}
+  .brand-words{flex:1;}
+  .brand-name{font-size:22px;font-weight:bold;letter-spacing:.06em;color:#161d27;}
+  .brand-sub{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#e7732a;font-weight:bold;margin-top:3px;}
+  .brand-meta{text-align:right;font-size:11px;color:#667;line-height:1.7;}
+  .brand-meta .ml{text-transform:uppercase;letter-spacing:.05em;color:#9aa1ab;font-size:9.5px;}
+  .foot{margin-top:24px;border-top:1px solid #e2e6ea;padding-top:10px;color:#667;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .foot .co{font-weight:bold;color:#161d27;}
   h1{color:#e7732a;margin:0;font-size:22px;letter-spacing:.5px;}
   h2{font-size:15px;margin:20px 0 6px;color:#161d27;border-left:4px solid #e7732a;padding-left:8px;}
   h2 .ct{color:#889;font-size:12px;font-weight:normal;}
@@ -3469,8 +3496,17 @@ function CostsModal({ orders, onClose }) {
   @media print{button{display:none;}body{margin:0;}}
 </style></head>
 <body>
-  <h1>AUSSIEBLOCK READY MIX</h1>
-  <div class="muted">Customer cost tracking &middot; Generated ${stamp}</div>
+  <header class="brand">
+    <svg class="logo" viewBox="54 54 517 374" xmlns="http://www.w3.org/2000/svg"><path d="${LOGO_TILE}" fill="#161d27"/><path d="${LOGO_ROO}" fill="#e7732a"/></svg>
+    <div class="brand-words">
+      <div class="brand-name">AUSSIEBLOCK READY MIX</div>
+      <div class="brand-sub">Customer Cost Report</div>
+    </div>
+    <div class="brand-meta">
+      <div><span class="ml">Generated</span> ${stamp}</div>
+      <div><span class="ml">Period</span> ${esc(period)}</div>
+    </div>
+  </header>
   <div class="sum">
     <div><div class="lab">Period</div><div class="big" style="font-size:15px;">${esc(period)}</div></div>
     <div><div class="lab">Total billed</div><div class="big">${m(grand.billed)}</div></div>
@@ -3480,12 +3516,16 @@ function CostsModal({ orders, onClose }) {
   ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
   <div class="sec-title">Summary by customer</div>
   <table>
-    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">To hauler</th></tr></thead>
+    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">$/yd all-in</th><th class="r">To hauler</th></tr></thead>
     <tbody>${summaryRows}</tbody>
-    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
+    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${perYd(grand.billed, grand.yards)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
   </table>
   ${sections}`}
-  <div class="muted" style="margin-top:10px;font-size:11px;">“To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
+  <div class="muted" style="margin-top:10px;font-size:11px;">“$/yd all-in” = billed total ÷ yards — the effective price per yard the customer paid, including admixtures, fiber, fees &amp; tax. “To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
+  <div class="foot">
+    <span class="co">Aussieblock Ready Mix</span>
+    <span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span>
+  </div>
   <button onclick="window.print()">Print / Save as PDF</button>
   <button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
 </body></html>`);
