@@ -118,7 +118,7 @@ const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
-const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
+const ADMIXTURES = ["Set Control", "Accelerant", "Mac Matrix Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Block Fill", "Other"];
 const DRIVERS = ["Rodney", "Brandon", "Henry"];   // current drivers (staff-assignable on an order)
@@ -592,7 +592,7 @@ function parseSpec(o = {}) {
   const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "";
   String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
     if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
-    else if (p.startsWith("Fiber")) { admix.push("Fiber"); const m = p.match(/([\d.]+)\s*lbs/); if (m) { const t = parseFloat(m[1]); if (t && t !== 3) fiberLbs = m[1]; } }
+    else if (/fiber/i.test(p)) { admix.push("Mac Matrix Fiber"); const m = p.match(/([\d.]+)\s*lbs/); if (m) { const t = parseFloat(m[1]); if (t && t !== 3) fiberLbs = m[1]; } }   // matches new "Mac Matrix Fiber: 3 lbs/yd" and legacy "Fiber: 3 lbs/yd"
     else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
     else if (p === "Accelerant") admix.push("Accelerant");
   });
@@ -626,7 +626,7 @@ function useConcreteSpec(initial) {
     admixtures: admix.map((a) => {
       if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
-      if (a === "Fiber") { const x = parseFloat(fiberLbs); return x > 0 ? `Fiber: ${x} lbs/yd` : "Fiber: 3 lbs/yd"; }
+      if (a === "Mac Matrix Fiber") { const x = parseFloat(fiberLbs); return x > 0 ? `Mac Matrix Fiber: ${x} lbs/yd` : "Mac Matrix Fiber: 3 lbs/yd"; }
       return a;
     }),
     project: project.trim(),
@@ -704,9 +704,9 @@ function useConcreteSpec(initial) {
           </select>
         </div>
       )}
-      {admix.includes("Fiber") && (
+      {admix.includes("Mac Matrix Fiber") && (
         <div className="mb-3">
-          <label className={lbl}>Fiber — lbs/yd (3 is standard)</label>
+          <label className={lbl}>Mac Matrix Fiber — lbs/yd (3 is standard)</label>
           <div className="flex items-center rounded-lg" style={inSt}>
             <input type="number" min="0" step="0.5" value={fiberLbs} onChange={(e) => setFiberLbs(e.target.value)} placeholder="3 (standard)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
             <span className="px-3 text-white/55 text-sm">lbs/yd</span>
