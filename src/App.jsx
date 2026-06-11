@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun8-v64";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun11-v65";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3385,7 +3385,11 @@ function CostsModal({ orders, onClose }) {
           const fees = cp ? (Number(cp.short_load) || 0) + (Number(cp.backhaul) || 0) : 0;
           const toHauler = (haulMi != null || fees) ? (haulMi || 0) + fees : null;
           const yards = p && p.billed_qty != null ? p.billed_qty : o.qty;
-          return [o.ref, { billed, toHauler, yards }];
+          // base (pre-tax) price per yard: the sheet/override unit price, plus the
+          // concrete-only extended (unit × yards) so subtotals blend correctly.
+          const unit = cp && cp.unit_price != null ? Number(cp.unit_price) : null;
+          const ext = cp && cp.extended != null ? Number(cp.extended) : null;
+          return [o.ref, { billed, toHauler, yards, unit, ext }];
         } catch {
           return [o.ref, { billed: null, toHauler: null, yards: o.qty, error: true }];
         }
@@ -3420,9 +3424,10 @@ function CostsModal({ orders, onClose }) {
     const r = px[o.ref] || {};
     if (r.billed != null) acc.billed += r.billed;
     if (r.toHauler != null) acc.toHauler += r.toHauler;
+    if (r.ext != null) acc.ext += r.ext;   // concrete-only $ (pre-tax/fees) → blended base $/yd
     if (r.billed != null && r.yards != null && Number(r.yards) > 0) acc.yards += Number(r.yards);   // yards that have a billed total → blended $/yd
     return acc;
-  }, { billed: 0, toHauler: 0, yards: 0 });
+  }, { billed: 0, toHauler: 0, yards: 0, ext: 0 });
   const grand = sumFor(filtered);
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
@@ -3433,9 +3438,11 @@ function CostsModal({ orders, onClose }) {
     setErr("");
     const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const m = (v) => (v == null ? "—" : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-    // All-in price per yard = billed total ÷ yards (the billed total already bundles
-    // concrete + admixtures/fiber + short-load/back-haul fees + tax).
-    const perYd = (billed, yards) => (billed == null || !(Number(yards) > 0)) ? "—" : `${m(billed / Number(yards))}/yd`;
+    // Base price per yard = the price-sheet rate (concrete only, BEFORE tax/fees).
+    // perYd(concrete $, yards) is used for subtotals (a yards-weighted blend);
+    // basePerYd shows a single order's exact sheet/override unit price.
+    const perYd = (val, yards) => (val == null || !(Number(yards) > 0)) ? "—" : `${m(val / Number(yards))}/yd`;
+    const basePerYd = (r) => (r && r.unit != null && Number(r.unit) > 0) ? `${m(r.unit)}/yd` : perYd(r && r.ext, r && r.yards);
     const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     const period = (from || to)
       ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}`
@@ -3444,7 +3451,7 @@ function CostsModal({ orders, onClose }) {
     // Page 1 — summary: one row per customer.
     const summaryRows = custNames.map((name) => {
       const t = sumFor(groups[name]);
-      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.billed, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.ext, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
     }).join("");
 
     // Detail — per-customer tables (kept whole, won't split across a page).
@@ -3453,12 +3460,12 @@ function CostsModal({ orders, onClose }) {
       const t = sumFor(list);
       const rows = list.map((o) => {
         const r = px[o.ref] || {};
-        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : perYd(r.billed, r.yards)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
       }).join("");
       return `<section class="cust"><h2>${esc(name)} <span class="ct">· ${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
-<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">$/yd all-in</th><th class="r">To hauler</th></tr></thead>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.billed, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
+<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.ext, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
     }).join("");
 
     const empty = custNames.length === 0;
@@ -3516,12 +3523,12 @@ function CostsModal({ orders, onClose }) {
   ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
   <div class="sec-title">Summary by customer</div>
   <table>
-    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">$/yd all-in</th><th class="r">To hauler</th></tr></thead>
+    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
     <tbody>${summaryRows}</tbody>
-    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${perYd(grand.billed, grand.yards)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
+    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${perYd(grand.ext, grand.yards)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
   </table>
   ${sections}`}
-  <div class="muted" style="margin-top:10px;font-size:11px;">“$/yd all-in” = billed total ÷ yards — the effective price per yard the customer paid, including admixtures, fiber, fees &amp; tax. “To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
+  <div class="muted" style="margin-top:10px;font-size:11px;">“Base $/yd” = your price-sheet rate per yard — concrete only, before sales tax, fees &amp; admixtures (matches what you set in the Price sheet). “Billed” is the full amount the customer paid, including tax &amp; any fees. “To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
   <div class="foot">
     <span class="co">Aussieblock Ready Mix</span>
     <span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span>
