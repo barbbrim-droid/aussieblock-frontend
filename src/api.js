@@ -275,6 +275,19 @@ export function getFuel() {
 export function getTruckFuel(label) {
   return request(`/trucks/${encodeURIComponent(label)}/fuel`)
 }
+// Import a FluidSecure transaction export (CSV) when the API token isn't
+// available (staff). Returns { rows, added }.
+export async function importFuel(file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${API_BASE}/fuel/import`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)
 }

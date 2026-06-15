@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -2988,12 +2988,28 @@ function FuelModal({ onClose }) {
   const [openLabel, setOpenLabel] = useState(null);   // truck whose fills are expanded
   const [fills, setFills] = useState(null);           // fills for the expanded truck
   const [loadingFills, setLoadingFills] = useState(false);
+  const [importing, setImporting] = useState(false);  // CSV upload in progress
+  const [importMsg, setImportMsg] = useState("");     // result of the last upload
+  const fileRef = useRef(null);
 
-  useEffect(() => {
-    (async () => {
-      try { setData(await getFuel()); } catch (e) { setErr(e.message); }
-    })();
-  }, []);
+  const load = async () => {
+    try { setData(await getFuel()); setErr(""); } catch (e) { setErr(e.message); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";   // allow re-selecting the same file
+    if (!file) return;
+    setImporting(true); setImportMsg(""); setErr("");
+    try {
+      const r = await importFuel(file);
+      setImportMsg(`Imported ${r.added} new fill${r.added === 1 ? "" : "s"} of ${r.rows} row${r.rows === 1 ? "" : "s"}.`);
+      await load();
+    } catch (e) { setErr(e.message); }
+    finally { setImporting(false); }
+  };
 
   const toggle = async (label) => {
     if (openLabel === label) { setOpenLabel(null); setFills(null); return; }
@@ -3079,8 +3095,20 @@ function FuelModal({ onClose }) {
                 </div>
               )}
 
+              <div className="mt-3 rounded-lg px-3 py-3" style={card}>
+                <div className="text-white/80 text-xs font-semibold mb-1.5" style={{ fontFamily: C.cond }}>Import from FluidSecure</div>
+                <p className="text-white/40 text-[11px] mb-2">In the FluidSecure portal, export your transactions as a <span className="font-semibold">CSV</span>, then upload it here. Fills match to trucks by vehicle #; re-uploading the same file is safe.</p>
+                <input ref={fileRef} type="file" accept=".csv,.txt,.tsv,text/csv" onChange={onFile} className="hidden" />
+                <button onClick={() => fileRef.current?.click()} disabled={importing}
+                  className="w-full rounded-lg py-2 text-sm font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{ background: ORANGE, color: NAVY_DEEP }}>
+                  {importing ? <><Loader2 size={14} className="animate-spin" /> Importing…</> : <><Droplets size={14} /> Upload fuel export (CSV)</>}
+                </button>
+                {importMsg && <div className="text-[11px] mt-2" style={{ color: GREEN }}>{importMsg}</div>}
+              </div>
+
               {!data.live && (
-                <p className="text-white/35 text-[11px] mt-3">Add <span className="font-semibold">FLUIDSECURE_TOKEN</span> and <span className="font-semibold">FLUIDSECURE_COMPANY</span> on the API service, then map each truck's FluidSecure vehicle # to start pulling fuel.</p>
+                <p className="text-white/35 text-[11px] mt-3">Live auto-pull needs <span className="font-semibold">FLUIDSECURE_TOKEN</span> on the API service — until then, use the CSV upload above. Either way, map each truck's FluidSecure vehicle # in <span className="font-semibold">Manage trucks</span>.</p>
               )}
             </>
           )}
