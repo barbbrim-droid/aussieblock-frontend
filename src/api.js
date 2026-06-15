@@ -249,17 +249,31 @@ export function getOrder(ref) {
 export function getTrucks() {
   return request('/trucks')
 }
-// Add a truck (or update its GPS device id if the name already exists) — staff
-// only. gps_device_id is optional; fill it in later to enable live tracking.
-export function addTruck(label, gps_device_id, notes) {
+// Add a truck (or update it if the name already exists) — staff only.
+// gps_device_id (One Step GPS) and fluidsecure_vehicle_id (FluidSecure fuel) are
+// both optional; fill them in later to enable live tracking / fuel tracking.
+export function addTruck(label, gps_device_id, notes, fluidsecure_vehicle_id) {
   return request('/trucks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ label, gps_device_id: gps_device_id || null, notes: notes || '' }),
+    body: JSON.stringify({
+      label,
+      gps_device_id: gps_device_id || null,
+      fluidsecure_vehicle_id: fluidsecure_vehicle_id || null,
+      notes: notes || '',
+    }),
   })
 }
 export function deleteTruck(label) {
   return request(`/trucks/${encodeURIComponent(label)}`, { method: 'DELETE' })
+}
+// Per-truck fuel usage rolled up from FluidSecure (staff only).
+export function getFuel() {
+  return request('/fuel')
+}
+// The individual fuel fills for one truck, newest first (staff only).
+export function getTruckFuel(label) {
+  return request(`/trucks/${encodeURIComponent(label)}/fuel`)
 }
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -780,7 +780,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
-              <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+              <div className="min-w-0"><label className={lbl}>Time (optional)</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
             </div>
             {date && date < localToday() && (
               <div className="rounded-lg px-3 py-2 mb-3 text-xs font-semibold" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85", fontFamily: C.body }}>Delivery date can’t be in the past — pick today or later.</div>
@@ -841,7 +841,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
           <AddressInput value={site} onChange={setSite} placeholder="Type address or business name" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
-            <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Time (optional)</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
           <label className={lbl}>Notes (optional)</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
@@ -2895,6 +2895,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const [trucks, setTrucks] = useState([]);
   const [label, setLabel] = useState("");
   const [device, setDevice] = useState("");
+  const [fuelVehicle, setFuelVehicle] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -2907,9 +2908,9 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const add = async () => {
     setBusy(true); setMsg(null);
     try {
-      const r = await addTruck(label.trim(), device.trim(), notes.trim());
+      const r = await addTruck(label.trim(), device.trim(), notes.trim(), fuelVehicle.trim());
       setMsg({ ok: true, text: `Truck ${r.action}: ${r.label}` });
-      setLabel(""); setDevice(""); setNotes("");
+      setLabel(""); setDevice(""); setFuelVehicle(""); setNotes("");
       await load(); onChanged && onChanged();
     } catch (e) { setMsg({ ok: false, text: e.message }); }
     finally { setBusy(false); }
@@ -2943,9 +2944,9 @@ function ManageTrucksModal({ onClose, onChanged }) {
             <div className="mb-4">
               {trucks.map((t) => (
                 <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: `1px solid ${existing && existing.label === t.label ? ORANGE : "rgba(255,255,255,0.06)"}` }}>
-                  <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setNotes(t.notes || ""); }} className="min-w-0 flex-1 text-left">
+                  <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setFuelVehicle(t.fuel_vehicle || ""); setNotes(t.notes || ""); }} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
-                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}</div>
+                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}{t.fuel_vehicle ? ` · Fuel: ${t.fuel_vehicle}` : ""}</div>
                     {t.notes && <div className="text-white/55 text-xs truncate mt-0.5 flex items-center gap-1"><FileText size={11} /> {t.notes}</div>}
                   </button>
                   <button onClick={() => remove(t.label)} disabled={busy} title="Remove truck" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
@@ -2961,8 +2962,9 @@ function ManageTrucksModal({ onClose, onChanged }) {
             <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>{existing ? `Edit ${existing.label}` : "Add a truck"}</div>
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Truck name (e.g. RTS 4554)" className={inCls + " mb-2"} style={inSt} />
             <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-2"} style={inSt} />
+            <input value={fuelVehicle} onChange={(e) => setFuelVehicle(e.target.value)} placeholder="FluidSecure vehicle # (optional)" className={inCls + " mb-2"} style={inSt} />
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (driver, capacity, maintenance…)" className={inCls + " mb-1 resize-none"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID optional — add it later to turn on live tracking.</p>
+            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking; FluidSecure vehicle # turns on fuel tracking — both optional.</p>
             <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {existing ? "Update truck" : "Add truck"}
             </button>
@@ -2970,6 +2972,117 @@ function ManageTrucksModal({ onClose, onChanged }) {
 
           {msg && (
             <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Staff modal: fuel usage per truck, pulled from FluidSecure. Tap a truck to see
+// its individual fills. Vehicle numbers with no truck mapped show under "Unmatched"
+// — map that number on the truck (Manage trucks) to pull those fills in.
+function FuelModal({ onClose }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [openLabel, setOpenLabel] = useState(null);   // truck whose fills are expanded
+  const [fills, setFills] = useState(null);           // fills for the expanded truck
+  const [loadingFills, setLoadingFills] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try { setData(await getFuel()); } catch (e) { setErr(e.message); }
+    })();
+  }, []);
+
+  const toggle = async (label) => {
+    if (openLabel === label) { setOpenLabel(null); setFills(null); return; }
+    setOpenLabel(label); setFills(null); setLoadingFills(true);
+    try { setFills((await getTruckFuel(label)).fills); }
+    catch (e) { setErr(e.message); }
+    finally { setLoadingFills(false); }
+  };
+
+  const totalGal = data ? data.trucks.reduce((a, t) => a + (t.gallons || 0), 0) : 0;
+  const card = { background: NAVY, border: "1px solid rgba(255,255,255,0.06)" };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Droplets size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Fuel usage</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {!data && !err && <div className="text-white/50 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading fuel data…</div>}
+          {err && <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+
+          {data && (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-white/50 text-xs uppercase tracking-wide">Total fuel — all trucks</div>
+                  <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span></div>
+                </div>
+                <span className="text-[11px] px-2 py-1 rounded-full font-semibold" style={{ background: data.live ? GREEN + "22" : "rgba(255,255,255,0.08)", color: data.live ? GREEN : "rgba(255,255,255,0.5)" }}>
+                  {data.live ? "FluidSecure live" : "Not connected"}
+                </span>
+              </div>
+
+              {data.trucks.length === 0 ? (
+                <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ ...card, borderRadius: 12 }}>No trucks yet.</div>
+              ) : (
+                <div className="mb-3">
+                  {data.trucks.map((t) => (
+                    <div key={t.label} className="rounded-lg mb-1.5 overflow-hidden" style={card}>
+                      <button onClick={() => t.fills > 0 && toggle(t.label)} className="w-full flex items-center justify-between px-3 py-2.5 text-left">
+                        <div className="min-w-0">
+                          <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
+                          <div className="text-white/40 text-xs truncate">
+                            {t.fuel_vehicle ? `${t.fills} fill${t.fills === 1 ? "" : "s"}` : "No FluidSecure vehicle # — set one in Manage trucks"}
+                            {t.last_fill ? ` · last ${timeAgo(t.last_fill)}` : ""}
+                            {t.last_odometer != null ? ` · ${Number(t.last_odometer).toLocaleString()} odo` : ""}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <div className="text-white font-bold" style={{ fontFamily: C.cond }}>{(t.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</div>
+                          <div className="text-white/40 text-[11px]">gal</div>
+                        </div>
+                      </button>
+                      {openLabel === t.label && (
+                        <div className="px-3 pb-2.5 pt-0.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                          {loadingFills ? (
+                            <div className="text-white/40 text-xs py-2 flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Loading…</div>
+                          ) : !fills || fills.length === 0 ? (
+                            <div className="text-white/40 text-xs py-2">No fills recorded.</div>
+                          ) : (
+                            fills.map((f, i) => (
+                              <div key={i} className="flex items-center justify-between text-xs py-1" style={{ borderBottom: i < fills.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                <span className="text-white/55">{f.when ? formatOrderDate(f.when) : "—"}{f.fuel_type ? ` · ${f.fuel_type}` : ""}{f.odometer != null ? ` · ${Number(f.odometer).toLocaleString()} odo` : ""}</span>
+                                <span className="text-white font-semibold shrink-0 ml-2">{(f.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {data.unmatched.fills > 0 && (
+                <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(255,170,60,0.10)", border: "1px solid rgba(255,170,60,0.25)" }}>
+                  <div className="text-xs font-semibold flex items-center gap-1.5" style={{ color: ORANGE }}><AlertTriangle size={13} /> {data.unmatched.fills} fill{data.unmatched.fills === 1 ? "" : "s"} ({data.unmatched.gallons.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal) not matched to a truck</div>
+                  {data.unmatched.vehicles.length > 0 && (
+                    <div className="text-white/55 text-[11px] mt-1">Vehicle #s: {data.unmatched.vehicles.join(", ")} — set the matching number on a truck in <span className="font-semibold">Manage trucks</span> to pull these in.</div>
+                  )}
+                </div>
+              )}
+
+              {!data.live && (
+                <p className="text-white/35 text-[11px] mt-3">Add <span className="font-semibold">FLUIDSECURE_TOKEN</span> and <span className="font-semibold">FLUIDSECURE_COMPANY</span> on the API service, then map each truck's FluidSecure vehicle # to start pulling fuel.</p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -3829,7 +3942,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
-            <div className="min-w-0"><label className={lbl}>Time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Time (optional)</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
 
           <label className={lbl}>Truck (optional)</label>
@@ -4118,6 +4231,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [err, setErr] = useState("");
   const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
+  const [showFuel, setShowFuel] = useState(false);       // "Fuel usage" modal
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [showPast, setShowPast] = useState(false);   // "Past orders" modal
   const [showCosts, setShowCosts] = useState(false);   // "Customer costs" tracking modal
@@ -4354,6 +4468,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
+      {showFuel && <FuelModal onClose={() => setShowFuel(false)} />}
       {showNew && (
         <NewOrderModal
           trucks={trucks}
@@ -4450,6 +4565,9 @@ function DispatchApp({ email, role, onLogout }) {
               </button>
               <button onClick={() => setShowTrucks(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <Truck size={16} color={ORANGE} /> Trucks
+              </button>
+              <button onClick={() => setShowFuel(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <Droplets size={16} color={ORANGE} /> Fuel
               </button>
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
                 <CalendarPlus size={16} /> New order
