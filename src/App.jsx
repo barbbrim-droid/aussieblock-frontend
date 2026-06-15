@@ -3035,14 +3035,9 @@ function FuelModal({ onClose }) {
 
           {data && (
             <>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <div className="text-white/50 text-xs uppercase tracking-wide">Total fuel — all trucks</div>
-                  <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span></div>
-                </div>
-                <span className="text-[11px] px-2 py-1 rounded-full font-semibold" style={{ background: data.live ? GREEN + "22" : "rgba(255,255,255,0.08)", color: data.live ? GREEN : "rgba(255,255,255,0.5)" }}>
-                  {data.live ? "FluidSecure live" : "Not connected"}
-                </span>
+              <div className="mb-3">
+                <div className="text-white/50 text-xs uppercase tracking-wide">Total fuel — all trucks</div>
+                <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span></div>
               </div>
 
               {data.trucks.length === 0 ? (
