@@ -3058,7 +3058,7 @@ function FuelModal({ onClose }) {
                           ) : (
                             fills.map((f, i) => (
                               <div key={i} className="flex items-center justify-between text-xs py-1" style={{ borderBottom: i < fills.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                <span className="text-white/55">{f.when ? formatOrderDate(f.when) : "—"}{f.fuel_type ? ` · ${f.fuel_type}` : ""}{f.odometer != null ? ` · ${Number(f.odometer).toLocaleString()} odo` : ""}</span>
+                                <span className="text-white/55">{f.when ? formatOrderDate(f.when) : "—"}{f.fuel_type ? ` · ${f.fuel_type}` : ""}{f.driver ? ` · ${f.driver}` : ""}{f.odometer != null ? ` · ${Number(f.odometer).toLocaleString()} odo` : ""}</span>
                                 <span className="text-white font-semibold shrink-0 ml-2">{(f.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal</span>
                               </div>
                             ))
