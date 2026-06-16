@@ -293,18 +293,34 @@ export async function importFuel(file) {
 export function getDriverOrders() {
   return request('/driver/orders')
 }
-// Capture the customer's signature (a PNG Blob) + printed name; marks the order
-// Delivered/Complete and stores proof of delivery.
-export async function signOffOrder(ref, blob, signedBy) {
+// Capture the customer's signature (a PNG Blob) + printed name + water added on
+// site (gal); marks the order Delivered/Complete and stores proof of delivery.
+export async function signOffOrder(ref, blob, signedBy, waterAdded = '') {
   const fd = new FormData()
   fd.append('file', blob, `${ref}-signature.png`)
-  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/signoff?signed_by=${encodeURIComponent(signedBy)}`, {
+  const q = `signed_by=${encodeURIComponent(signedBy)}&water_added=${encodeURIComponent(waterAdded)}`
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/signoff?${q}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },   // browser sets the multipart boundary
     body: fd,
   })
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   return res.json()
+}
+
+// Fetch the captured signature image as a data URL (authed) — for showing it on
+// the in-app signed delivery ticket. Returns null if there's none.
+export async function getSignatureDataUrl(ref) {
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/signature`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) return null
+  const blob = await res.blob()
+  return await new Promise((resolve) => {
+    const r = new FileReader()
+    r.onloadend = () => resolve(r.result)
+    r.readAsDataURL(blob)
+  })
 }
 
 export function getBilling(customerId) {

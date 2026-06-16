@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -328,6 +328,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const [payErr, setPayErr] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
+  const [showSignedTicket, setShowSignedTicket] = useState(false);   // signed delivery ticket (proof of delivery)
   // Workers manage orders like a customer; only billing (canFinance) is hidden.
   const editable = ["requested", "scheduled"].includes(live.status);
   const cancelOrder = async () => {
@@ -509,6 +510,11 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       ) : isLive ? (
         <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch ticket will appear here once it's uploaded.</div>
       ) : null}
+
+      {live.has_signature && (
+        <button onClick={() => setShowSignedTicket(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55`, color: GREEN, fontFamily: C.body }}><CheckCircle2 size={18} /> Signed delivery ticket</button>
+      )}
+      {showSignedTicket && <DeliveryTicketModal order={live} onClose={() => setShowSignedTicket(false)} />}
 
       {/* Reach dispatch about this delivery — one number, call or text */}
       <div className="grid grid-cols-2 gap-3 mt-3">
@@ -2247,6 +2253,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   const [showEdit, setShowEdit] = useState(false);   // staff "Edit order" modal
   const [showReorder, setShowReorder] = useState(false);   // "Order again" — new order pre-filled from this one
   const [showBatch, setShowBatch] = useState(false);       // "Ticket details" — full batch-ticket form panel
+  const [showSigned, setShowSigned] = useState(false);     // signed delivery ticket (proof of delivery)
   const [expanded, setExpanded] = useState(false);   // compact (Upcoming) rows: collapsed to just client + yardage; "Manage" reveals the controls
 
   // The selects are *controlled* by o.status / o.truck (server truth). On a
@@ -2474,6 +2481,11 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
         </div>
       )}
       <div className="mt-2 flex justify-end gap-2 flex-wrap">
+        {o.has_signature && (
+          <button onClick={() => setShowSigned(true)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: GREEN, background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
+            <CheckCircle2 size={12} /> Signed ticket
+          </button>
+        )}
         {onArchived && o.status === "complete" && (
           <button onClick={async () => { setBusy(true); setErr(""); try { onArchived(await setOrderArchived(o.ref, !o.archived)); } catch (e) { setErr(e.message); } finally { setBusy(false); } }} disabled={busy} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.7)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
             <Inbox size={12} /> {o.archived ? "Unarchive" : "Archive"}
@@ -2499,6 +2511,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       </>
       )}
       {showBatch && <BatchTicketForm o={o} onEdited={onEdited} />}
+      {showSigned && <DeliveryTicketModal order={o} onClose={() => setShowSigned(false)} />}
       {showEdit && (
         <EditOrderModal
           order={{ ...o, id: o.ref }}
@@ -4757,6 +4770,7 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
   const last = useRef(null);
   const [hasInk, setHasInk] = useState(false);
   const [name, setName] = useState("");
+  const [water, setWater] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -4801,7 +4815,7 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
     if (!name.trim()) { setErr("Enter the name of who signed."); return; }
     setBusy(true); setErr("");
     canvasRef.current.toBlob((blob) => {
-      Promise.resolve(onSubmit(blob, name.trim())).catch((e) => { setErr(e.message || "Could not save"); setBusy(false); });
+      Promise.resolve(onSubmit(blob, name.trim(), water.trim())).catch((e) => { setErr(e.message || "Could not save"); setBusy(false); });
     }, "image/png");
   };
 
@@ -4820,13 +4834,97 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
           <div className="flex justify-end mt-1.5">
             <button onClick={clear} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear</button>
           </div>
-          <label className="flex flex-col gap-1 mt-3">
-            <span className="text-white/40 text-[10px] uppercase tracking-wide">Printed name</span>
-            <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
-          </label>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-white/40 text-[10px] uppercase tracking-wide">Printed name</span>
+              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-white/40 text-[10px] uppercase tracking-wide">Water added (gal)</span>
+              <input value={water} onChange={(e) => setWater(e.target.value)} placeholder="e.g. 5" inputMode="decimal" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+            </label>
+          </div>
           {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
           <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 text-base font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
             {busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : <><CheckCircle2 size={18} /> Confirm delivery</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The signed Delivery Ticket: order details + water added on site + the captured
+// customer signature. In-app overlay (works in the installed PWA) with a
+// Print / Save-PDF option. Shown wherever an order has_signature.
+function DeliveryTicketModal({ order, onClose }) {
+  const [sig, setSig] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (order.has_signature) getSignatureDataUrl(order.ref).then((d) => live && setSig(d)).catch(() => {});
+    return () => { live = false; };
+  }, [order.ref, order.has_signature]);
+
+  const signedAt = order.signed_at ? new Date(order.signed_at + "Z").toLocaleString() : "";
+  const Row = ({ label, val }) => (val ? (
+    <div className="flex justify-between gap-3 py-1.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <span className="text-white/45 text-xs uppercase tracking-wide" style={{ fontFamily: C.body }}>{label}</span>
+      <span className="text-white/90 text-sm text-right" style={{ fontFamily: C.body }}>{val}</span>
+    </div>
+  ) : null);
+
+  const printTicket = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const r = (l, v) => v ? `<tr><td style="color:#667;padding:4px 0;text-transform:uppercase;font-size:11px">${l}</td><td style="text-align:right;padding:4px 0">${v}</td></tr>` : "";
+    w.document.write(`<html><head><title>Delivery Ticket ${order.ref}</title></head>
+      <body style="font-family:Arial,sans-serif;max-width:620px;margin:24px auto;color:#111">
+      <h2 style="margin:0">AUSSIEBLOCK — Delivery Ticket</h2>
+      <div style="color:#667;margin-bottom:12px">${order.ref}</div>
+      <table style="width:100%;border-collapse:collapse;border-top:2px solid #111">
+        ${r("Customer", order.customer)}${r("Job site", order.site)}${r("Project", order.project)}
+        ${r("Mix", order.mix)}${r("Quantity", (order.qty || "") + " yd")}${r("Slump", order.slump)}
+        ${r("Admixtures", order.admixtures)}${r("For", order.use_for)}
+        ${r("Driver", order.driver)}${r("Truck", order.truck)}
+        ${r("Water added on site", order.water_added ? order.water_added + " gal" : "")}
+        ${r("Date / time", [order.when, order.time].filter(Boolean).join(" "))}
+        ${r("Signed by", order.signed_by)}${r("Signed at", signedAt)}
+      </table>
+      ${sig ? `<div style="margin-top:16px"><div style="color:#667;font-size:11px;text-transform:uppercase">Customer signature</div><img src="${sig}" style="max-width:320px;border:1px solid #ccc;border-radius:6px;margin-top:4px"/></div>` : ""}
+      <script>window.onload=function(){window.print()}</script>
+      </body></html>`);
+    w.document.close();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-3.5 flex items-center justify-between" style={{ background: ORANGE }}>
+          <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Delivery ticket · {order.ref}</span>
+          <button onClick={onClose} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          <Row label="Customer" val={order.customer} />
+          <Row label="Job site" val={order.site} />
+          <Row label="Project" val={order.project} />
+          <Row label="Mix" val={order.mix} />
+          <Row label="Quantity" val={order.qty ? `${order.qty} yd` : ""} />
+          <Row label="Slump" val={order.slump} />
+          <Row label="Admixtures" val={order.admixtures} />
+          <Row label="Driver" val={order.driver} />
+          <Row label="Truck" val={order.truck} />
+          <Row label="Water added on site" val={order.water_added ? `${order.water_added} gal` : "—"} />
+          <Row label="Signed by" val={order.signed_by} />
+          <Row label="Signed at" val={signedAt} />
+          <div className="mt-3">
+            <div className="text-white/45 text-xs uppercase tracking-wide mb-1">Customer signature</div>
+            {order.has_signature ? (
+              sig ? <img src={sig} alt="signature" className="w-full rounded-lg" style={{ background: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+                  : <div className="text-white/40 text-xs py-3 flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Loading signature…</div>
+            ) : <div className="text-white/40 text-xs py-3">Not signed yet.</div>}
+          </div>
+          <button onClick={printTicket} className="w-full mt-4 rounded-xl py-2.5 text-sm font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+            <Printer size={15} /> Print / Save PDF
           </button>
         </div>
       </div>
@@ -4842,6 +4940,7 @@ function DriverApp({ driver, onLogout }) {
   const [err, setErr] = useState("");
   const [activeRef, setActiveRef] = useState(null);
   const [signing, setSigning] = useState(false);
+  const [showTicket, setShowTicket] = useState(false);
   const [ticketBusy, setTicketBusy] = useState(false);
 
   const load = async () => {
@@ -4860,8 +4959,8 @@ function DriverApp({ driver, onLogout }) {
     catch (e) { setErr(e.message || "Could not open the ticket"); }
     finally { setTicketBusy(false); }
   };
-  const submitSignature = async (blob, name) => {
-    await signOffOrder(active.ref, blob, name);
+  const submitSignature = async (blob, name, water) => {
+    await signOffOrder(active.ref, blob, name, water);
     setSigning(false);
     await load();
   };
@@ -4931,13 +5030,18 @@ function DriverApp({ driver, onLogout }) {
               </button>
 
               {active.has_signature ? (
-                <div className="rounded-xl py-3 px-4 flex items-center gap-2" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
-                  <CheckCircle2 size={20} color={GREEN} />
-                  <div>
-                    <div className="text-white font-bold text-sm">Delivered — signed by {active.signed_by}</div>
-                    <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}</div>
+                <>
+                  <div className="rounded-xl py-3 px-4 flex items-center gap-2 mb-2.5" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
+                    <CheckCircle2 size={20} color={GREEN} />
+                    <div>
+                      <div className="text-white font-bold text-sm">Delivered — signed by {active.signed_by}</div>
+                      <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
+                    </div>
                   </div>
-                </div>
+                  <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                    <FileText size={18} /> View signed delivery ticket
+                  </button>
+                </>
               ) : (
                 <button onClick={() => setSigning(true)} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                   <ClipboardList size={18} /> Get customer signature
@@ -4948,6 +5052,7 @@ function DriverApp({ driver, onLogout }) {
         </div>
       </div>
       {signing && active && <SignaturePad orderRef={active.ref} onCancel={() => setSigning(false)} onSubmit={submitSignature} />}
+      {showTicket && active && <DeliveryTicketModal order={active} onClose={() => setShowTicket(false)} />}
     </div>
   );
 }
