@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun15-v66";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun15-v67";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -2331,6 +2331,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           <div className="flex items-center gap-2 flex-wrap">
             <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{o.ref}</span>
             {canFinance && o.prepay_required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: o.prepaid ? GREEN + "22" : "#6aa9ff22", color: o.prepaid ? GREEN : "#6aa9ff", fontFamily: C.body }}>{o.prepaid ? "COD · PAID" : "COD · UNPAID"}</span>}
+            {o.has_signature && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1" style={{ background: GREEN + "22", color: GREEN, fontFamily: C.body }}><CheckCircle2 size={10} /> SIGNED</span>}
             <span className="text-white/30 text-xs">·</span>
             <span className="text-white/60 text-xs flex items-center gap-1"><Clock size={12} /> {[formatOrderDate(o.when), o.time].filter(Boolean).join(" · ")}</span>
             <span className="text-white/30 text-xs">·</span>
@@ -5042,7 +5043,7 @@ function DriverApp({ driver, onLogout }) {
                   <div className="rounded-xl py-3 px-4 flex items-center gap-2 mb-2.5" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
                     <CheckCircle2 size={20} color={GREEN} />
                     <div>
-                      <div className="text-white font-bold text-sm">Delivered — signed by {active.signed_by}</div>
+                      <div className="text-white font-bold text-sm">Customer signed — {active.signed_by}</div>
                       <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
                     </div>
                   </div>
