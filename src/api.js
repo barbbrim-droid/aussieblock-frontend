@@ -175,6 +175,25 @@ export async function openBatchTicket(ref, variant = 'view') {
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
+// Fetch an order's batch-ticket PDF as a blob URL (authed) WITHOUT opening a new
+// window — for showing it in an in-app viewer (the driver tablet PWA can't get
+// back from a new browser tab). Caller should URL.revokeObjectURL when done.
+export async function fetchBatchTicketUrl(ref, variant = 'view') {
+  const q = (variant && variant !== 'view' ? `?variant=${encodeURIComponent(variant)}&` : '?') + `t=${Date.now()}`
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket${q}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return URL.createObjectURL(await res.blob())
+}
+
+// The batch ticket as PNG page images (data URLs) for an in-app viewer that works
+// on any tablet (Android won't render a PDF in an iframe). Returns { pages: [...] }.
+export function getBatchTicketImages(ref) {
+  return request(`/orders/${encodeURIComponent(ref)}/batch-ticket-images`)
+}
+
 // Upload a batch ticket for ONE load of a pour (staff). Returns the updated order.
 export async function uploadLoadBatchTicket(ref, seq, file) {
   const fd = new FormData()

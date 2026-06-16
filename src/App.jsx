@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun15-v67";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun15-v68";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -4943,6 +4943,7 @@ function DriverApp({ driver, onLogout }) {
   const [signing, setSigning] = useState(false);
   const [showTicket, setShowTicket] = useState(false);
   const [ticketBusy, setTicketBusy] = useState(false);
+  const [ticketPages, setTicketPages] = useState(null);   // in-app ticket viewer (PNG page data URLs)
 
   const load = async () => {
     try { setData(await getDriverOrders()); setErr(""); }
@@ -4955,8 +4956,8 @@ function DriverApp({ driver, onLogout }) {
 
   const openTicket = async () => {
     if (!active) return;
-    setTicketBusy(true);
-    try { await openBatchTicket(active.ref); }
+    setTicketBusy(true); setErr("");
+    try { setTicketPages((await getBatchTicketImages(active.ref)).pages || []); }   // show in-app images
     catch (e) { setErr(e.message || "Could not open the ticket"); }
     finally { setTicketBusy(false); }
   };
@@ -5062,6 +5063,21 @@ function DriverApp({ driver, onLogout }) {
       </div>
       {signing && active && <SignaturePad orderRef={active.ref} onCancel={() => setSigning(false)} onSubmit={submitSignature} />}
       {showTicket && active && <DeliveryTicketModal order={active} onClose={() => setShowTicket(false)} />}
+      {ticketPages && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: NAVY_DEEP }}>
+          <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
+            <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-base font-bold flex items-center gap-2"><FileText size={18} /> Batch ticket{active ? ` · ${active.ref}` : ""}</span>
+            <button onClick={() => setTicketPages(null)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}><X size={16} /> Close</button>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain p-2" style={{ background: "#3a3f44" }}>
+            {ticketPages.length === 0 ? (
+              <div className="text-white/60 text-sm text-center py-10">Ticket has no viewable pages.</div>
+            ) : ticketPages.map((src, i) => (
+              <img key={i} src={src} alt={`Ticket page ${i + 1}`} className="w-full rounded shadow-lg mb-2" style={{ background: "#fff" }} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
