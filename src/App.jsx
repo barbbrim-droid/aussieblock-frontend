@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3126,6 +3126,7 @@ function ManageStaffModal({ onClose }) {
   const [phone, setPhone] = useState("");
   const [companyId, setCompanyId] = useState("");   // the company a worker belongs to (a real customer id) — scopes what they see
   const [project, setProject] = useState("");       // their current project/job
+  const [driverName, setDriverName] = useState(""); // for a driver login: their name (matches Order.driver)
   const [editing, setEditing] = useState(false);   // editing an existing login (locks the email field)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);            // { ok, text }
@@ -3145,7 +3146,7 @@ function ManageStaffModal({ onClose }) {
     getCustomers().then((cs) => setCompanies(cs.map((c) => ({ id: c.id, name: c.name })))).catch(() => {});   // the company a worker belongs to
   }, []);
 
-  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompanyId(""); setProject(""); setEditing(false); };
+  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompanyId(""); setProject(""); setDriverName(""); setEditing(false); };
 
   // Auto-generate an email + password for a worker so the office doesn't have to
   // invent one. These are just login ids (workers never type them — they use the
@@ -3160,14 +3161,20 @@ function ManageStaffModal({ onClose }) {
   const pick = (u) => {
     setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
     setCompanyId(u.customer_id || ""); setProject(u.project || "");
+    setDriverName(u.role === "driver" ? (u.company || "") : "");
     setEditing(true); setMsg(null); setInvite(null);
   };
 
   const submit = async () => {
-    if (role !== "staff" && !companyId) { setMsg({ ok: false, text: "Pick the company this person belongs to." }); return; }
+    if (role === "worker" || role === "customer") {
+      if (!companyId) { setMsg({ ok: false, text: "Pick the company this person belongs to." }); return; }
+    }
+    if (role === "driver" && !driverName.trim()) { setMsg({ ok: false, text: "Enter the driver's name (must match the name on their orders)." }); return; }
     setBusy(true); setMsg(null);
     try {
-      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(), role !== "staff" ? Number(companyId) : null, project.trim());
+      const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(),
+        (role === "worker" || role === "customer") ? Number(companyId) : null, project.trim(),
+        role === "driver" ? driverName.trim() : "");
       if (pw) {
         // A password was set (new login or a reset) — offer the invite to send.
         const appUrl = window.location.origin;
@@ -3177,6 +3184,8 @@ function ManageStaffModal({ onClose }) {
         const quickLink = `${appUrl}/?login=${encodeURIComponent(btoa(`${r.email}:${pw}`))}`;
         const text = (role === "staff"
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
+          : role === "driver"
+          ? `Hi ${r.company || ""} — you're set up on the Aussieblock driver app for your truck tablet. Tap this link and it opens already signed in — no typing: ${quickLink} You'll see today's deliveries, the batch ticket, and can get the customer's signature on delivery. (Backup login — email: ${r.email}, password: ${pw}.) Questions? Call dispatch at ${DISPATCH_PHONE}.`
           : role === "customer"
           ? `Hi — Aussieblock has an app for ordering and tracking concrete deliveries and managing your account. You can place orders, track the trucks live, and view invoices for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : `Hi! This is Aussieblock, your ready-mix concrete supplier. We've set you up on our app so you can see your scheduled deliveries for ${r.company || "your company"} and track the trucks live on a map. Just tap this link and the app opens already signed in — no username or password to type: ${quickLink} (Backup login if the link ever stops working — email: ${r.email}, password: ${pw}.) Questions? Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
@@ -3247,7 +3256,7 @@ function ManageStaffModal({ onClose }) {
                   <button onClick={() => pick(u)} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate flex items-center gap-2" style={{ fontFamily: C.cond }}>
                       {u.email}
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : u.role === "customer" ? { background: GREEN + "22", color: GREEN } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "OPERATOR" : u.role === "customer" ? "ADMIN" : "WORKER"}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : u.role === "customer" ? { background: GREEN + "22", color: GREEN } : u.role === "driver" ? { background: ORANGE_HOT + "22", color: ORANGE_HOT } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "OPERATOR" : u.role === "customer" ? "ADMIN" : u.role === "driver" ? "DRIVER" : "WORKER"}</span>
                     </div>
                     {(u.company || u.project) && (
                       <div className="text-white/55 text-xs truncate flex items-center gap-1" style={{ fontFamily: C.body }}><Building2 size={11} color={ORANGE} /> {[u.company, u.project].filter(Boolean).join(" · ")}</div>
@@ -3278,6 +3287,7 @@ function ManageStaffModal({ onClose }) {
                 <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Operator — full office</button>
                 <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker</button>
                 <button onClick={() => setRole("customer")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "customer" ? GREEN + "22" : NAVY_DEEP, color: role === "customer" ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${role === "customer" ? GREEN : "rgba(255,255,255,0.12)"}` }}>Admin</button>
+                <button onClick={() => setRole("driver")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "driver" ? ORANGE_HOT + "22" : NAVY_DEEP, color: role === "driver" ? ORANGE_HOT : "rgba(255,255,255,0.5)", border: `1px solid ${role === "driver" ? ORANGE_HOT : "rgba(255,255,255,0.12)"}` }}>Driver</button>
               </div>
             )}
             {role === "worker" && !editing && (
@@ -3288,15 +3298,18 @@ function ManageStaffModal({ onClose }) {
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
             <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-2"} style={inSt} />
-            {role !== "staff" && (
+            {(role === "worker" || role === "customer") && (
               <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inCls + " mb-2"} style={inSt}>
                 <option value="">— company they belong to (required) —</option>
                 {companies.slice().sort((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
-            <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
-            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6) || (role !== "staff" && !companyId)} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+            {role === "driver" && (
+              <input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="driver's name — must match the name on their orders (e.g. Rodney)" className={inCls + " mb-2"} style={inSt} />
+            )}
+            {role !== "driver" && <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />}
+            <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : role === "driver" ? "A driver uses the truck tablet — today's deliveries assigned to them, the batch ticket, and customer sign-off. No board, no billing, no other companies." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
+            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6) || ((role === "worker" || role === "customer") && !companyId) || (role === "driver" && !driverName.trim())} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Save changes" : "Create login"}
             </button>
           </div>
@@ -4736,6 +4749,209 @@ function DispatchApp({ email, role, onLogout }) {
   );
 }
 
+// On-screen signature pad: the customer signs with a finger/stylus on the tablet.
+// White background so the captured PNG is legible anywhere. onSubmit(blob, name).
+function SignaturePad({ orderRef, onCancel, onSubmit }) {
+  const canvasRef = useRef(null);
+  const drawing = useRef(false);
+  const last = useRef(null);
+  const [hasInk, setHasInk] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const ratio = window.devicePixelRatio || 1;
+    const rect = c.getBoundingClientRect();
+    c.width = rect.width * ratio;
+    c.height = rect.height * ratio;
+    const ctx = c.getContext("2d");
+    ctx.scale(ratio, ratio);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0c1117";
+  }, []);
+
+  const pos = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+  };
+  const start = (e) => { e.preventDefault(); drawing.current = true; last.current = pos(e); };
+  const move = (e) => {
+    if (!drawing.current) return;
+    e.preventDefault();
+    const ctx = canvasRef.current.getContext("2d");
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.current.x, last.current.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last.current = p; if (!hasInk) setHasInk(true);
+  };
+  const end = () => { drawing.current = false; };
+  const clear = () => {
+    const c = canvasRef.current; const ctx = c.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width / ratio, c.height / ratio);
+    setHasInk(false); setErr("");
+  };
+  const submit = () => {
+    if (!hasInk) { setErr("Please have the customer sign above."); return; }
+    if (!name.trim()) { setErr("Enter the name of who signed."); return; }
+    setBusy(true); setErr("");
+    canvasRef.current.toBlob((blob) => {
+      Promise.resolve(onSubmit(blob, name.trim())).catch((e) => { setErr(e.message || "Could not save"); setBusy(false); });
+    }, "image/png");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
+        <div className="px-5 py-3.5 flex items-center justify-between" style={{ background: ORANGE }}>
+          <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Customer sign-off · {orderRef}</span>
+          <button onClick={onCancel} disabled={busy} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5" style={{ fontFamily: C.body }}>
+          <div className="text-white/60 text-xs mb-2">Have the customer sign below to confirm delivery.</div>
+          <canvas ref={canvasRef} className="w-full rounded-xl touch-none" style={{ height: 200, background: "#fff", border: "2px solid rgba(255,255,255,0.15)" }}
+            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+            onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+          <div className="flex justify-end mt-1.5">
+            <button onClick={clear} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear</button>
+          </div>
+          <label className="flex flex-col gap-1 mt-3">
+            <span className="text-white/40 text-[10px] uppercase tracking-wide">Printed name</span>
+            <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+          </label>
+          {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 text-base font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
+            {busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : <><CheckCircle2 size={18} /> Confirm delivery</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The DRIVER tablet app: today's deliveries assigned to this driver. Tap one to
+// see details, open the batch ticket, and capture the customer's signature
+// (which marks the delivery complete). No board, no billing.
+function DriverApp({ driver, onLogout }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [activeRef, setActiveRef] = useState(null);
+  const [signing, setSigning] = useState(false);
+  const [ticketBusy, setTicketBusy] = useState(false);
+
+  const load = async () => {
+    try { setData(await getDriverOrders()); setErr(""); }
+    catch (e) { setErr(e.message); }
+  };
+  useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, []);
+
+  const orders = data?.orders || [];
+  const active = orders.find((o) => o.ref === activeRef) || null;
+
+  const openTicket = async () => {
+    if (!active) return;
+    setTicketBusy(true);
+    try { await openBatchTicket(active.ref); }
+    catch (e) { setErr(e.message || "Could not open the ticket"); }
+    finally { setTicketBusy(false); }
+  };
+  const submitSignature = async (blob, name) => {
+    await signOffOrder(active.ref, blob, name);
+    setSigning(false);
+    await load();
+  };
+
+  const Header = (
+    <div className="px-4 pb-3 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Truck size={28} color={NAVY_DEEP} />
+          <div className="leading-none">
+            <div style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-xl font-bold tracking-tight">DRIVER · {driver}</div>
+            <div style={{ color: NAVY_DEEP, fontFamily: C.body }} className="text-[11px] font-semibold opacity-70 -mt-0.5">Today's deliveries · {BUILD_TAG}</div>
+          </div>
+        </div>
+        <button onClick={onLogout} title="Log out" className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><LogOut size={14} color={ORANGE} /></button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="w-full flex justify-center sm:items-center sm:p-4 overflow-hidden" style={{ height: "100dvh", background: "#0c1117" }}>
+      <style>{FONT}</style>
+      <div className="w-full sm:max-w-xl h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
+        {Header}
+        {err && <div className="px-4 py-2 text-xs shrink-0" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-4">
+          {!data ? (
+            <div className="text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading deliveries…</div>
+          ) : !active ? (
+            orders.length === 0 ? (
+              <div className="text-white/40 text-sm py-10 text-center">No deliveries assigned for today.</div>
+            ) : (
+              orders.map((o) => {
+                const sm = STATUS_META[o.status] || { label: o.status, color: "#7c8794" };
+                return (
+                  <button key={o.ref} onClick={() => setActiveRef(o.ref)} className="w-full text-left rounded-xl mb-2.5 p-3.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white font-bold text-base" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
+                    </div>
+                    <div className="text-white/55 text-xs mt-1 flex items-center gap-1"><MapPin size={12} /> {o.site}</div>
+                    <div className="text-white/70 text-sm mt-1.5">{o.mix} · {o.qty} yd{o.time ? ` · ${o.time}` : ""}</div>
+                    {o.has_signature && <div className="text-xs mt-1 flex items-center gap-1" style={{ color: GREEN }}><CheckCircle2 size={13} /> Signed by {o.signed_by}</div>}
+                  </button>
+                );
+              })
+            )
+          ) : (
+            <div>
+              <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
+              <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="text-white font-bold text-lg" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
+                <div className="text-white/55 text-sm mt-1 flex items-center gap-1"><MapPin size={13} /> {active.site}</div>
+                <div className="grid grid-cols-2 gap-y-2 gap-x-3 mt-3 text-sm">
+                  <div><div className="text-white/35 text-[10px] uppercase">Customer</div><div className="text-white/85">{active.customer || "—"}</div></div>
+                  <div><div className="text-white/35 text-[10px] uppercase">Mix</div><div className="text-white/85">{active.mix}</div></div>
+                  <div><div className="text-white/35 text-[10px] uppercase">Quantity</div><div className="text-white/85">{active.qty} yd</div></div>
+                  <div><div className="text-white/35 text-[10px] uppercase">Time</div><div className="text-white/85">{active.time || "—"}</div></div>
+                  {active.slump && <div><div className="text-white/35 text-[10px] uppercase">Slump</div><div className="text-white/85">{active.slump}</div></div>}
+                  {active.use_for && <div><div className="text-white/35 text-[10px] uppercase">For</div><div className="text-white/85">{active.use_for}</div></div>}
+                </div>
+                {active.notes && <div className="mt-2 text-xs text-white/60">Notes: {active.notes}</div>}
+              </div>
+
+              <button onClick={openTicket} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {active.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
+              </button>
+
+              {active.has_signature ? (
+                <div className="rounded-xl py-3 px-4 flex items-center gap-2" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
+                  <CheckCircle2 size={20} color={GREEN} />
+                  <div>
+                    <div className="text-white font-bold text-sm">Delivered — signed by {active.signed_by}</div>
+                    <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}</div>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setSigning(true)} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                  <ClipboardList size={18} /> Get customer signature
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      {signing && active && <SignaturePad orderRef={active.ref} onCancel={() => setSigning(false)} onSubmit={submitSignature} />}
+    </div>
+  );
+}
+
 export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [me, setMe] = useState(null);          // { email, role, customer_id }
@@ -4868,6 +5084,7 @@ export default function App() {
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
   if (me.role === "staff") return <DispatchApp email={me.email} role={me.role} onLogout={handleLogout} />;   // the dispatch board is the operator's only
+  if (me.role === "driver") return <DriverApp driver={me.company || me.email} onLogout={handleLogout} />;   // truck tablet
   if (loading) return <Splash label="Loading your orders…" />;
 
   return (

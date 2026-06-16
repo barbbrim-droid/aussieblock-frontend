@@ -288,6 +288,25 @@ export async function importFuel(file) {
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   return res.json()
 }
+// ── Driver tablet ──
+// Today's deliveries assigned to the logged-in driver (+ any not yet assigned).
+export function getDriverOrders() {
+  return request('/driver/orders')
+}
+// Capture the customer's signature (a PNG Blob) + printed name; marks the order
+// Delivered/Complete and stores proof of delivery.
+export async function signOffOrder(ref, blob, signedBy) {
+  const fd = new FormData()
+  fd.append('file', blob, `${ref}-signature.png`)
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/signoff?signed_by=${encodeURIComponent(signedBy)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },   // browser sets the multipart boundary
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)
 }
@@ -406,11 +425,13 @@ export function textInvite(customerId, message) {
 export function listStaff() {
   return request('/staff')
 }
-export function createStaff(email, password, role, phone, customerId, project) {
+// company is the driver's NAME for role 'driver' (matches Order.driver); ignored
+// for other roles (their company comes from customer_id).
+export function createStaff(email, password, role, phone, customerId, project, company) {
   return request('/staff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role, phone, customer_id: customerId, project }),
+    body: JSON.stringify({ email, password, role, phone, customer_id: customerId, project, company }),
   })
 }
 export function deleteStaff(email) {
