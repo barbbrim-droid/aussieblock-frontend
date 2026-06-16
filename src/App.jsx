@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun15-v68";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun16-v69";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -4443,15 +4443,18 @@ function DispatchApp({ email, role, onLogout }) {
     // Order-level truck (a delivery assigned directly, no loads yet): match the order's own truck.
     const o = activeOrders.find((x) => (!x.loads || x.loads.length === 0) && x.truck === t.label && LIVE_POUR_STATUS.includes(x.status));
     if (o) return statusToTruck(o.status, o.ref, o);
-    // Loads: the truck is assigned to a load, not the umbrella order. Use the load's
-    // own stage if staff advanced it; otherwise fall back to the pour's overall stage.
+    // Loads: the truck is assigned to a load, not the umbrella order. A truck can
+    // have SEVERAL loads in a pour (it finished one and is now reloading), so pick
+    // its ACTIVE load — the newest one in a live stage — not the first match (which
+    // may be an already-completed load and would wrongly read as "At yard").
+    let best = null;
     for (const p of activeOrders) {
-      const ld = (p.loads || []).find((l) => l.truck === t.label);
-      if (!ld) continue;
-      const st = LIVE_POUR_STATUS.includes(ld.status) ? ld.status
-        : (LIVE_POUR_STATUS.includes(p.status) ? p.status : null);
-      if (st) return statusToTruck(st, p.ref, p);
+      for (const ld of p.loads || []) {
+        if (ld.truck !== t.label || !LIVE_POUR_STATUS.includes(ld.status)) continue;
+        if (!best || (ld.seq || 0) >= (best.ld.seq || 0)) best = { ld, p };
+      }
     }
+    if (best) return statusToTruck(best.ld.status, best.p.ref, best.p);
     return { label: "At yard", color: "#7c8794" };
   };
 
