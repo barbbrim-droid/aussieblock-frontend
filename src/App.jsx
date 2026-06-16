@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun11-v65";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun15-v66";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -5013,16 +5013,24 @@ function DriverApp({ driver, onLogout }) {
               <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <div className="text-white font-bold text-lg" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
-                <div className="text-white/55 text-sm mt-1 flex items-center gap-1"><MapPin size={13} /> {active.site}</div>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-3 mt-3 text-sm">
-                  <div><div className="text-white/35 text-[10px] uppercase">Customer</div><div className="text-white/85">{active.customer || "—"}</div></div>
-                  <div><div className="text-white/35 text-[10px] uppercase">Mix</div><div className="text-white/85">{active.mix}</div></div>
-                  <div><div className="text-white/35 text-[10px] uppercase">Quantity</div><div className="text-white/85">{active.qty} yd</div></div>
-                  <div><div className="text-white/35 text-[10px] uppercase">Time</div><div className="text-white/85">{active.time || "—"}</div></div>
-                  {active.slump && <div><div className="text-white/35 text-[10px] uppercase">Slump</div><div className="text-white/85">{active.slump}</div></div>}
-                  {active.use_for && <div><div className="text-white/35 text-[10px] uppercase">For</div><div className="text-white/85">{active.use_for}</div></div>}
+                {/* tappable address → opens turn-by-turn directions */}
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="text-sm mt-1.5 flex items-center gap-1.5 active:opacity-70" style={{ color: "#6aa9ff", fontFamily: C.body }}>
+                  <MapPin size={15} /> <span className="underline">{active.site}</span> <Navigation size={13} />
+                </a>
+                <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 mt-3 text-sm">
+                  {[
+                    ["Customer", active.customer], ["Order #", active.ref],
+                    ["Mix", active.mix], ["Quantity", active.qty ? `${active.qty} yd` : null],
+                    ["Date", active.when], ["Time", active.time],
+                    ["Slump", active.slump], ["For", active.use_for],
+                    ["Driver", active.driver && active.driver !== "—" ? active.driver : null],
+                    ["Truck", active.truck && active.truck !== "—" ? active.truck : null],
+                  ].filter(([, v]) => v).map(([k, v]) => (
+                    <div key={k}><div className="text-white/35 text-[10px] uppercase tracking-wide">{k}</div><div className="text-white/90">{v}</div></div>
+                  ))}
                 </div>
-                {active.notes && <div className="mt-2 text-xs text-white/60">Notes: {active.notes}</div>}
+                {active.admixtures && <div className="mt-2.5 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
+                {active.notes && <div className="mt-2.5 rounded-lg px-3 py-2 text-sm" style={{ background: "#6aa9ff14", color: "#cfe0ff" }}><span className="font-semibold">Delivery notes:</span> {active.notes}</div>}
               </div>
 
               <button onClick={openTicket} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
