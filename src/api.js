@@ -147,6 +147,53 @@ export function deleteDoc(id) {
   return request(`/knowledge/${id}`, { method: 'DELETE' })
 }
 
+// ── Cement & Slag tracker (staff only) ──
+// getMaterials() returns silo levels for Portland & slag (on-hand, capacity,
+// reorder flag) + any completed-order mixes that have no design yet. The receipts
+// functions are the receiving log (reconcile against supplier invoices). The
+// mix-design functions set the cement/slag lb-per-yard that drive silo draw-down.
+export function getMaterials() {
+  return request('/materials')
+}
+export function updateMaterial(materialId, settings) {
+  return request(`/materials/${materialId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),   // { capacity_tons, reorder_tons, opening_tons, counted_on }
+  })
+}
+export function getReceipts(materialId) {
+  const q = materialId != null ? `?material_id=${materialId}` : ''
+  return request(`/materials/receipts${q}`)
+}
+export function addReceipt(receipt) {
+  return request('/materials/receipts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(receipt),
+  })
+}
+export function editReceipt(id, patch) {
+  return request(`/materials/receipts/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+}
+export function deleteReceipt(id) {
+  return request(`/materials/receipts/${id}`, { method: 'DELETE' })
+}
+export function getMixDesigns() {
+  return request('/materials/mix-designs')
+}
+export function saveMixDesigns(designs) {
+  return request('/materials/mix-designs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ designs }),
+  })
+}
+
 // Save the full delivered batch-ticket fields for an order (staff). `data` is a
 // plain object of every paper-ticket field. Returns the updated order (whose
 // `batch_data` now holds what was saved).

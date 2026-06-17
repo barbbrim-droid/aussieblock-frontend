@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, createContext, useContext } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, logout, isLoggedIn } from "./api";
+import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, getMixDesigns, saveMixDesigns, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun16-v69";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun17-v70";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3447,6 +3447,228 @@ function ManageDocsModal({ onClose }) {
   );
 }
 
+// Staff modal: the cement & slag tracker. Two parts — silo gauges (on-hand =
+// opening + received − used) up top, and a tabbed body for the receiving log
+// (reconcile against supplier invoices) and the mix-design table (lb/yd that
+// drive the silo draw-down). Operator/office only.
+const t1 = (n) => (n == null ? "—" : (Math.round(n * 10) / 10).toLocaleString());   // tons, 1 dp
+const money = (n) => (n == null ? "" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+function SiloCard({ m, onSaved }) {
+  const [edit, setEdit] = useState(false);
+  const [f, setF] = useState({});
+  const [busy, setBusy] = useState(false);
+  const open = () => { setF({ capacity_tons: m.capacity_tons || "", reorder_tons: m.reorder_tons || "", opening_tons: m.opening_tons || "", counted_on: m.counted_on || localToday() }); setEdit(true); };
+  const save = async () => {
+    setBusy(true);
+    try {
+      await updateMaterial(m.id, {
+        capacity_tons: Number(f.capacity_tons) || 0, reorder_tons: Number(f.reorder_tons) || 0,
+        opening_tons: Number(f.opening_tons) || 0, counted_on: f.counted_on || null,
+      });
+      setEdit(false); onSaved && onSaved();
+    } catch (e) { alert(e.message); } finally { setBusy(false); }
+  };
+  const pct = m.pct != null ? m.pct : (m.capacity_tons ? Math.max(0, Math.min(1, m.on_hand_tons / m.capacity_tons)) : null);
+  const barColor = m.low ? "#ff8a4d" : (pct != null && pct < 0.15 ? "#ff8a4d" : GREEN);
+  const inCls = "w-full rounded-lg px-2 py-1.5 text-sm text-white outline-none";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  return (
+    <div className="rounded-xl p-3.5" style={{ background: NAVY, border: `1px solid ${m.low ? "#ff8a4d" : "rgba(255,255,255,0.08)"}` }}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-white font-bold" style={{ fontFamily: C.cond }}>{m.name}</span>
+        {m.low && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: "#ff8a4d22", color: "#ff8a4d" }}><AlertTriangle size={11} /> REORDER</span>}
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-3xl font-bold" style={{ fontFamily: C.cond, color: m.low ? "#ff8a4d" : "#fff" }}>{t1(m.on_hand_tons)}</span>
+        <span className="text-white/50 text-sm">ton{m.capacity_tons ? ` / ${t1(m.capacity_tons)}` : ""}</span>
+      </div>
+      <div className="h-2 rounded-full mt-1.5 mb-2 overflow-hidden" style={{ background: NAVY_DEEP }}>
+        <div className="h-full rounded-full" style={{ width: `${pct != null ? Math.round(pct * 100) : 0}%`, background: barColor }} />
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-white/50" style={{ fontFamily: C.body }}>
+        <span>+{t1(m.received_tons)} received · −{t1(m.used_tons)} used</span>
+        <button onClick={edit ? () => setEdit(false) : open} className="font-semibold" style={{ color: ORANGE }}>{edit ? "Cancel" : "Set up"}</button>
+      </div>
+      {edit && (
+        <div className="mt-2.5 pt-2.5 grid grid-cols-2 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Capacity (ton)<input type="number" value={f.capacity_tons} onChange={(e) => setF({ ...f, capacity_tons: e.target.value })} className={inCls} style={inSt} /></label>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Reorder at (ton)<input type="number" value={f.reorder_tons} onChange={(e) => setF({ ...f, reorder_tons: e.target.value })} className={inCls} style={inSt} /></label>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">On-hand now (ton)<input type="number" value={f.opening_tons} onChange={(e) => setF({ ...f, opening_tons: e.target.value })} className={inCls} style={inSt} /></label>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Counted on<input type="date" value={f.counted_on} onChange={(e) => setF({ ...f, counted_on: e.target.value })} className={inCls} style={inSt} /></label>
+          <div className="col-span-2 text-[10px] text-white/35 leading-snug">"On-hand now" is what's in the silo today; received &amp; used are counted from "counted on" forward.</div>
+          <button onClick={save} disabled={busy} className="col-span-2 rounded-lg py-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? "Saving…" : "Save silo"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MaterialsModal({ onClose }) {
+  const [summary, setSummary] = useState({ materials: [], unmapped_mixes: [] });
+  const [receipts, setReceipts] = useState([]);
+  const [designs, setDesigns] = useState([]);
+  const [tab, setTab] = useState("log");   // "log" | "mix"
+  const [msg, setMsg] = useState(null);
+  const today = localToday();
+  const blank = { material_id: "", received_on: today, supplier: "", tons: "", ticket_no: "", invoice_no: "", unit_cost: "" };
+  const [form, setForm] = useState(blank);
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try {
+      const [sm, rc, mx] = await Promise.all([getMaterials(), getReceipts(), getMixDesigns()]);
+      setSummary(sm); setReceipts(rc); setDesigns(mx);
+      setForm((f) => ({ ...f, material_id: f.material_id || (sm.materials[0]?.id ?? "") }));
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const matName = (id) => summary.materials.find((m) => m.id === id)?.name || "";
+
+  const logDelivery = async () => {
+    if (!form.material_id) { setMsg({ ok: false, text: "Pick a material." }); return; }
+    if (!(Number(form.tons) > 0)) { setMsg({ ok: false, text: "Enter the tons received." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      await addReceipt({
+        material_id: Number(form.material_id), received_on: form.received_on || today,
+        tons: Number(form.tons), supplier: form.supplier.trim() || null,
+        ticket_no: form.ticket_no.trim() || null, invoice_no: form.invoice_no.trim() || null,
+        unit_cost: form.unit_cost === "" ? null : Number(form.unit_cost),
+      });
+      setForm({ ...blank, material_id: form.material_id, received_on: form.received_on });
+      setMsg({ ok: true, text: "Delivery logged." });
+      await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const toggleMatched = async (r) => {
+    try { await editReceipt(r.id, { invoice_matched: !r.invoice_matched }); await load(); }
+    catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  const removeReceipt = async (r) => {
+    if (!window.confirm(`Delete this ${r.material} delivery (${t1(r.tons)} ton${r.supplier ? ", " + r.supplier : ""})?`)) return;
+    try { await deleteReceipt(r.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+
+  const setDesign = (mix, field, val) => setDesigns((ds) => ds.map((d) => d.mix === mix ? { ...d, [field]: val } : d));
+  const saveDesigns = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      await saveMixDesigns(designs.map((d) => ({ mix: d.mix, cement_lb_yd: Number(d.cement_lb_yd) || 0, slag_lb_yd: Number(d.slag_lb_yd) || 0 })));
+      setMsg({ ok: true, text: "Mix designs saved." });
+      await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const inCls = "w-full rounded-lg px-2.5 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const tabBtn = (k, label) => (
+    <button onClick={() => setTab(k)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: tab === k ? ORANGE : NAVY, color: tab === k ? NAVY_DEEP : "rgba(255,255,255,0.6)", border: tab === k ? "none" : "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>{label}</button>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Layers size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Cement &amp; Slag</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {/* silo gauges */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {summary.materials.map((m) => <SiloCard key={m.id} m={m} onSaved={load} />)}
+          </div>
+          {summary.unmapped_mixes.length > 0 && (
+            <div className="rounded-lg px-3 py-2 mb-4 text-xs" style={{ background: "#ffb02418", border: "1px solid #ffb02455", color: "#ffcf7a" }}>
+              <b>No mix design set</b> for: {summary.unmapped_mixes.map((u) => `${u.mix} (${u.yards} yd)`).join(", ")}. These aren't drawing down the silos — add their lb/yd under <b>Mix design</b>.
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 mb-3">{tabBtn("log", "Receiving log")}{tabBtn("mix", "Mix design")}</div>
+
+          {tab === "log" && (
+            <>
+              {/* log a delivery */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Log an incoming delivery</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <select value={form.material_id} onChange={(e) => setForm({ ...form, material_id: Number(e.target.value) })} className={inCls} style={inSt}>
+                    {summary.materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                  <input type="date" value={form.received_on} onChange={(e) => setForm({ ...form, received_on: e.target.value })} className={inCls} style={inSt} />
+                  <input type="number" placeholder="Tons" value={form.tons} onChange={(e) => setForm({ ...form, tons: e.target.value })} className={inCls} style={inSt} />
+                  <input placeholder="Supplier" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className={inCls} style={inSt} />
+                  <input placeholder="Ticket #" value={form.ticket_no} onChange={(e) => setForm({ ...form, ticket_no: e.target.value })} className={inCls} style={inSt} />
+                  <input placeholder="Invoice #" value={form.invoice_no} onChange={(e) => setForm({ ...form, invoice_no: e.target.value })} className={inCls} style={inSt} />
+                  <input type="number" placeholder="$/ton (optional)" value={form.unit_cost} onChange={(e) => setForm({ ...form, unit_cost: e.target.value })} className={inCls} style={inSt} />
+                  <button onClick={logDelivery} disabled={busy} className="sm:col-span-2 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}><Plus size={15} /> Log delivery</button>
+                </div>
+              </div>
+              {/* receiving log */}
+              {receipts.length === 0 ? (
+                <div className="text-white/40 text-sm py-4 text-center" style={{ background: NAVY, borderRadius: 12 }}>No deliveries logged yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs" style={{ fontFamily: C.body }}>
+                    <thead><tr className="text-white/45 text-left">
+                      <th className="py-1.5 pr-2 font-semibold">Date</th><th className="py-1.5 pr-2 font-semibold">Material</th><th className="py-1.5 pr-2 font-semibold">Supplier</th>
+                      <th className="py-1.5 pr-2 font-semibold text-right">Tons</th><th className="py-1.5 pr-2 font-semibold">Ticket</th><th className="py-1.5 pr-2 font-semibold">Invoice</th>
+                      <th className="py-1.5 pr-2 font-semibold text-right">Cost</th><th className="py-1.5 pr-2 font-semibold text-center">Matched</th><th></th>
+                    </tr></thead>
+                    <tbody>
+                      {receipts.map((r) => (
+                        <tr key={r.id} className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                          <td className="py-1.5 pr-2 whitespace-nowrap">{r.received_on}</td>
+                          <td className="py-1.5 pr-2"><span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: r.material === "Slag" ? "#6aa9ff22" : ORANGE + "22", color: r.material === "Slag" ? "#6aa9ff" : ORANGE }}>{r.material}</span></td>
+                          <td className="py-1.5 pr-2">{r.supplier || "—"}</td>
+                          <td className="py-1.5 pr-2 text-right font-semibold text-white">{t1(r.tons)}</td>
+                          <td className="py-1.5 pr-2">{r.ticket_no || "—"}</td>
+                          <td className="py-1.5 pr-2">{r.invoice_no || "—"}</td>
+                          <td className="py-1.5 pr-2 text-right">{r.total_cost != null ? money(r.total_cost) : (r.unit_cost != null ? money(r.unit_cost) + "/t" : "—")}</td>
+                          <td className="py-1.5 pr-2 text-center">
+                            <button onClick={() => toggleMatched(r)} title="Reconciled against the supplier invoice" className="inline-flex items-center justify-center w-5 h-5 rounded active:scale-90" style={{ background: r.invoice_matched ? GREEN : "transparent", border: `1px solid ${r.invoice_matched ? GREEN : "rgba(255,255,255,0.25)"}` }}>{r.invoice_matched && <Check size={13} color={NAVY_DEEP} />}</button>
+                          </td>
+                          <td className="py-1.5 text-right"><button onClick={() => removeReceipt(r)} title="Delete" className="p-1 rounded active:scale-90"><Trash2 size={13} color="#ff8a85" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === "mix" && (
+            <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div className="text-white text-sm font-semibold mb-1" style={{ fontFamily: C.cond }}>Cement &amp; slag per cubic yard</div>
+              <div className="text-white/40 text-[11px] mb-2.5">Used to draw the silos down as orders complete (lb/yd × yards ÷ 2000 = tons). Set your real plant numbers — the seeded values are ballpark.</div>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: "1fr auto auto" }}>
+                <div className="text-[10px] text-white/45 uppercase tracking-wide">Mix</div>
+                <div className="text-[10px] text-white/45 uppercase tracking-wide text-right w-24">Cement lb/yd</div>
+                <div className="text-[10px] text-white/45 uppercase tracking-wide text-right w-24">Slag lb/yd</div>
+                {designs.map((d) => (
+                  <Fragment key={d.mix}>
+                    <div className="text-white text-sm self-center" style={{ fontFamily: C.cond }}>{d.mix}</div>
+                    <input type="number" value={d.cement_lb_yd} onChange={(e) => setDesign(d.mix, "cement_lb_yd", e.target.value)} className="rounded-lg px-2 py-1.5 text-sm text-white text-right outline-none w-24" style={inSt} />
+                    <input type="number" value={d.slag_lb_yd} onChange={(e) => setDesign(d.mix, "slag_lb_yd", e.target.value)} className="rounded-lg px-2 py-1.5 text-sm text-white text-right outline-none w-24" style={inSt} />
+                  </Fragment>
+                ))}
+              </div>
+              <button onClick={saveDesigns} disabled={busy} className="w-full mt-3 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save mix designs</button>
+            </div>
+          )}
+
+          {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Staff modal: month calendar for delivery planning. Each day cell shows the
 // total yards scheduled; clicking a day lists that day's orders (with controls).
 // Staff "Past orders" history modal — completed orders, most recent first, each
@@ -4289,6 +4511,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showPrices, setShowPrices] = useState(false);   // "Price sheet" modal
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
   const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
+  const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
@@ -4518,6 +4741,7 @@ function DispatchApp({ email, role, onLogout }) {
       )}
       {showStaff && <ManageStaffModal onClose={() => setShowStaff(false)} />}
       {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
+      {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
@@ -4605,6 +4829,11 @@ function DispatchApp({ email, role, onLogout }) {
               {canFinance && (
                 <button onClick={() => setShowStaff(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                   <User size={16} color={ORANGE} /> Workers
+                </button>
+              )}
+              {canFinance && (
+                <button onClick={() => setShowMaterials(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                  <Layers size={16} color={ORANGE} /> Materials
                 </button>
               )}
               <button onClick={() => setShowDocs(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
