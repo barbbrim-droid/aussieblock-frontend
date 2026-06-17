@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun17-v72";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun17-v73";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -1843,6 +1843,7 @@ const BATCH_BLANK = {
     rock: { design: "", target: "", actual: "" },
     sand: { design: "", target: "", actual: "" },
     cement: { design: "", target: "", actual: "" },
+    slag: { design: "", target: "", actual: "" },
     air: { design: "", target: "", actual: "" },
     water: { design: "", target: "", actual: "" },
   },
@@ -3490,6 +3491,11 @@ function SiloCard({ m, onSaved }) {
         <span>+{t1(m.received_tons)} received · −{t1(m.used_tons)} used</span>
         <button onClick={edit ? () => setEdit(false) : open} className="font-semibold" style={{ color: ORANGE }}>{edit ? "Cancel" : "Set up"}</button>
       </div>
+      {m.used_tons > 0 && (
+        <div className="text-[10px] text-white/35 mt-0.5" style={{ fontFamily: C.body }}>
+          used: {t1(m.used_ticket_tons)} from batch tickets{m.used_estimate_tons > 0 ? ` · ${t1(m.used_estimate_tons)} estimated` : ""}
+        </div>
+      )}
       {edit && (
         <div className="mt-2.5 pt-2.5 grid grid-cols-2 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           <label className="text-[10px] text-white/45 uppercase tracking-wide">Capacity (ton)<input type="number" value={f.capacity_tons} onChange={(e) => setF({ ...f, capacity_tons: e.target.value })} className={inCls} style={inSt} /></label>
