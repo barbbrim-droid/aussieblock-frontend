@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, getMixDesigns, saveMixDesigns, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, getMixDesigns, saveMixDesigns, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun17-v70";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun17-v71";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3504,6 +3504,60 @@ function SiloCard({ m, onSaved }) {
   );
 }
 
+// The photo strip for one receipt — fetches each attached photo as an authed blob
+// and shows thumbnails (tap to open full, X to remove), plus an "Add" camera tile.
+function ReceiptPhotos({ receipt, onChanged }) {
+  const [urls, setUrls] = useState({});   // name -> object URL
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const names = receipt.photos || [];
+  useEffect(() => {
+    let live = true; const made = [];
+    (async () => {
+      for (const name of names) {
+        try {
+          const u = await fetchReceiptPhotoUrl(receipt.id, name);
+          if (!live) { URL.revokeObjectURL(u); return; }
+          made.push(u); setUrls((m) => ({ ...m, [name]: u }));
+        } catch { /* skip a missing photo */ }
+      }
+    })();
+    return () => { live = false; made.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [receipt.id, names.join(",")]);
+
+  const add = async (e) => {
+    const files = Array.from(e.target.files || []); if (!files.length) return;
+    setBusy(true);
+    try { for (const f of files) await uploadReceiptPhoto(receipt.id, f); if (onChanged) await onChanged(); }
+    catch (err) { alert(err.message); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+  const remove = async (name) => {
+    if (!window.confirm("Remove this photo?")) return;
+    setBusy(true);
+    try { await deleteReceiptPhoto(receipt.id, name); if (onChanged) await onChanged(); }
+    catch (err) { alert(err.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-2">
+      {names.map((name) => (
+        <div key={name} className="relative">
+          {urls[name] ? (
+            <img src={urls[name]} alt="delivery" onClick={() => window.open(urls[name], "_blank")} className="h-16 w-16 object-cover rounded-lg cursor-pointer" style={{ border: "1px solid rgba(255,255,255,0.15)" }} />
+          ) : (
+            <div className="h-16 w-16 rounded-lg flex items-center justify-center" style={{ background: NAVY }}><Loader2 size={14} className="animate-spin text-white/40" /></div>
+          )}
+          <button onClick={() => remove(name)} title="Remove" className="absolute -top-1.5 -right-1.5 rounded-full p-0.5 active:scale-90" style={{ background: "#ff5a52" }}><X size={11} color="#fff" /></button>
+        </div>
+      ))}
+      <button onClick={() => fileRef.current?.click()} disabled={busy} className="h-16 w-16 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px dashed rgba(255,255,255,0.25)" }}>
+        {busy ? <Loader2 size={15} className="animate-spin text-white/50" /> : <><Camera size={16} color={ORANGE} /><span className="text-[9px] text-white/50">Add</span></>}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={add} className="hidden" />
+    </div>
+  );
+}
+
 function MaterialsModal({ onClose }) {
   const [summary, setSummary] = useState({ materials: [], unmapped_mixes: [] });
   const [receipts, setReceipts] = useState([]);
@@ -3513,6 +3567,8 @@ function MaterialsModal({ onClose }) {
   const today = localToday();
   const blank = { material_id: "", received_on: today, supplier: "", tons: "", ticket_no: "", invoice_no: "", unit_cost: "" };
   const [form, setForm] = useState(blank);
+  const [formPhotos, setFormPhotos] = useState([]);   // photos to attach to the delivery being logged
+  const [openPhotos, setOpenPhotos] = useState(null);   // receipt id whose photo strip is expanded
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -3531,14 +3587,18 @@ function MaterialsModal({ onClose }) {
     if (!(Number(form.tons) > 0)) { setMsg({ ok: false, text: "Enter the tons received." }); return; }
     setBusy(true); setMsg(null);
     try {
-      await addReceipt({
+      const r = await addReceipt({
         material_id: Number(form.material_id), received_on: form.received_on || today,
         tons: Number(form.tons), supplier: form.supplier.trim() || null,
         ticket_no: form.ticket_no.trim() || null, invoice_no: form.invoice_no.trim() || null,
         unit_cost: form.unit_cost === "" ? null : Number(form.unit_cost),
       });
+      if (formPhotos.length && r?.id) {
+        for (const f of formPhotos) { try { await uploadReceiptPhoto(r.id, f); } catch { /* keep going */ } }
+      }
       setForm({ ...blank, material_id: form.material_id, received_on: form.received_on });
-      setMsg({ ok: true, text: "Delivery logged." });
+      setFormPhotos([]);
+      setMsg({ ok: true, text: `Delivery logged${formPhotos.length ? ` with ${formPhotos.length} photo${formPhotos.length > 1 ? "s" : ""}` : ""}.` });
       await load();
     } catch (e) { setMsg({ ok: false, text: e.message }); }
     finally { setBusy(false); }
@@ -3605,7 +3665,12 @@ function MaterialsModal({ onClose }) {
                   <input placeholder="Ticket #" value={form.ticket_no} onChange={(e) => setForm({ ...form, ticket_no: e.target.value })} className={inCls} style={inSt} />
                   <input placeholder="Invoice #" value={form.invoice_no} onChange={(e) => setForm({ ...form, invoice_no: e.target.value })} className={inCls} style={inSt} />
                   <input type="number" placeholder="$/ton (optional)" value={form.unit_cost} onChange={(e) => setForm({ ...form, unit_cost: e.target.value })} className={inCls} style={inSt} />
-                  <button onClick={logDelivery} disabled={busy} className="sm:col-span-2 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}><Plus size={15} /> Log delivery</button>
+                  <label className="sm:col-span-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm cursor-pointer active:scale-[0.99]" style={{ ...inSt, borderStyle: "dashed" }}>
+                    <Camera size={15} color={ORANGE} />
+                    <span className="text-white/55">{formPhotos.length ? `${formPhotos.length} photo${formPhotos.length > 1 ? "s" : ""} attached` : "Attach delivery-ticket photo(s) — optional"}</span>
+                    <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(e) => setFormPhotos(Array.from(e.target.files || []))} />
+                  </label>
+                  <button onClick={logDelivery} disabled={busy} className="sm:col-span-3 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Log delivery</button>
                 </div>
               </div>
               {/* receiving log */}
@@ -3621,19 +3686,32 @@ function MaterialsModal({ onClose }) {
                     </tr></thead>
                     <tbody>
                       {receipts.map((r) => (
-                        <tr key={r.id} className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                          <td className="py-1.5 pr-2 whitespace-nowrap">{r.received_on}</td>
-                          <td className="py-1.5 pr-2"><span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: r.material === "Slag" ? "#6aa9ff22" : ORANGE + "22", color: r.material === "Slag" ? "#6aa9ff" : ORANGE }}>{r.material}</span></td>
-                          <td className="py-1.5 pr-2">{r.supplier || "—"}</td>
-                          <td className="py-1.5 pr-2 text-right font-semibold text-white">{t1(r.tons)}</td>
-                          <td className="py-1.5 pr-2">{r.ticket_no || "—"}</td>
-                          <td className="py-1.5 pr-2">{r.invoice_no || "—"}</td>
-                          <td className="py-1.5 pr-2 text-right">{r.total_cost != null ? money(r.total_cost) : (r.unit_cost != null ? money(r.unit_cost) + "/t" : "—")}</td>
-                          <td className="py-1.5 pr-2 text-center">
-                            <button onClick={() => toggleMatched(r)} title="Reconciled against the supplier invoice" className="inline-flex items-center justify-center w-5 h-5 rounded active:scale-90" style={{ background: r.invoice_matched ? GREEN : "transparent", border: `1px solid ${r.invoice_matched ? GREEN : "rgba(255,255,255,0.25)"}` }}>{r.invoice_matched && <Check size={13} color={NAVY_DEEP} />}</button>
-                          </td>
-                          <td className="py-1.5 text-right"><button onClick={() => removeReceipt(r)} title="Delete" className="p-1 rounded active:scale-90"><Trash2 size={13} color="#ff8a85" /></button></td>
-                        </tr>
+                        <Fragment key={r.id}>
+                          <tr className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                            <td className="py-1.5 pr-2 whitespace-nowrap">{r.received_on}</td>
+                            <td className="py-1.5 pr-2"><span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: r.material === "Slag" ? "#6aa9ff22" : ORANGE + "22", color: r.material === "Slag" ? "#6aa9ff" : ORANGE }}>{r.material}</span></td>
+                            <td className="py-1.5 pr-2">{r.supplier || "—"}</td>
+                            <td className="py-1.5 pr-2 text-right font-semibold text-white">{t1(r.tons)}</td>
+                            <td className="py-1.5 pr-2">{r.ticket_no || "—"}</td>
+                            <td className="py-1.5 pr-2">{r.invoice_no || "—"}</td>
+                            <td className="py-1.5 pr-2 text-right">{r.total_cost != null ? money(r.total_cost) : (r.unit_cost != null ? money(r.unit_cost) + "/t" : "—")}</td>
+                            <td className="py-1.5 pr-2 text-center">
+                              <button onClick={() => toggleMatched(r)} title="Reconciled against the supplier invoice" className="inline-flex items-center justify-center w-5 h-5 rounded active:scale-90" style={{ background: r.invoice_matched ? GREEN : "transparent", border: `1px solid ${r.invoice_matched ? GREEN : "rgba(255,255,255,0.25)"}` }}>{r.invoice_matched && <Check size={13} color={NAVY_DEEP} />}</button>
+                            </td>
+                            <td className="py-1.5 text-right whitespace-nowrap">
+                              <button onClick={() => setOpenPhotos(openPhotos === r.id ? null : r.id)} title="Delivery photos" className="p-1 rounded active:scale-90 inline-flex items-center gap-0.5 align-middle">
+                                <Camera size={14} color={(r.photos || []).length ? ORANGE : "rgba(255,255,255,0.4)"} />
+                                {(r.photos || []).length > 0 && <span className="text-[10px] font-semibold" style={{ color: ORANGE }}>{r.photos.length}</span>}
+                              </button>
+                              <button onClick={() => removeReceipt(r)} title="Delete" className="p-1 rounded active:scale-90 align-middle"><Trash2 size={13} color="#ff8a85" /></button>
+                            </td>
+                          </tr>
+                          {openPhotos === r.id && (
+                            <tr style={{ background: NAVY }}>
+                              <td colSpan={9} className="px-2"><ReceiptPhotos receipt={r} onChanged={load} /></td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

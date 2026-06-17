@@ -183,6 +183,30 @@ export function editReceipt(id, patch) {
 export function deleteReceipt(id) {
   return request(`/materials/receipts/${id}`, { method: 'DELETE' })
 }
+// Attach / view / remove a delivery photo on a receipt (staff). uploadReceiptPhoto
+// returns the updated receipt; fetchReceiptPhotoUrl returns an authed blob URL for
+// an <img> (revoke it when done).
+export async function uploadReceiptPhoto(id, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${API_BASE}/materials/receipts/${id}/photos`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },   // browser sets the multipart boundary
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+export async function fetchReceiptPhotoUrl(id, name) {
+  const res = await fetch(`${API_BASE}/materials/receipts/${id}/photos/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return URL.createObjectURL(await res.blob())
+}
+export function deleteReceiptPhoto(id, name) {
+  return request(`/materials/receipts/${id}/photos/${encodeURIComponent(name)}`, { method: 'DELETE' })
+}
 export function getMixDesigns() {
   return request('/materials/mix-designs')
 }
