@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun17-v71";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun17-v72";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3569,6 +3569,7 @@ function MaterialsModal({ onClose }) {
   const [form, setForm] = useState(blank);
   const [formPhotos, setFormPhotos] = useState([]);   // photos to attach to the delivery being logged
   const [openPhotos, setOpenPhotos] = useState(null);   // receipt id whose photo strip is expanded
+  const [newMix, setNewMix] = useState("");   // "add a mix" input on the Mix design tab
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -3614,6 +3615,11 @@ function MaterialsModal({ onClose }) {
   };
 
   const setDesign = (mix, field, val) => setDesigns((ds) => ds.map((d) => d.mix === mix ? { ...d, [field]: val } : d));
+  const addMixRow = (name) => {
+    const m = (name || "").trim();
+    if (!m || designs.some((d) => d.mix.toLowerCase() === m.toLowerCase())) return;
+    setDesigns((ds) => [...ds, { id: null, mix: m, cement_lb_yd: "", slag_lb_yd: "" }]);
+  };
   const saveDesigns = async () => {
     setBusy(true); setMsg(null);
     try {
@@ -3643,8 +3649,15 @@ function MaterialsModal({ onClose }) {
             {summary.materials.map((m) => <SiloCard key={m.id} m={m} onSaved={load} />)}
           </div>
           {summary.unmapped_mixes.length > 0 && (
-            <div className="rounded-lg px-3 py-2 mb-4 text-xs" style={{ background: "#ffb02418", border: "1px solid #ffb02455", color: "#ffcf7a" }}>
-              <b>No mix design set</b> for: {summary.unmapped_mixes.map((u) => `${u.mix} (${u.yards} yd)`).join(", ")}. These aren't drawing down the silos — add their lb/yd under <b>Mix design</b>.
+            <div className="rounded-lg px-3 py-2.5 mb-4 text-xs" style={{ background: "#ffb02418", border: "1px solid #ffb02455", color: "#ffcf7a" }}>
+              <div className="mb-1.5"><b>No mix design set</b> for these — they aren't drawing down the silos. Tap to add one, then enter its lb/yd:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {summary.unmapped_mixes.map((u) => (
+                  <button key={u.mix} onClick={() => { addMixRow(u.mix); setTab("mix"); }} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold active:scale-95" style={{ background: "#ffb02422", border: "1px solid #ffb02466", color: "#ffcf7a" }}>
+                    <Plus size={12} /> {u.mix} <span className="opacity-60">({u.yards} yd)</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -3735,6 +3748,12 @@ function MaterialsModal({ onClose }) {
                     <input type="number" value={d.slag_lb_yd} onChange={(e) => setDesign(d.mix, "slag_lb_yd", e.target.value)} className="rounded-lg px-2 py-1.5 text-sm text-white text-right outline-none w-24" style={inSt} />
                   </Fragment>
                 ))}
+              </div>
+              <div className="mt-3 pt-3 flex items-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <label className="flex-1 text-[10px] text-white/45 uppercase tracking-wide">Add a mix (e.g. TxDOT Class A)
+                  <input value={newMix} onChange={(e) => setNewMix(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addMixRow(newMix); setNewMix(""); } }} placeholder="Mix name" className="w-full rounded-lg px-2.5 py-2 text-sm text-white outline-none placeholder:text-white/30 mt-0.5" style={inSt} />
+                </label>
+                <button onClick={() => { addMixRow(newMix); setNewMix(""); }} disabled={!newMix.trim()} className="rounded-lg px-3 py-2 flex items-center gap-1 text-sm font-semibold active:scale-95 disabled:opacity-40" style={{ background: NAVY_DEEP, border: `1px solid ${ORANGE}`, color: ORANGE }}><Plus size={14} /> Add</button>
               </div>
               <button onClick={saveDesigns} disabled={busy} className="w-full mt-3 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save mix designs</button>
             </div>
