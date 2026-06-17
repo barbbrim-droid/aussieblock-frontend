@@ -3877,7 +3877,14 @@ function CostsModal({ orders, onClose }) {
           // concrete-only extended (unit × yards) so subtotals blend correctly.
           const unit = cp && cp.unit_price != null ? Number(cp.unit_price) : null;
           const ext = cp && cp.extended != null ? Number(cp.extended) : null;
-          return [o.ref, { billed, toHauler, yards, unit, ext }];
+          // Fiber used — itemized from the admixture lines the backend already
+          // priced (label carries the lbs, e.g. "Fiber (60 lb @ $3.75/lb)"). It's
+          // included in `billed`; we surface it as its own column.
+          const fiber = ((cp && cp.admixtures) || []).find((a) => /fiber/i.test(a && a.label || ""));
+          const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
+          const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
+          const fiberLbs = lbM ? Number(lbM[1]) : 0;
+          return [o.ref, { billed, toHauler, yards, unit, ext, fiberAmt, fiberLbs }];
         } catch {
           return [o.ref, { billed: null, toHauler: null, yards: o.qty, error: true }];
         }
@@ -3913,9 +3920,12 @@ function CostsModal({ orders, onClose }) {
     if (r.billed != null) acc.billed += r.billed;
     if (r.toHauler != null) acc.toHauler += r.toHauler;
     if (r.ext != null) acc.ext += r.ext;   // concrete-only $ (pre-tax/fees) → blended base $/yd
+    if (r.fiberAmt) acc.fiber += r.fiberAmt;
+    if (r.fiberLbs) acc.fiberLbs += r.fiberLbs;
     if (r.billed != null && r.yards != null && Number(r.yards) > 0) acc.yards += Number(r.yards);   // yards that have a billed total → blended $/yd
+    if (r.unit != null && Number(r.unit) > 0) acc.units.add(Number(r.unit).toFixed(2));   // distinct sheet rates in the group
     return acc;
-  }, { billed: 0, toHauler: 0, yards: 0, ext: 0 });
+  }, { billed: 0, toHauler: 0, yards: 0, ext: 0, fiber: 0, fiberLbs: 0, units: new Set() });
   const grand = sumFor(filtered);
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
@@ -3931,6 +3941,16 @@ function CostsModal({ orders, onClose }) {
     // basePerYd shows a single order's exact sheet/override unit price.
     const perYd = (val, yards) => (val == null || !(Number(yards) > 0)) ? "—" : `${m(val / Number(yards))}/yd`;
     const basePerYd = (r) => (r && r.unit != null && Number(r.unit) > 0) ? `${m(r.unit)}/yd` : perYd(r && r.ext, r && r.yards);
+    // Summary/subtotal base $/yd: the flat sheet rate when every order in the
+    // group is at one rate; only blend (concrete $ ÷ yards) when rates differ.
+    const groupBase = (t) => (t.units && t.units.size === 1) ? `${m(Number([...t.units][0]))}/yd` : perYd(t.ext, t.yards);
+    // Fiber used: lbs · $ charged (blank when no fiber on the order/group).
+    const fiberCell = (amt, lbs) => {
+      const parts = [];
+      if (lbs) parts.push(`${Number(lbs).toLocaleString("en-US", { maximumFractionDigits: 1 })} lb`);
+      if (amt) parts.push(m(amt));
+      return parts.length ? parts.join(" · ") : "—";
+    };
     const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     const period = (from || to)
       ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}`
@@ -3939,7 +3959,7 @@ function CostsModal({ orders, onClose }) {
     // Page 1 — summary: one row per customer.
     const summaryRows = custNames.map((name) => {
       const t = sumFor(groups[name]);
-      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.ext, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${fiberCell(t.fiber, t.fiberLbs)}</td><td class="r">${groupBase(t)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
     }).join("");
 
     // Detail — per-customer tables (kept whole, won't split across a page).
@@ -3948,12 +3968,12 @@ function CostsModal({ orders, onClose }) {
       const t = sumFor(list);
       const rows = list.map((o) => {
         const r = px[o.ref] || {};
-        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : fiberCell(r.fiberAmt, r.fiberLbs)}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
       }).join("");
       return `<section class="cust"><h2>${esc(name)} <span class="ct">· ${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
-<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Billed</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Fiber</th><th class="r">Billed</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${m(t.billed)}</td><td class="r">${perYd(t.ext, t.yards)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
+<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${fiberCell(t.fiber, t.fiberLbs)}</td><td class="r">${m(t.billed)}</td><td class="r">${groupBase(t)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
     }).join("");
 
     const empty = custNames.length === 0;
@@ -4011,12 +4031,12 @@ function CostsModal({ orders, onClose }) {
   ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
   <div class="sec-title">Summary by customer</div>
   <table>
-    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
+    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">Fiber</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
     <tbody>${summaryRows}</tbody>
-    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${perYd(grand.ext, grand.yards)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
+    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${fiberCell(grand.fiber, grand.fiberLbs)}</td><td class="r">${groupBase(grand)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
   </table>
   ${sections}`}
-  <div class="muted" style="margin-top:10px;font-size:11px;">“Base $/yd” = your price-sheet rate per yard — concrete only, before sales tax, fees &amp; admixtures (matches what you set in the Price sheet). “Billed” is the full amount the customer paid, including tax &amp; any fees. “To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
+  <div class="muted" style="margin-top:10px;font-size:11px;">“Base $/yd” = your price-sheet rate per yard — concrete only, before sales tax, fees &amp; admixtures (the flat sheet rate; only blended when a customer’s orders span different rates). “Fiber” = Mac Matrix fiber used (lbs · $ charged), already included in “Billed”. “Billed” is the full amount the customer paid, including tax, fiber &amp; any fees. “To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
   <div class="foot">
     <span class="co">Aussieblock Ready Mix</span>
     <span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span>
