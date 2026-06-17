@@ -159,7 +159,7 @@ export function updateMaterial(materialId, settings) {
   return request(`/materials/${materialId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(settings),   // { capacity_tons, reorder_tons, opening_tons, counted_on }
+    body: JSON.stringify(settings),   // { capacity_tons, reorder_tons, opening_tons, counted_on, cost_rate }
   })
 }
 export function getReceipts(materialId) {

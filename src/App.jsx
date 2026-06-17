@@ -3454,18 +3454,21 @@ function ManageDocsModal({ onClose }) {
 // drive the silo draw-down). Operator/office only.
 const t1 = (n) => (n == null ? "—" : (Math.round(n * 10) / 10).toLocaleString());   // tons, 1 dp
 const money = (n) => (n == null ? "" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+// An amount in a material's own unit: tons to 1 dp, lb/oz as whole numbers.
+const amt = (n, unit) => (n == null ? "—" : (unit === "ton" ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString());
 
 function SiloCard({ m, onSaved }) {
   const [edit, setEdit] = useState(false);
   const [f, setF] = useState({});
   const [busy, setBusy] = useState(false);
-  const open = () => { setF({ capacity_tons: m.capacity_tons || "", reorder_tons: m.reorder_tons || "", opening_tons: m.opening_tons || "", counted_on: m.counted_on || localToday() }); setEdit(true); };
+  const open = () => { setF({ capacity_tons: m.capacity_tons || "", reorder_tons: m.reorder_tons || "", opening_tons: m.opening_tons || "", counted_on: m.counted_on || localToday(), cost_rate: m.cost_rate || "" }); setEdit(true); };
   const save = async () => {
     setBusy(true);
     try {
       await updateMaterial(m.id, {
         capacity_tons: Number(f.capacity_tons) || 0, reorder_tons: Number(f.reorder_tons) || 0,
         opening_tons: Number(f.opening_tons) || 0, counted_on: f.counted_on || null,
+        cost_rate: Number(f.cost_rate) || 0,
       });
       setEdit(false); onSaved && onSaved();
     } catch (e) { alert(e.message); } finally { setBusy(false); }
@@ -3488,12 +3491,12 @@ function SiloCard({ m, onSaved }) {
         <div className="h-full rounded-full" style={{ width: `${pct != null ? Math.round(pct * 100) : 0}%`, background: barColor }} />
       </div>
       <div className="flex items-center justify-between text-[11px] text-white/50" style={{ fontFamily: C.body }}>
-        <span>+{t1(m.received_tons)} received · −{t1(m.used_tons)} used</span>
+        <span>+{t1(m.received_tons)} received · −{t1(m.used_amount)} used{m.cost > 0 ? ` · ${money(m.cost)}` : ""}</span>
         <button onClick={edit ? () => setEdit(false) : open} className="font-semibold" style={{ color: ORANGE }}>{edit ? "Cancel" : "Set up"}</button>
       </div>
-      {m.used_tons > 0 && (
+      {m.used_amount > 0 && (
         <div className="text-[10px] text-white/35 mt-0.5" style={{ fontFamily: C.body }}>
-          used: {t1(m.used_ticket_tons)} from batch tickets{m.used_estimate_tons > 0 ? ` · ${t1(m.used_estimate_tons)} estimated` : ""}
+          used: {t1(m.used_ticket_amount)} from batch tickets{m.used_estimate_amount > 0 ? ` · ${t1(m.used_estimate_amount)} estimated` : ""}{m.cost_rate > 0 ? ` · @ ${money(m.cost_rate)}/ton` : ""}
         </div>
       )}
       {edit && (
@@ -3502,8 +3505,52 @@ function SiloCard({ m, onSaved }) {
           <label className="text-[10px] text-white/45 uppercase tracking-wide">Reorder at (ton)<input type="number" value={f.reorder_tons} onChange={(e) => setF({ ...f, reorder_tons: e.target.value })} className={inCls} style={inSt} /></label>
           <label className="text-[10px] text-white/45 uppercase tracking-wide">On-hand now (ton)<input type="number" value={f.opening_tons} onChange={(e) => setF({ ...f, opening_tons: e.target.value })} className={inCls} style={inSt} /></label>
           <label className="text-[10px] text-white/45 uppercase tracking-wide">Counted on<input type="date" value={f.counted_on} onChange={(e) => setF({ ...f, counted_on: e.target.value })} className={inCls} style={inSt} /></label>
-          <div className="col-span-2 text-[10px] text-white/35 leading-snug">"On-hand now" is what's in the silo today; received &amp; used are counted from "counted on" forward.</div>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Cost ($/ton)<input type="number" value={f.cost_rate} onChange={(e) => setF({ ...f, cost_rate: e.target.value })} className={inCls} style={inSt} /></label>
+          <div className="col-span-2 text-[10px] text-white/35 leading-snug">"On-hand now" is what's in the silo today; received &amp; used are counted from "counted on" forward. Cost = actual tons used × $/ton.</div>
           <button onClick={save} disabled={busy} className="col-span-2 rounded-lg py-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? "Saving…" : "Save silo"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A non-silo material (gravel, sand, admixtures): tracked by ACTUAL batched usage off
+// completed orders' tickets + cost only — no on-hand balance. Edit the cost rate (and
+// optionally a start date) inline.
+function UsageCard({ m, onSaved }) {
+  const [edit, setEdit] = useState(false);
+  const [f, setF] = useState({});
+  const [busy, setBusy] = useState(false);
+  const open = () => { setF({ cost_rate: m.cost_rate || "", counted_on: m.counted_on || "" }); setEdit(true); };
+  const save = async () => {
+    setBusy(true);
+    try {
+      await updateMaterial(m.id, { cost_rate: Number(f.cost_rate) || 0, counted_on: f.counted_on || null });
+      setEdit(false); onSaved && onSaved();
+    } catch (e) { alert(e.message); } finally { setBusy(false); }
+  };
+  const inCls = "w-full rounded-lg px-2 py-1.5 text-sm text-white outline-none";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  return (
+    <div className="rounded-xl p-3.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-white font-bold" style={{ fontFamily: C.cond }}>{m.name}</span>
+        <button onClick={edit ? () => setEdit(false) : open} className="text-[11px] font-semibold" style={{ color: ORANGE }}>{edit ? "Cancel" : "Set rate"}</button>
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-3xl font-bold" style={{ fontFamily: C.cond, color: "#fff" }}>{amt(m.used_amount, m.unit)}</span>
+        <span className="text-white/50 text-sm">{m.unit} used</span>
+      </div>
+      <div className="flex items-center justify-between text-[11px] mt-1.5" style={{ fontFamily: C.body }}>
+        <span className="font-semibold" style={{ color: m.cost > 0 ? GREEN : "rgba(255,255,255,0.4)" }}>{m.cost > 0 ? money(m.cost) : "—"}</span>
+        <span className="text-white/40">{m.cost_rate > 0 ? `${money(m.cost_rate)}/${m.unit}` : `set $/${m.unit}`}</span>
+      </div>
+      {edit && (
+        <div className="mt-2.5 pt-2.5 grid grid-cols-2 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Cost ($/{m.unit})<input type="number" value={f.cost_rate} onChange={(e) => setF({ ...f, cost_rate: e.target.value })} className={inCls} style={inSt} /></label>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Count from<input type="date" value={f.counted_on} onChange={(e) => setF({ ...f, counted_on: e.target.value })} className={inCls} style={inSt} /></label>
+          <div className="col-span-2 text-[10px] text-white/35 leading-snug">Usage = actual {m.unit} batched on completed orders' tickets{m.counted_on ? "" : " (all-time unless you set a start date)"}. Cost = used × $/{m.unit}.</div>
+          <button onClick={save} disabled={busy} className="col-span-2 rounded-lg py-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? "Saving…" : "Save"}</button>
         </div>
       )}
     </div>
@@ -3588,6 +3635,8 @@ function MaterialsModal({ onClose }) {
   useEffect(() => { load(); }, []);
 
   const matName = (id) => summary.materials.find((m) => m.id === id)?.name || "";
+  const silos = summary.materials.filter((m) => m.track_inventory);
+  const usage = summary.materials.filter((m) => !m.track_inventory);
 
   const logDelivery = async () => {
     if (!form.material_id) { setMsg({ ok: false, text: "Pick a material." }); return; }
@@ -3646,14 +3695,26 @@ function MaterialsModal({ onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
       <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><Layers size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Cement &amp; Slag</span></div>
+          <div className="flex items-center gap-2"><Layers size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Materials</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
-          {/* silo gauges */}
+          {/* cement & slag silos */}
           <div className="grid grid-cols-2 gap-3 mb-4">
-            {summary.materials.map((m) => <SiloCard key={m.id} m={m} onSaved={load} />)}
+            {silos.map((m) => <SiloCard key={m.id} m={m} onSaved={load} />)}
           </div>
+          {/* aggregates & admixtures — actual usage + cost (no silo) */}
+          {usage.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/55 text-xs font-semibold uppercase tracking-wide" style={{ fontFamily: C.body }}>Aggregates &amp; admixtures · actual used</span>
+                {summary.total_cost > 0 && <span className="text-xs" style={{ color: GREEN, fontFamily: C.body }}>total material cost {money(summary.total_cost)}</span>}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {usage.map((m) => <UsageCard key={m.id} m={m} onSaved={load} />)}
+              </div>
+            </div>
+          )}
           {summary.unmapped_mixes.length > 0 && (
             <div className="rounded-lg px-3 py-2.5 mb-4 text-xs" style={{ background: "#ffb02418", border: "1px solid #ffb02455", color: "#ffcf7a" }}>
               <div className="mb-1.5"><b>No mix design set</b> for these — they aren't drawing down the silos. Tap to add one, then enter its lb/yd:</div>
@@ -3676,7 +3737,7 @@ function MaterialsModal({ onClose }) {
                 <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Log an incoming delivery</div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <select value={form.material_id} onChange={(e) => setForm({ ...form, material_id: Number(e.target.value) })} className={inCls} style={inSt}>
-                    {summary.materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {silos.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                   <input type="date" value={form.received_on} onChange={(e) => setForm({ ...form, received_on: e.target.value })} className={inCls} style={inSt} />
                   <input type="number" placeholder="Tons" value={form.tons} onChange={(e) => setForm({ ...form, tons: e.target.value })} className={inCls} style={inSt} />
