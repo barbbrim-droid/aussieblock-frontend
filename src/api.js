@@ -472,6 +472,16 @@ export function setOrderPrice(ref, price_override) {
     body: JSON.stringify({ price_override }),
   })
 }
+// Set (or clear, with null/0) the Mac Matrix Fiber dosage (lbs/yd) and the $/lb
+// rate on an order. Rate null = use the price-sheet rate. Works on completed
+// orders too. Returns the updated order.
+export function setOrderFiber(ref, lbs, rate) {
+  return request(`/orders/${encodeURIComponent(ref)}/fiber`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lbs, rate }),
+  })
+}
 // Price sheet (staff): rates that fill the batch-ticket pricing block.
 export function getPriceSheet() {
   return request('/price-sheet')

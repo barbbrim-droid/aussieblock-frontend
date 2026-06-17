@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, getMixDesigns, saveMixDesigns, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, getMixDesigns, saveMixDesigns, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1903,6 +1903,13 @@ function BatchTicketForm({ o, onEdited }) {
   const [hauler, setHauler] = useState(o.hauler || "");
   const [mileage, setMileage] = useState(o.mileage != null ? String(o.mileage) : "");
   const [priceOv, setPriceOv] = useState(o.price_override != null ? String(o.price_override) : "");
+  // Mac Matrix Fiber dosage (lbs/yd), parsed from the order's admixtures string.
+  const [fiberLbs, setFiberLbs] = useState(() => {
+    const m = /fiber[^\d]*([\d.]+)\s*lb/i.exec(o.admixtures || "");
+    return m ? m[1] : "";
+  });
+  // Custom fiber $/lb for this order (blank = price-sheet rate).
+  const [fiberRate, setFiberRate] = useState(o.fiber_rate != null ? String(o.fiber_rate) : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [savedOk, setSavedOk] = useState(false);
@@ -1946,6 +1953,25 @@ function BatchTicketForm({ o, onEdited }) {
       onEdited && onEdited(updated);
       setSavedOk(true);
     } catch (e) { setErr(e.message || "Could not save price"); }
+    finally { setBusy(false); }
+  };
+
+  // Set the fiber lbs/yd and $/lb on this order (blank/0 clears each). Re-pulls
+  // pricing so the fiber line and totals reflect the new dosage × rate.
+  const saveFiber = async () => {
+    const lt = fiberLbs.trim(), rt = fiberRate.trim();
+    const lbs = lt === "" ? null : Number(lt);
+    const rate = rt === "" ? null : Number(rt);
+    if (lbs != null && (Number.isNaN(lbs) || lbs < 0)) { setErr("Enter fiber lbs/yd as a number (0 or more)."); return; }
+    if (rate != null && (Number.isNaN(rate) || rate < 0)) { setErr("Enter fiber $/lb as a number (0 or more)."); return; }
+    setBusy(true); setErr(""); setSavedOk(false);
+    try {
+      const updated = await setOrderFiber(o.ref, lbs, rate);
+      const p = await getOrderPricing(o.ref);
+      setPx((prev) => ({ ...p, delivery: (prev && prev.delivery) ? prev.delivery : p.delivery }));
+      onEdited && onEdited(updated);
+      setSavedOk(true);
+    } catch (e) { setErr(e.message || "Could not save fiber"); }
     finally { setBusy(false); }
   };
 
@@ -2015,6 +2041,25 @@ function BatchTicketForm({ o, onEdited }) {
         )}
       </div>
       <div className="text-white/35 text-[11px] mt-1">Overrides the price-sheet $/yd for this order only (blank = sheet price). Applies to completed orders too.</div>
+
+      {/* Mac Matrix Fiber — lbs/yd dosage and $/lb rate, both set per order */}
+      <div className="mt-3 flex items-end gap-2 flex-wrap">
+        <label className="flex flex-col gap-1">
+          <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Fiber lbs/yd</span>
+          <input value={fiberLbs} onChange={(e) => { setFiberLbs(e.target.value); setSavedOk(false); }} placeholder="e.g. 4.5" inputMode="decimal" className="rounded-lg px-2 py-1.5 text-sm outline-none w-24" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-white/40 text-[10px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Fiber $/lb</span>
+          <input value={fiberRate} onChange={(e) => { setFiberRate(e.target.value); setSavedOk(false); }} placeholder={cp && cp.admixtures ? "sheet rate" : "e.g. 3.00"} inputMode="decimal" className="rounded-lg px-2 py-1.5 text-sm outline-none w-24" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+        </label>
+        <button onClick={saveFiber} disabled={busy} className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: NAVY_DEEP, background: ORANGE, fontFamily: C.body }}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Apply fiber
+        </button>
+        {(fiberLbs.trim() !== "" || fiberRate.trim() !== "") && (
+          <button onClick={() => { setFiberLbs(""); setFiberRate(""); setTimeout(saveFiber, 0); }} disabled={busy} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>Clear</button>
+        )}
+      </div>
+      <div className="text-white/35 text-[11px] mt-1">Fiber bill = lbs/yd × $/lb × yards. Liberty is 4.5 lbs/yd at $3.00/lb. Leave $/lb blank to use the Price-sheet rate; leave lbs/yd blank for no fiber.</div>
 
       {groupHead("Delivery cost — haul (internal)")}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
