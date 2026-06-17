@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun17-v73";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun17-v74";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -120,6 +120,15 @@ const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
+// Customers locked to a single mix — they never order anything else, so the mix
+// field defaults to (and locks on) it. Matched as a substring of the customer
+// name, case-insensitive. The backend enforces this too. Keep in sync there.
+const FORCED_MIX = { landers: "Precast" };
+function forcedMixFor(name) {
+  const n = (name || "").toLowerCase();
+  for (const key of Object.keys(FORCED_MIX)) if (n.includes(key)) return FORCED_MIX[key];
+  return "";
+}
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
 const ADMIXTURES = ["Set Control", "Accelerant", "Mac Matrix Fiber", "Color"];
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
@@ -524,7 +533,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       <div className="text-center text-white/35 text-xs mt-1.5" style={{ fontFamily: C.body }}>Dispatch · {DISPATCH_PHONE}</div>
 
       {showEdit && <EditOrderModal order={order} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); onChanged && onChanged(); onBack(); }} />}
-      {showReorder && <OrderConcreteModal initial={order} onClose={() => setShowReorder(false)} onPlaced={() => { setShowReorder(false); onChanged && onChanged(); onBack(); }} />}
+      {showReorder && <OrderConcreteModal initial={order} onClose={() => setShowReorder(false)} onPlaced={() => { setShowReorder(false); onChanged && onChanged(); onBack(); }} companyName={order.customer} />}
     </div>
   );
 }
@@ -608,9 +617,13 @@ function parseSpec(o = {}) {
   return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, colorDetail, project: o.project || "" };
 }
 
-function useConcreteSpec(initial) {
+function useConcreteSpec(initial, customerName) {
   const p = parseSpec(initial);
-  const [mix, setMix] = useState(p.mix);
+  const forcedMix = forcedMixFor(customerName);   // e.g. Landers → always "Precast"
+  const [mix, setMix] = useState(forcedMix || p.mix);
+  // When the order is for a single-mix customer, snap the mix to theirs and keep
+  // it there even if the customer is picked/changed after the form opened.
+  useEffect(() => { if (forcedMix && mix !== forcedMix) setMix(forcedMix); }, [forcedMix]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [useFor, setUseFor] = useState(p.useFor);
   const [useOther, setUseOther] = useState(p.useOther);
   const [qty, setQty] = useState(p.qty);
@@ -651,7 +664,10 @@ function useConcreteSpec(initial) {
       <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="Project or job name / reference" className={inCls + " mb-3"} style={inSt} />
 
       <label className={lbl}>Mix</label>
-      <select value={mix} onChange={(e) => setMix(e.target.value)} className={inCls + " mb-3"} style={inSt}>
+      <select value={mix} onChange={(e) => setMix(e.target.value)} disabled={!!forcedMix} className={inCls + (forcedMix ? " mb-1 opacity-70" : " mb-3")} style={inSt}>
+        {forcedMix ? (
+          <option value={forcedMix}>{forcedMix}</option>
+        ) : (<>
         <optgroup label="Strength (PSI)">
           {MIXES.map((m) => <option key={m} value={m}>{m === RECOMMENDED_MIX ? `${m} (recommended)` : m}</option>)}
         </optgroup>
@@ -661,7 +677,9 @@ function useConcreteSpec(initial) {
         <optgroup label="Specialty">
           {PRECAST_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
         </optgroup>
+        </>)}
       </select>
+      {forcedMix && <div className="text-white/35 text-[11px] mb-3">This customer only uses {forcedMix} — mix is set automatically.</div>}
 
       <label className={lbl}>What's it for?</label>
       <select value={useFor} onChange={(e) => setUseFor(e.target.value)} className={inCls + (useFor === "Other" ? "" : " mb-3")} style={inSt}>
@@ -733,8 +751,8 @@ function useConcreteSpec(initial) {
 
 // Customer-facing: place a concrete order from the app. Lands as "requested" for
 // staff to confirm.
-function OrderConcreteModal({ onClose, onPlaced, initial }) {
-  const spec = useConcreteSpec(initial);
+function OrderConcreteModal({ onClose, onPlaced, initial, companyName }) {
+  const spec = useConcreteSpec(initial, companyName);   // single-mix customers (Landers) lock the mix
   // Date is always left for the customer to choose; everything else can be
   // pre-filled from a past order ("Order again"). The estimator passes only
   // { qty } as `initial`, so site/time/notes just stay empty there.
@@ -811,7 +829,7 @@ function OrderConcreteModal({ onClose, onPlaced, initial }) {
 // Modify an existing order (customer or staff), reusing the shared spec fields
 // pre-filled from the order. Saves via PATCH.
 function EditOrderModal({ order, onClose, onSaved }) {
-  const spec = useConcreteSpec(order);
+  const spec = useConcreteSpec(order, order.customer);
   const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(order.when || "") ? order.when : "");
   const [time, setTime] = useState(/^\d{2}:\d{2}/.test(order.time || "") ? order.time : "");
   const [site, setSite] = useState(order.site || "");
@@ -870,7 +888,7 @@ const CALC_SHAPES = [
 ];
 
 // Customer concrete estimator — enter dimensions, get cubic yards, then order it.
-function CalculatorScreen({ onPlaced }) {
+function CalculatorScreen({ onPlaced, companyName }) {
   const [shapeKey, setShapeKey] = useState("Slab");
   const [vals, setVals] = useState({});
   const [waste, setWaste] = useState(true);
@@ -942,7 +960,7 @@ function CalculatorScreen({ onPlaced }) {
       </button>
       <div className="text-white/35 text-[11px] mt-2 text-center" style={{ fontFamily: C.body }}>Estimate only — confirm coverage with your crew.</div>
 
-      {showOrder && <OrderConcreteModal initial={{ qty: `${orderCy} CY` }} onClose={() => setShowOrder(false)} onPlaced={() => { setShowOrder(false); onPlaced && onPlaced(); }} />}
+      {showOrder && <OrderConcreteModal initial={{ qty: `${orderCy} CY` }} onClose={() => setShowOrder(false)} onPlaced={() => { setShowOrder(false); onPlaced && onPlaced(); }} companyName={companyName} />}
     </div>
   );
 }
@@ -1050,8 +1068,8 @@ function OrdersScreen({ orders, account, onOpen, onPlaced, canFinance = true, co
       {completed.length > 0 && <div className={hdr + " mt-5"}>Past orders · tap “Again” to reorder</div>}
       {completed.map((o) => <PastOrderRow key={o.ref} o={o} onOpen={onOpen} onReorder={setReorder} />)}
 
-      {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} />}
-      {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} />}
+      {showOrder && <OrderConcreteModal onClose={() => setShowOrder(false)} onPlaced={onPlaced} companyName={account?.company || companyName} />}
+      {reorder && <OrderConcreteModal initial={reorder} onClose={() => setReorder(null)} onPlaced={() => { setReorder(null); onPlaced && onPlaced(); }} companyName={account?.company || companyName} />}
 
       {showNotifs && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setShowNotifs(false)}>
@@ -4346,7 +4364,6 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
   // `initial` (from "Order again") pre-fills spec/site/notes/time and the
   // customer (matched by name once the roster loads). Date is always re-picked.
   const canFinance = useContext(FinanceContext);   // workers don't see the COD payment box
-  const spec = useConcreteSpec(initial);
   const [customers, setCustomers] = useState([]);
   const [custFilter, setCustFilter] = useState("");
   const [customerId, setCustomerId] = useState(null);
@@ -4368,6 +4385,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
   }, []);
 
   const selCust = customers.find((c) => c.id === customerId);
+  const spec = useConcreteSpec(initial, selCust?.name);   // single-mix customers (Landers) lock the mix
   const f = custFilter.trim().toLowerCase();
   const shown = f ? customers.filter((c) => c.name.toLowerCase().includes(f)).slice(0, 25) : [];
   const canSubmit = customerId && site.trim() && spec.valid && date >= localToday() && !busy;
@@ -5708,7 +5726,7 @@ export default function App() {
         <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {screen === "track" && active ? <TrackScreen order={active} onBack={() => setScreen("home")} onChanged={reloadOrders} canFinance={!isWorker} />
             : screen === "docs" ? <KnowledgeScreen />
-            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} />
+            : screen === "calc" ? <CalculatorScreen onPlaced={reloadOrders} companyName={me.company} />
             : screen === "account" && !isWorker ? <AccountScreen account={account} customerId={me.customer_id} />
             : <OrdersScreen orders={orders} account={account} onOpen={open} onPlaced={reloadOrders} canFinance={!isWorker} companyName={me.company} />}
         </div>
