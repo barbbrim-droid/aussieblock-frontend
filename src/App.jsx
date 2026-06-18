@@ -3544,7 +3544,7 @@ function SiloCard({ m, onSaved }) {
   const saveTons = async () => {
     setBusy(true);
     try {
-      await updateMaterial(m.id, { opening_tons: Number(tons) || 0, counted_on: localToday() });
+      await updateMaterial(m.id, { on_hand_tons: Number(tons) || 0, counted_on: localToday() });
       setTonsMode(false); onSaved && onSaved();
     } catch (e) { alert(e.message); } finally { setBusy(false); }
   };
