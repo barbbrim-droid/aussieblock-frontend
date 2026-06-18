@@ -511,14 +511,14 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
           // Legacy order: a pour with no loads but an order-level ticket (uploaded
           // before load-tracking). Show the order-level ticket so it stays reachable.
           <button onClick={() => openBatchTicket(order.ref).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
-        ) : isLive ? (
+        ) : (
           <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Loads will appear here as each truck is delivered.</div>
-        ) : null
+        )
       ) : order.has_batch_ticket ? (
         <button onClick={() => openBatchTicket(order.ref).catch((e) => alert(e.message))} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><FileText size={18} /> Batch ticket (PDF)</button>
-      ) : isLive ? (
+      ) : (
         <div className="text-center text-white/35 text-xs py-2 mt-3" style={{ fontFamily: C.body }}>Batch ticket will appear here once it's uploaded.</div>
-      ) : null}
+      )}
 
       {live.has_signature && (
         <button onClick={() => setShowSignedTicket(true)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold active:scale-95 transition-transform" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55`, color: GREEN, fontFamily: C.body }}><CheckCircle2 size={18} /> Signed delivery ticket</button>
