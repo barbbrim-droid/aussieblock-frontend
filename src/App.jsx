@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun17-v75";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun18-v76";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3670,19 +3670,24 @@ function ReceiptPhotos({ receipt, onChanged }) {
     finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   };
   const remove = async (name) => {
-    if (!window.confirm("Remove this photo?")) return;
+    if (!window.confirm("Remove this attachment?")) return;
     setBusy(true);
     try { await deleteReceiptPhoto(receipt.id, name); if (onChanged) await onChanged(); }
     catch (err) { alert(err.message); } finally { setBusy(false); }
   };
+  const isPdf = (name) => /\.pdf$/i.test(name);
   return (
     <div className="flex flex-wrap items-center gap-2 py-2">
       {names.map((name) => (
         <div key={name} className="relative">
-          {urls[name] ? (
-            <img src={urls[name]} alt="delivery" onClick={() => window.open(urls[name], "_blank")} className="h-16 w-16 object-cover rounded-lg cursor-pointer" style={{ border: "1px solid rgba(255,255,255,0.15)" }} />
-          ) : (
+          {!urls[name] ? (
             <div className="h-16 w-16 rounded-lg flex items-center justify-center" style={{ background: NAVY }}><Loader2 size={14} className="animate-spin text-white/40" /></div>
+          ) : isPdf(name) ? (
+            <button onClick={() => window.open(urls[name], "_blank")} title="Open PDF" className="h-16 w-16 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>
+              <FileText size={20} color={ORANGE} /><span className="text-[9px] font-semibold text-white/70">PDF</span>
+            </button>
+          ) : (
+            <img src={urls[name]} alt="delivery" onClick={() => window.open(urls[name], "_blank")} className="h-16 w-16 object-cover rounded-lg cursor-pointer" style={{ border: "1px solid rgba(255,255,255,0.15)" }} />
           )}
           <button onClick={() => remove(name)} title="Remove" className="absolute -top-1.5 -right-1.5 rounded-full p-0.5 active:scale-90" style={{ background: "#ff5a52" }}><X size={11} color="#fff" /></button>
         </div>
@@ -3690,7 +3695,7 @@ function ReceiptPhotos({ receipt, onChanged }) {
       <button onClick={() => fileRef.current?.click()} disabled={busy} className="h-16 w-16 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px dashed rgba(255,255,255,0.25)" }}>
         {busy ? <Loader2 size={15} className="animate-spin text-white/50" /> : <><Camera size={16} color={ORANGE} /><span className="text-[9px] text-white/50">Add</span></>}
       </button>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={add} className="hidden" />
+      <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" multiple onChange={add} className="hidden" />
     </div>
   );
 }
@@ -3735,7 +3740,7 @@ function MaterialsModal({ onClose }) {
       }
       setForm({ ...blank, material_id: form.material_id, received_on: form.received_on });
       setFormPhotos([]);
-      setMsg({ ok: true, text: `Delivery logged${formPhotos.length ? ` with ${formPhotos.length} photo${formPhotos.length > 1 ? "s" : ""}` : ""}.` });
+      setMsg({ ok: true, text: `Delivery logged${formPhotos.length ? ` with ${formPhotos.length} file${formPhotos.length > 1 ? "s" : ""}` : ""}.` });
       await load();
     } catch (e) { setMsg({ ok: false, text: e.message }); }
     finally { setBusy(false); }
@@ -3795,8 +3800,8 @@ function MaterialsModal({ onClose }) {
                   <input type="number" placeholder="$/ton (optional)" value={form.unit_cost} onChange={(e) => setForm({ ...form, unit_cost: e.target.value })} className={inCls} style={inSt} />
                   <label className="sm:col-span-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm cursor-pointer active:scale-[0.99]" style={{ ...inSt, borderStyle: "dashed" }}>
                     <Camera size={15} color={ORANGE} />
-                    <span className="text-white/55">{formPhotos.length ? `${formPhotos.length} photo${formPhotos.length > 1 ? "s" : ""} attached` : "Attach delivery-ticket photo(s) — optional"}</span>
-                    <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(e) => setFormPhotos(Array.from(e.target.files || []))} />
+                    <span className="text-white/55">{formPhotos.length ? `${formPhotos.length} file${formPhotos.length > 1 ? "s" : ""} attached` : "Attach delivery ticket — photo or PDF (optional)"}</span>
+                    <input type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" onChange={(e) => setFormPhotos(Array.from(e.target.files || []))} />
                   </label>
                   <button onClick={logDelivery} disabled={busy} className="sm:col-span-3 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Log delivery</button>
                 </div>
@@ -3827,7 +3832,7 @@ function MaterialsModal({ onClose }) {
                               <button onClick={() => toggleMatched(r)} title="Reconciled against the supplier invoice" className="inline-flex items-center justify-center w-5 h-5 rounded active:scale-90" style={{ background: r.invoice_matched ? GREEN : "transparent", border: `1px solid ${r.invoice_matched ? GREEN : "rgba(255,255,255,0.25)"}` }}>{r.invoice_matched && <Check size={13} color={NAVY_DEEP} />}</button>
                             </td>
                             <td className="py-1.5 text-right whitespace-nowrap">
-                              <button onClick={() => setOpenPhotos(openPhotos === r.id ? null : r.id)} title="Delivery photos" className="p-1 rounded active:scale-90 inline-flex items-center gap-0.5 align-middle">
+                              <button onClick={() => setOpenPhotos(openPhotos === r.id ? null : r.id)} title="Delivery ticket photos / PDFs" className="p-1 rounded active:scale-90 inline-flex items-center gap-0.5 align-middle">
                                 <Camera size={14} color={(r.photos || []).length ? ORANGE : "rgba(255,255,255,0.4)"} />
                                 {(r.photos || []).length > 0 && <span className="text-[10px] font-semibold" style={{ color: ORANGE }}>{r.photos.length}</span>}
                               </button>
