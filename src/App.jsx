@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, getMixDesigns, saveMixDesigns, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3521,19 +3521,31 @@ const money = (n) => (n == null ? "" : `$${Number(n).toLocaleString(undefined, {
 const amt = (n, unit) => (n == null ? "—" : (unit === "ton" ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString());
 
 function SiloCard({ m, onSaved }) {
-  const [edit, setEdit] = useState(false);
+  const [edit, setEdit] = useState(false);       // capacity / reorder / cost setup
+  const [tonsMode, setTonsMode] = useState(false); // manual "set current tons" override
   const [f, setF] = useState({});
+  const [tons, setTons] = useState("");
   const [busy, setBusy] = useState(false);
-  const open = () => { setF({ capacity_tons: m.capacity_tons || "", reorder_tons: m.reorder_tons || "", opening_tons: m.opening_tons || "", counted_on: m.counted_on || localToday(), cost_rate: m.cost_rate || "" }); setEdit(true); };
-  const save = async () => {
+  const openSetup = () => { setF({ capacity_tons: m.capacity_tons || "", reorder_tons: m.reorder_tons || "", cost_rate: m.cost_rate || "" }); setEdit(true); setTonsMode(false); };
+  const openTons = () => { setTons(m.on_hand_tons != null ? String(Math.round(m.on_hand_tons * 10) / 10) : ""); setTonsMode(true); setEdit(false); };
+  const saveSetup = async () => {
     setBusy(true);
     try {
       await updateMaterial(m.id, {
         capacity_tons: Number(f.capacity_tons) || 0, reorder_tons: Number(f.reorder_tons) || 0,
-        opening_tons: Number(f.opening_tons) || 0, counted_on: f.counted_on || null,
         cost_rate: Number(f.cost_rate) || 0,
       });
       setEdit(false); onSaved && onSaved();
+    } catch (e) { alert(e.message); } finally { setBusy(false); }
+  };
+  // Manual override: pin the silo to the counted tons as of today. The backend treats
+  // this as the new baseline (opening + counted_on), so batch-ticket draw-down resumes
+  // from this number going forward.
+  const saveTons = async () => {
+    setBusy(true);
+    try {
+      await updateMaterial(m.id, { opening_tons: Number(tons) || 0, counted_on: localToday() });
+      setTonsMode(false); onSaved && onSaved();
     } catch (e) { alert(e.message); } finally { setBusy(false); }
   };
   const pct = m.pct != null ? m.pct : (m.capacity_tons ? Math.max(0, Math.min(1, m.on_hand_tons / m.capacity_tons)) : null);
@@ -3555,22 +3567,31 @@ function SiloCard({ m, onSaved }) {
       </div>
       <div className="flex items-center justify-between text-[11px] text-white/50" style={{ fontFamily: C.body }}>
         <span>+{t1(m.received_tons)} received · −{t1(m.used_amount)} used{m.cost > 0 ? ` · ${money(m.cost)}` : ""}</span>
-        <button onClick={edit ? () => setEdit(false) : open} className="font-semibold" style={{ color: ORANGE }}>{edit ? "Cancel" : "Set up"}</button>
+        <div className="flex items-center gap-2">
+          <button onClick={tonsMode ? () => setTonsMode(false) : openTons} className="font-semibold" style={{ color: ORANGE }}>{tonsMode ? "Cancel" : "Set tons"}</button>
+          <span className="text-white/20">·</span>
+          <button onClick={edit ? () => setEdit(false) : openSetup} className="font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>{edit ? "Cancel" : "Set up"}</button>
+        </div>
       </div>
       {m.used_amount > 0 && (
         <div className="text-[10px] text-white/35 mt-0.5" style={{ fontFamily: C.body }}>
-          used: {t1(m.used_ticket_amount)} from batch tickets{m.used_estimate_amount > 0 ? ` · ${t1(m.used_estimate_amount)} estimated` : ""}{m.cost_rate > 0 ? ` · @ ${money(m.cost_rate)}/ton` : ""}
+          drawn down {t1(m.used_amount)} ton from batch tickets{m.cost_rate > 0 ? ` · @ ${money(m.cost_rate)}/ton` : ""}
+        </div>
+      )}
+      {tonsMode && (
+        <div className="mt-2.5 pt-2.5 grid grid-cols-1 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide">Tons in silo right now<input type="number" autoFocus value={tons} onChange={(e) => setTons(e.target.value)} className={inCls} style={inSt} /></label>
+          <div className="text-[10px] text-white/35 leading-snug">Sets the silo to this exact amount as of today. Batch-ticket deliveries keep drawing it down from here.</div>
+          <button onClick={saveTons} disabled={busy} className="rounded-lg py-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? "Saving…" : "Set current tons"}</button>
         </div>
       )}
       {edit && (
         <div className="mt-2.5 pt-2.5 grid grid-cols-2 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           <label className="text-[10px] text-white/45 uppercase tracking-wide">Capacity (ton)<input type="number" value={f.capacity_tons} onChange={(e) => setF({ ...f, capacity_tons: e.target.value })} className={inCls} style={inSt} /></label>
           <label className="text-[10px] text-white/45 uppercase tracking-wide">Reorder at (ton)<input type="number" value={f.reorder_tons} onChange={(e) => setF({ ...f, reorder_tons: e.target.value })} className={inCls} style={inSt} /></label>
-          <label className="text-[10px] text-white/45 uppercase tracking-wide">On-hand now (ton)<input type="number" value={f.opening_tons} onChange={(e) => setF({ ...f, opening_tons: e.target.value })} className={inCls} style={inSt} /></label>
-          <label className="text-[10px] text-white/45 uppercase tracking-wide">Counted on<input type="date" value={f.counted_on} onChange={(e) => setF({ ...f, counted_on: e.target.value })} className={inCls} style={inSt} /></label>
-          <label className="text-[10px] text-white/45 uppercase tracking-wide">Cost ($/ton)<input type="number" value={f.cost_rate} onChange={(e) => setF({ ...f, cost_rate: e.target.value })} className={inCls} style={inSt} /></label>
-          <div className="col-span-2 text-[10px] text-white/35 leading-snug">"On-hand now" is what's in the silo today; received &amp; used are counted from "counted on" forward. Cost = actual tons used × $/ton.</div>
-          <button onClick={save} disabled={busy} className="col-span-2 rounded-lg py-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? "Saving…" : "Save silo"}</button>
+          <label className="text-[10px] text-white/45 uppercase tracking-wide col-span-2">Cost ($/ton)<input type="number" value={f.cost_rate} onChange={(e) => setF({ ...f, cost_rate: e.target.value })} className={inCls} style={inSt} /></label>
+          <div className="col-span-2 text-[10px] text-white/35 leading-snug">Capacity sizes the gauge; reorder flags the silo when it runs low. To correct the on-hand amount, use "Set tons". Cost = actual tons used × $/ton.</div>
+          <button onClick={saveSetup} disabled={busy} className="col-span-2 rounded-lg py-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? "Saving…" : "Save silo"}</button>
         </div>
       )}
     </div>
@@ -3677,21 +3698,18 @@ function ReceiptPhotos({ receipt, onChanged }) {
 function MaterialsModal({ onClose }) {
   const [summary, setSummary] = useState({ materials: [], unmapped_mixes: [] });
   const [receipts, setReceipts] = useState([]);
-  const [designs, setDesigns] = useState([]);
-  const [tab, setTab] = useState("log");   // "log" | "mix"
   const [msg, setMsg] = useState(null);
   const today = localToday();
   const blank = { material_id: "", received_on: today, supplier: "", tons: "", ticket_no: "", invoice_no: "", unit_cost: "" };
   const [form, setForm] = useState(blank);
   const [formPhotos, setFormPhotos] = useState([]);   // photos to attach to the delivery being logged
   const [openPhotos, setOpenPhotos] = useState(null);   // receipt id whose photo strip is expanded
-  const [newMix, setNewMix] = useState("");   // "add a mix" input on the Mix design tab
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     try {
-      const [sm, rc, mx] = await Promise.all([getMaterials(), getReceipts(), getMixDesigns()]);
-      setSummary(sm); setReceipts(rc); setDesigns(mx);
+      const [sm, rc] = await Promise.all([getMaterials(), getReceipts()]);
+      setSummary(sm); setReceipts(rc);
       setForm((f) => ({ ...f, material_id: f.material_id || (sm.materials[0]?.id ?? "") }));
     } catch (e) { setMsg({ ok: false, text: e.message }); }
   };
@@ -3732,27 +3750,8 @@ function MaterialsModal({ onClose }) {
     try { await deleteReceipt(r.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); }
   };
 
-  const setDesign = (mix, field, val) => setDesigns((ds) => ds.map((d) => d.mix === mix ? { ...d, [field]: val } : d));
-  const addMixRow = (name) => {
-    const m = (name || "").trim();
-    if (!m || designs.some((d) => d.mix.toLowerCase() === m.toLowerCase())) return;
-    setDesigns((ds) => [...ds, { id: null, mix: m, cement_lb_yd: "", slag_lb_yd: "" }]);
-  };
-  const saveDesigns = async () => {
-    setBusy(true); setMsg(null);
-    try {
-      await saveMixDesigns(designs.map((d) => ({ mix: d.mix, cement_lb_yd: Number(d.cement_lb_yd) || 0, slag_lb_yd: Number(d.slag_lb_yd) || 0 })));
-      setMsg({ ok: true, text: "Mix designs saved." });
-      await load();
-    } catch (e) { setMsg({ ok: false, text: e.message }); }
-    finally { setBusy(false); }
-  };
-
   const inCls = "w-full rounded-lg px-2.5 py-2 text-sm text-white outline-none placeholder:text-white/30";
   const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
-  const tabBtn = (k, label) => (
-    <button onClick={() => setTab(k)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: tab === k ? ORANGE : NAVY, color: tab === k ? NAVY_DEEP : "rgba(255,255,255,0.6)", border: tab === k ? "none" : "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>{label}</button>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
@@ -3778,23 +3777,9 @@ function MaterialsModal({ onClose }) {
               </div>
             </div>
           )}
-          {summary.unmapped_mixes.length > 0 && (
-            <div className="rounded-lg px-3 py-2.5 mb-4 text-xs" style={{ background: "#ffb02418", border: "1px solid #ffb02455", color: "#ffcf7a" }}>
-              <div className="mb-1.5"><b>No batch-ticket weights</b> for these completed orders — they aren't drawing down the silos. Upload each order's batch ticket (on the order) to count it:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {summary.unmapped_mixes.map((u) => (
-                  <span key={u.mix} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold" style={{ background: "#ffb02422", border: "1px solid #ffb02466", color: "#ffcf7a" }}>
-                    {u.mix} <span className="opacity-60">({u.yards} yd)</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-3" style={{ fontFamily: C.body }}>Receiving log</div>
 
-          <div className="flex items-center gap-2 mb-3">{tabBtn("log", "Receiving log")}{tabBtn("mix", "Mix design")}</div>
-
-          {tab === "log" && (
-            <>
+          <>
               {/* log a delivery */}
               <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
                 <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Log an incoming delivery</div>
@@ -3860,34 +3845,7 @@ function MaterialsModal({ onClose }) {
                   </table>
                 </div>
               )}
-            </>
-          )}
-
-          {tab === "mix" && (
-            <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div className="text-white text-sm font-semibold mb-1" style={{ fontFamily: C.cond }}>Cement &amp; slag per cubic yard</div>
-              <div className="text-white/40 text-[11px] mb-2.5">Used to draw the silos down as orders complete (lb/yd × yards ÷ 2000 = tons). Set your real plant numbers — the seeded values are ballpark.</div>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: "1fr auto auto" }}>
-                <div className="text-[10px] text-white/45 uppercase tracking-wide">Mix</div>
-                <div className="text-[10px] text-white/45 uppercase tracking-wide text-right w-24">Cement lb/yd</div>
-                <div className="text-[10px] text-white/45 uppercase tracking-wide text-right w-24">Slag lb/yd</div>
-                {designs.map((d) => (
-                  <Fragment key={d.mix}>
-                    <div className="text-white text-sm self-center" style={{ fontFamily: C.cond }}>{d.mix}</div>
-                    <input type="number" value={d.cement_lb_yd} onChange={(e) => setDesign(d.mix, "cement_lb_yd", e.target.value)} className="rounded-lg px-2 py-1.5 text-sm text-white text-right outline-none w-24" style={inSt} />
-                    <input type="number" value={d.slag_lb_yd} onChange={(e) => setDesign(d.mix, "slag_lb_yd", e.target.value)} className="rounded-lg px-2 py-1.5 text-sm text-white text-right outline-none w-24" style={inSt} />
-                  </Fragment>
-                ))}
-              </div>
-              <div className="mt-3 pt-3 flex items-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                <label className="flex-1 text-[10px] text-white/45 uppercase tracking-wide">Add a mix (e.g. TxDOT Class A)
-                  <input value={newMix} onChange={(e) => setNewMix(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addMixRow(newMix); setNewMix(""); } }} placeholder="Mix name" className="w-full rounded-lg px-2.5 py-2 text-sm text-white outline-none placeholder:text-white/30 mt-0.5" style={inSt} />
-                </label>
-                <button onClick={() => { addMixRow(newMix); setNewMix(""); }} disabled={!newMix.trim()} className="rounded-lg px-3 py-2 flex items-center gap-1 text-sm font-semibold active:scale-95 disabled:opacity-40" style={{ background: NAVY_DEEP, border: `1px solid ${ORANGE}`, color: ORANGE }}><Plus size={14} /> Add</button>
-              </div>
-              <button onClick={saveDesigns} disabled={busy} className="w-full mt-3 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save mix designs</button>
-            </div>
-          )}
+          </>
 
           {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
         </div>
