@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun17-v74";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun17-v75";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3780,12 +3780,12 @@ function MaterialsModal({ onClose }) {
           )}
           {summary.unmapped_mixes.length > 0 && (
             <div className="rounded-lg px-3 py-2.5 mb-4 text-xs" style={{ background: "#ffb02418", border: "1px solid #ffb02455", color: "#ffcf7a" }}>
-              <div className="mb-1.5"><b>No mix design set</b> for these — they aren't drawing down the silos. Tap to add one, then enter its lb/yd:</div>
+              <div className="mb-1.5"><b>No batch-ticket weights</b> for these completed orders — they aren't drawing down the silos. Upload each order's batch ticket (on the order) to count it:</div>
               <div className="flex flex-wrap gap-1.5">
                 {summary.unmapped_mixes.map((u) => (
-                  <button key={u.mix} onClick={() => { addMixRow(u.mix); setTab("mix"); }} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold active:scale-95" style={{ background: "#ffb02422", border: "1px solid #ffb02466", color: "#ffcf7a" }}>
-                    <Plus size={12} /> {u.mix} <span className="opacity-60">({u.yards} yd)</span>
-                  </button>
+                  <span key={u.mix} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold" style={{ background: "#ffb02422", border: "1px solid #ffb02466", color: "#ffcf7a" }}>
+                    {u.mix} <span className="opacity-60">({u.yards} yd)</span>
+                  </span>
                 ))}
               </div>
             </div>
