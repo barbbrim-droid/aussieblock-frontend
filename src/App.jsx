@@ -3950,7 +3950,8 @@ function CostsModal({ orders, onClose }) {
   useEffect(() => {
     let live = true;
     (async () => {
-      const entries = await Promise.all((orders || []).map(async (o) => {
+      const list = orders || [];
+      const priceOne = async (o) => {
         try {
           const p = await getOrderPricing(o.ref);
           const cp = p && p.customer, dl = p && p.delivery;
@@ -3975,8 +3976,18 @@ function CostsModal({ orders, onClose }) {
         } catch {
           return [o.ref, { billed: null, toHauler: null, yards: o.qty, error: true }];
         }
-      }));
-      if (live) { setPx(Object.fromEntries(entries)); setLoading(false); }
+      };
+      // Fetch in small concurrent batches rather than firing every order at once:
+      // the pricing endpoint can be slow (road-miles lookup), and flooding it with
+      // hundreds of simultaneous requests was leaving the screen stuck loading.
+      const BATCH = 6;
+      const entries = [];
+      for (let i = 0; i < list.length && live; i += BATCH) {
+        const chunk = await Promise.all(list.slice(i, i + BATCH).map(priceOne));
+        entries.push(...chunk);
+        if (live) setPx(Object.fromEntries(entries));   // fill rows in as they arrive
+      }
+      if (live) setLoading(false);
     })();
     return () => { live = false; };
   }, [orders]);

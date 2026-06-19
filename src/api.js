@@ -27,12 +27,29 @@ export function logout() {
 }
 
 // Core fetch wrapper: attaches the bearer token, parses JSON, throws on errors.
+// Pass options.timeoutMs to abort a request that never responds — without it a
+// hung backend would leave the fetch promise pending forever (e.g. a Promise.all
+// of order-pricing calls that never resolves, leaving a spinner stuck on screen).
 async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) }
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  const { timeoutMs, ...fetchOpts } = options
+  let res
+  if (timeoutMs) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    try {
+      res = await fetch(`${API_BASE}${path}`, { ...fetchOpts, headers, signal: ctrl.signal })
+    } catch (e) {
+      throw new Error(e.name === 'AbortError' ? 'Request timed out' : (e.message || 'Network error'))
+    } finally {
+      clearTimeout(timer)
+    }
+  } else {
+    res = await fetch(`${API_BASE}${path}`, { ...fetchOpts, headers })
+  }
 
   if (res.status === 401) {
     // Token missing/expired — clear it so the app can show the login screen.
@@ -454,7 +471,10 @@ export function removeLoad(ref, seq) {
 }
 // Per-order pricing: what we bill the customer + the delivery (haul) cost.
 export function getOrderPricing(ref) {
-  return request(`/orders/${ref}/pricing`)
+  // The pricing endpoint may do a (slow) road-miles lookup on first call, so give
+  // it a generous timeout — but cap it so one stuck request can't hang the Costs
+  // screen forever (the modal fetches pricing for every completed order at once).
+  return request(`/orders/${encodeURIComponent(ref)}/pricing`, { timeoutMs: 25000 })
 }
 export function setOrderDelivery(ref, { hauler, mileage }) {
   return request(`/orders/${ref}/delivery`, {
