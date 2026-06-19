@@ -169,8 +169,14 @@ export function deleteDoc(id) {
 // reorder flag) + any completed-order mixes that have no design yet. The receipts
 // functions are the receiving log (reconcile against supplier invoices). The
 // mix-design functions set the cement/slag lb-per-yard that drive silo draw-down.
-export function getMaterials() {
-  return request('/materials')
+// Optional { from, to } (yyyy-mm-dd) narrow the usage/cost figures to orders
+// completed in that window; silo on-hand levels stay the live balance regardless.
+export function getMaterials({ from, to } = {}) {
+  const p = new URLSearchParams()
+  if (from) p.set('from', from)
+  if (to) p.set('to', to)
+  const q = p.toString()
+  return request(`/materials${q ? `?${q}` : ''}`)
 }
 export function updateMaterial(materialId, settings) {
   return request(`/materials/${materialId}`, {

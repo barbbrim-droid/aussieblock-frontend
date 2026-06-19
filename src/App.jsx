@@ -3710,19 +3710,29 @@ function MaterialsModal({ onClose }) {
   const [formPhotos, setFormPhotos] = useState([]);   // photos to attach to the delivery being logged
   const [openPhotos, setOpenPhotos] = useState(null);   // receipt id whose photo strip is expanded
   const [busy, setBusy] = useState(false);
+  // Usage filters: a completed-date window (day or range) + a single-material focus.
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [matFilter, setMatFilter] = useState("all");
 
   const load = async () => {
     try {
-      const [sm, rc] = await Promise.all([getMaterials(), getReceipts()]);
+      const [sm, rc] = await Promise.all([getMaterials({ from, to }), getReceipts()]);
       setSummary(sm); setReceipts(rc);
       setForm((f) => ({ ...f, material_id: f.material_id || (sm.materials[0]?.id ?? "") }));
     } catch (e) { setMsg({ ok: false, text: e.message }); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [from, to]);   // refetch usage when the date window changes
 
   const matName = (id) => summary.materials.find((m) => m.id === id)?.name || "";
-  const silos = summary.materials.filter((m) => m.track_inventory);
-  const usage = summary.materials.filter((m) => !m.track_inventory);
+  const allSilos = summary.materials.filter((m) => m.track_inventory);
+  const dateActive = !!(from || to);
+  const matSel = (list) => (matFilter === "all" ? list : list.filter((m) => m.id === Number(matFilter)));
+  const silos = matSel(allSilos);
+  const usage = matSel(summary.materials.filter((m) => !m.track_inventory));
+  const windowLabel = dateActive
+    ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}`
+    : "";
 
   const logDelivery = async () => {
     if (!form.material_id) { setMsg({ ok: false, text: "Pick a material." }); return; }
@@ -3766,15 +3776,33 @@ function MaterialsModal({ onClose }) {
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
-          {/* cement & slag silos */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {silos.map((m) => <SiloCard key={m.id} m={m} onSaved={load} />)}
+          {/* usage filters: material + completed-date window */}
+          <div className="rounded-xl p-3 mb-4 flex flex-wrap items-center gap-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+            <span className="text-white/45 text-[11px] uppercase tracking-wide shrink-0" style={{ fontFamily: C.body }}>Show usage for</span>
+            <select value={matFilter} onChange={(e) => setMatFilter(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs text-white outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+              <option value="all">All materials</option>
+              {summary.materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <CalendarDays size={14} className="shrink-0" style={{ color: ORANGE }} />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            <span className="text-white/40 text-xs shrink-0" style={{ fontFamily: C.body }}>to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            {(dateActive || matFilter !== "all") && <button onClick={() => { setFrom(""); setTo(""); setMatFilter("all"); }} className="text-white/45 text-xs px-2 py-1 rounded-lg active:scale-95 shrink-0" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>Clear</button>}
+            <div className="basis-full text-[10px] text-white/35 leading-snug">
+              {dateActive ? `Usage shown is what was batched on orders completed ${windowLabel}. Silo on-hand always reflects the live balance.` : "Usage is all-time (from each material's start date). Pick a day or range to narrow it."}
+            </div>
           </div>
+          {/* cement & slag silos */}
+          {silos.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {silos.map((m) => <SiloCard key={m.id} m={m} onSaved={load} />)}
+            </div>
+          )}
           {/* aggregates & admixtures — actual usage + cost (no silo) */}
           {usage.length > 0 && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-white/55 text-xs font-semibold uppercase tracking-wide" style={{ fontFamily: C.body }}>Aggregates &amp; admixtures · actual used</span>
+                <span className="text-white/55 text-xs font-semibold uppercase tracking-wide" style={{ fontFamily: C.body }}>Aggregates &amp; admixtures · {dateActive ? `used ${windowLabel}` : "actual used"}</span>
                 {summary.total_cost > 0 && <span className="text-xs" style={{ color: GREEN, fontFamily: C.body }}>total material cost {money(summary.total_cost)}</span>}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -3790,7 +3818,7 @@ function MaterialsModal({ onClose }) {
                 <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Log an incoming delivery</div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <select value={form.material_id} onChange={(e) => setForm({ ...form, material_id: Number(e.target.value) })} className={inCls} style={inSt}>
-                    {silos.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {allSilos.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                   <input type="date" value={form.received_on} onChange={(e) => setForm({ ...form, received_on: e.target.value })} className={inCls} style={inSt} />
                   <input type="number" placeholder="Tons" value={form.tons} onChange={(e) => setForm({ ...form, tons: e.target.value })} className={inCls} style={inSt} />
