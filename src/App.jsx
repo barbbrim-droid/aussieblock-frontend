@@ -111,7 +111,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun18-v76";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Jun18-v77";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -1995,7 +1995,7 @@ function BatchTicketForm({ o, onEdited }) {
 
   const money = (v) => (v == null || v === "" ? "—" : `$${Number(v).toFixed(2)}`);
   const cp = px && px.customer, dl = px && px.delivery;
-  const HAULERS = ["LGTZ", "P&L", "RAY"];
+  const HAULERS = ["PL", "RTS"];
 
   const groupHead = (txt) => (
     <div className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1 pb-1" style={{ color: ORANGE, borderBottom: "1px solid rgba(255,255,255,0.08)", fontFamily: C.body }}>{txt}</div>
