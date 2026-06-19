@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, saveDriverNotes, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -5417,7 +5417,7 @@ function DriverApp({ driver, onLogout }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [activeRef, setActiveRef] = useState(null);
-  const [signing, setSigning] = useState(false);
+  const [signSeq, setSignSeq] = useState(null);   // null=closed, "order"=order-level, or a load seq number
   const [showTicket, setShowTicket] = useState(false);
   const [ticketBusy, setTicketBusy] = useState(false);
   const [ticketPages, setTicketPages] = useState(null);   // in-app ticket viewer (PNG page data URLs)
@@ -5438,8 +5438,7 @@ function DriverApp({ driver, onLogout }) {
   // otherwise Rodney sees every truck's ticket instead of just his.
   const myName = (driver || "").trim().toLowerCase();
   const myLoads = (active?.loads || []).filter((l) => (l.driver || "").trim().toLowerCase() === myName);
-  const ticketLoads = myLoads.filter((l) => l.has_batch_ticket);
-  const hasAnyTicket = !!active && (active.has_batch_ticket || ticketLoads.length > 0);
+  const isPour = myLoads.length > 0;   // a continuous pour: sign + show tickets per load
 
   // Load the saved notes into the editor when you open a delivery (only on open, so
   // the 20s background refresh never wipes out what the driver is mid-typing).
@@ -5456,27 +5455,23 @@ function DriverApp({ driver, onLogout }) {
     finally { setNotesBusy(false); }
   };
 
-  const openTicket = async () => {
+  // Open the order's ticket (single delivery) or one load's ticket (pour).
+  const openTicket = async (seq = null) => {
     if (!active) return;
     setTicketBusy(true); setErr("");
     try {
-      let pages = [];
-      if (active.has_batch_ticket) {
-        pages = (await getBatchTicketImages(active.ref)).pages || [];          // single-delivery ticket
-      } else {
-        for (const l of ticketLoads) {                                          // pour: gather each load's ticket
-          try { pages.push(...((await getLoadBatchTicketImages(active.ref, l.seq)).pages || [])); }
-          catch { /* skip a load that fails, still show the rest */ }
-        }
-      }
+      const res = seq != null ? await getLoadBatchTicketImages(active.ref, seq)
+                              : await getBatchTicketImages(active.ref);
+      const pages = res.pages || [];
       if (!pages.length) { setErr("No batch ticket pages to show yet."); return; }
       setTicketPages(pages);
     } catch (e) { setErr(e.message || "Could not open the ticket"); }
     finally { setTicketBusy(false); }
   };
   const submitSignature = async (blob, name, water) => {
-    await signOffOrder(active.ref, blob, name, water);
-    setSigning(false);
+    if (typeof signSeq === "number") await signOffLoad(active.ref, signSeq, blob, name, water);
+    else await signOffOrder(active.ref, blob, name, water);
+    setSignSeq(null);
     await load();
   };
 
@@ -5584,27 +5579,62 @@ function DriverApp({ driver, onLogout }) {
                 </button>
               </div>
 
-              <button onClick={openTicket} disabled={ticketBusy || !hasAnyTicket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
-                {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {hasAnyTicket ? (!active.has_batch_ticket && ticketLoads.length > 1 ? `View batch tickets · ${ticketLoads.length} loads` : "View batch ticket") : "No batch ticket yet"}
-              </button>
-
-              {active.has_signature ? (
-                <>
-                  <div className="rounded-xl py-3 px-4 flex items-center gap-2 mb-2.5" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
-                    <CheckCircle2 size={20} color={GREEN} />
-                    <div>
-                      <div className="text-white font-bold text-sm">Customer signed — {active.signed_by}</div>
-                      <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
-                    </div>
-                  </div>
-                  <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
-                    <FileText size={18} /> View signed delivery ticket
-                  </button>
-                </>
+              {isPour ? (
+                /* continuous pour: a ticket + customer signature for EACH of the driver's loads */
+                <div className="mb-1">
+                  <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: C.body }}>Your load{myLoads.length > 1 ? "s" : ""} — sign each truck</div>
+                  {myLoads.map((l) => {
+                    const sm = STATUS_META[l.status] || { label: l.status, color: "#7c8794" };
+                    return (
+                      <div key={l.seq} className="rounded-xl p-3.5 mb-2.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-white font-bold text-base" style={{ fontFamily: C.cond }}>Load {l.seq}{l.truck && l.truck !== "—" ? ` · ${l.truck}` : ""}</span>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
+                        </div>
+                        <button onClick={() => openTicket(l.seq)} disabled={ticketBusy || !l.has_batch_ticket} className="w-full rounded-lg py-2.5 mb-2 text-sm font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                          {ticketBusy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={16} />} {l.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
+                        </button>
+                        {l.has_signature ? (
+                          <div className="rounded-lg py-2.5 px-3 flex items-center gap-2" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
+                            <CheckCircle2 size={18} color={GREEN} />
+                            <div>
+                              <div className="text-white font-bold text-sm">Signed — {l.signed_by}</div>
+                              <div className="text-white/50 text-xs">{l.signed_at ? new Date(l.signed_at + "Z").toLocaleString() : ""}{l.water_added ? ` · ${l.water_added} gal water` : ""}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                            <ClipboardList size={17} /> Get customer signature
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <button onClick={() => setSigning(true)} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
-                  <ClipboardList size={18} /> Get customer signature
-                </button>
+                <>
+                  <button onClick={() => openTicket()} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                    {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {active.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
+                  </button>
+                  {active.has_signature ? (
+                    <>
+                      <div className="rounded-xl py-3 px-4 flex items-center gap-2 mb-2.5" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
+                        <CheckCircle2 size={20} color={GREEN} />
+                        <div>
+                          <div className="text-white font-bold text-sm">Customer signed — {active.signed_by}</div>
+                          <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                        <FileText size={18} /> View signed delivery ticket
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                      <ClipboardList size={18} /> Get customer signature
+                    </button>
+                  )}
+                </>
               )}
 
               {/* always-available help line */}
@@ -5615,7 +5645,7 @@ function DriverApp({ driver, onLogout }) {
           )}
         </div>
       </div>
-      {signing && active && <SignaturePad orderRef={active.ref} onCancel={() => setSigning(false)} onSubmit={submitSignature} />}
+      {signSeq != null && active && <SignaturePad orderRef={typeof signSeq === "number" ? `${active.ref} · Load ${signSeq}` : active.ref} onCancel={() => setSignSeq(null)} onSubmit={submitSignature} />}
       {showTicket && active && <DeliveryTicketModal order={active} onClose={() => setShowTicket(false)} />}
       {ticketPages && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: NAVY_DEEP }}>

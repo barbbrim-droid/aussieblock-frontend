@@ -434,6 +434,20 @@ export async function signOffOrder(ref, blob, signedBy, waterAdded = '') {
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   return res.json()
 }
+// Same, but for ONE load of a continuous pour — each truck is signed for as it's
+// delivered (the driver who drove that load captures the customer's signature).
+export async function signOffLoad(ref, seq, blob, signedBy, waterAdded = '') {
+  const fd = new FormData()
+  fd.append('file', blob, `${ref}-L${seq}-signature.png`)
+  const q = `signed_by=${encodeURIComponent(signedBy)}&water_added=${encodeURIComponent(waterAdded)}`
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/loads/${seq}/signoff?${q}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
 
 // Fetch the captured signature image as a data URL (authed) — for showing it on
 // the in-app signed delivery ticket. Returns null if there's none.
