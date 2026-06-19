@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, saveDriverNotes, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -5421,6 +5421,9 @@ function DriverApp({ driver, onLogout }) {
   const [showTicket, setShowTicket] = useState(false);
   const [ticketBusy, setTicketBusy] = useState(false);
   const [ticketPages, setTicketPages] = useState(null);   // in-app ticket viewer (PNG page data URLs)
+  const [notesDraft, setNotesDraft] = useState("");        // driver's editable on-site notes
+  const [notesBusy, setNotesBusy] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
 
   const load = async () => {
     try { setData(await getDriverOrders()); setErr(""); }
@@ -5430,6 +5433,21 @@ function DriverApp({ driver, onLogout }) {
 
   const orders = data?.orders || [];
   const active = orders.find((o) => o.ref === activeRef) || null;
+
+  // Load the saved notes into the editor when you open a delivery (only on open, so
+  // the 20s background refresh never wipes out what the driver is mid-typing).
+  useEffect(() => {
+    const o = (data?.orders || []).find((x) => x.ref === activeRef);
+    setNotesDraft(o?.driver_notes || ""); setNotesSaved(false);
+  }, [activeRef]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveNotes = async () => {
+    if (!active) return;
+    setNotesBusy(true); setErr("");
+    try { await saveDriverNotes(active.ref, notesDraft); setNotesSaved(true); await load(); }
+    catch (e) { setErr(e.message || "Could not save notes"); }
+    finally { setNotesBusy(false); }
+  };
 
   const openTicket = async () => {
     if (!active) return;
@@ -5490,26 +5508,62 @@ function DriverApp({ driver, onLogout }) {
           ) : (
             <div>
               <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
+
+              {/* payment alert — drivers must know whether to collect before unloading */}
+              {active.prepay_required && (
+                active.prepaid ? (
+                  <div className="rounded-xl py-2.5 px-3.5 mb-3 flex items-center gap-2" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55` }}>
+                    <CheckCircle2 size={18} color={GREEN} />
+                    <span className="text-white font-semibold text-sm">Prepaid{active.prepay_amount ? ` · $${Number(active.prepay_amount).toFixed(2)}` : ""} — OK to deliver</span>
+                  </div>
+                ) : (
+                  <div className="rounded-xl py-2.5 px-3.5 mb-3 flex items-center gap-2" style={{ background: "rgba(239,83,80,0.16)", border: "1px solid rgba(239,83,80,0.6)" }}>
+                    <AlertTriangle size={18} color="#ff8a85" />
+                    <span className="font-semibold text-sm" style={{ color: "#ffb3ae" }}>COLLECT{active.prepay_amount ? ` $${Number(active.prepay_amount).toFixed(2)}` : " payment"} before unloading — call dispatch if unsure.</span>
+                  </div>
+                )
+              )}
+
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="text-white font-bold text-lg" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-white font-bold text-lg leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
+                  {(() => { const sm = STATUS_META[active.status] || { label: active.status, color: "#7c8794" }; return <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>; })()}
+                </div>
                 {/* tappable address → opens turn-by-turn directions */}
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="text-sm mt-1.5 flex items-center gap-1.5 active:opacity-70" style={{ color: "#6aa9ff", fontFamily: C.body }}>
-                  <MapPin size={15} /> <span className="underline">{active.site}</span> <Navigation size={13} />
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
+                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs font-semibold shrink-0"><Navigation size={13} /> Directions</span>
                 </a>
-                <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 mt-3 text-sm">
+                <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3.5 text-sm">
                   {[
                     ["Customer", active.customer], ["Order #", active.ref],
                     ["Mix", active.mix], ["Quantity", active.qty ? `${active.qty} yd` : null],
-                    ["Date", active.when], ["Time", active.time],
-                    ["Slump", active.slump], ["For", active.use_for],
-                    ["Driver", active.driver && active.driver !== "—" ? active.driver : null],
-                    ["Truck", active.truck && active.truck !== "—" ? active.truck : null],
+                    ["Time", active.time], ["Slump", active.slump],
+                    ["For", active.use_for], ["Truck", active.truck && active.truck !== "—" ? active.truck : null],
                   ].filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k}><div className="text-white/35 text-[10px] uppercase tracking-wide">{k}</div><div className="text-white/90">{v}</div></div>
+                    <div key={k}><div className="text-white/35 text-[10px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold">{v}</div></div>
                   ))}
                 </div>
-                {active.admixtures && <div className="mt-2.5 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
-                {active.notes && <div className="mt-2.5 rounded-lg px-3 py-2 text-sm" style={{ background: "#6aa9ff14", color: "#cfe0ff" }}><span className="font-semibold">Delivery notes:</span> {active.notes}</div>}
+                {active.admixtures && <div className="mt-3 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
+                {active.notes && <div className="mt-3 rounded-lg px-3 py-2 text-sm" style={{ background: ORANGE + "14", color: "#ffd9bf" }}><span className="font-semibold uppercase text-[10px] tracking-wide block mb-0.5" style={{ color: ORANGE }}>Dispatch instructions</span>{active.notes}</div>}
+              </div>
+
+              {/* driver's on-site notes — saved to the order, visible to dispatch */}
+              <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white/80 text-sm font-bold flex items-center gap-1.5" style={{ fontFamily: C.cond }}><ClipboardList size={16} color={ORANGE} /> Driver notes</span>
+                  {notesSaved && <span className="text-xs flex items-center gap-1" style={{ color: GREEN }}><Check size={13} /> Saved</span>}
+                </div>
+                <textarea
+                  value={notesDraft}
+                  onChange={(e) => { setNotesDraft(e.target.value); setNotesSaved(false); }}
+                  rows={3}
+                  placeholder="Notes from the site — gate code, where to pour, who received it, any issues…"
+                  className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none resize-none placeholder:text-white/30"
+                  style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.14)", fontFamily: C.body }}
+                />
+                <button onClick={saveNotes} disabled={notesBusy || notesDraft === (active.driver_notes || "")} className="w-full mt-2 rounded-lg py-2.5 text-sm font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP }}>
+                  {notesBusy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save notes
+                </button>
               </div>
 
               <button onClick={openTicket} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
@@ -5534,6 +5588,11 @@ function DriverApp({ driver, onLogout }) {
                   <ClipboardList size={18} /> Get customer signature
                 </button>
               )}
+
+              {/* always-available help line */}
+              <a href={`tel:${DISPATCH_TEL}`} className="w-full rounded-xl py-3 mt-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                <Phone size={17} color={ORANGE} /> Call dispatch · {DISPATCH_PHONE}
+              </a>
             </div>
           )}
         </div>

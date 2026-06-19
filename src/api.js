@@ -406,6 +406,15 @@ export async function importFuel(file) {
 export function getDriverOrders() {
   return request('/driver/orders')
 }
+// Driver's on-site notes for an order (site access, who received it, issues…).
+// Visible to dispatch. Assigned driver or staff may set it; '' clears it.
+export function saveDriverNotes(ref, notes) {
+  return request(`/orders/${encodeURIComponent(ref)}/driver-notes`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notes: notes || null }),
+  })
+}
 // Capture the customer's signature (a PNG Blob) + printed name + water added on
 // site (gal); marks the order Delivered/Complete and stores proof of delivery.
 export async function signOffOrder(ref, blob, signedBy, waterAdded = '') {
