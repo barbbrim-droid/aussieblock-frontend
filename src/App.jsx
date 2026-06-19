@@ -5433,9 +5433,12 @@ function DriverApp({ driver, onLogout }) {
 
   const orders = data?.orders || [];
   const active = orders.find((o) => o.ref === activeRef) || null;
-  // A continuous pour keeps its tickets on the loads, not the order — so look at
-  // both, otherwise pour deliveries (most of Rodney's) show "no batch ticket".
-  const ticketLoads = (active?.loads || []).filter((l) => l.has_batch_ticket);
+  // A continuous pour keeps its tickets on the loads, not the order. Show the
+  // driver ONLY the load(s) they drove (matched by name) — not the whole pour —
+  // otherwise Rodney sees every truck's ticket instead of just his.
+  const myName = (driver || "").trim().toLowerCase();
+  const myLoads = (active?.loads || []).filter((l) => (l.driver || "").trim().toLowerCase() === myName);
+  const ticketLoads = myLoads.filter((l) => l.has_batch_ticket);
   const hasAnyTicket = !!active && (active.has_batch_ticket || ticketLoads.length > 0);
 
   // Load the saved notes into the editor when you open a delivery (only on open, so
