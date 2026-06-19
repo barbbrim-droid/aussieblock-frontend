@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3951,41 +3951,37 @@ function CostsModal({ orders, onClose }) {
     let live = true;
     (async () => {
       const list = orders || [];
-      const priceOne = async (o) => {
-        try {
-          const p = await getOrderPricing(o.ref);
-          const cp = p && p.customer, dl = p && p.delivery;
-          const billed = cp && cp.total != null ? Number(cp.total) : null;
-          // To the hauler = delivery/mileage cost + short-load fee + back-haul fee.
-          const haulMi = dl && dl.total != null ? Number(dl.total) : null;
-          const fees = cp ? (Number(cp.short_load) || 0) + (Number(cp.backhaul) || 0) : 0;
-          const toHauler = (haulMi != null || fees) ? (haulMi || 0) + fees : null;
-          const yards = p && p.billed_qty != null ? p.billed_qty : o.qty;
-          // base (pre-tax) price per yard: the sheet/override unit price, plus the
-          // concrete-only extended (unit × yards) so subtotals blend correctly.
-          const unit = cp && cp.unit_price != null ? Number(cp.unit_price) : null;
-          const ext = cp && cp.extended != null ? Number(cp.extended) : null;
-          // Fiber used — itemized from the admixture lines the backend already
-          // priced (label carries the lbs, e.g. "Fiber (60 lb @ $3.75/lb)"). It's
-          // included in `billed`; we surface it as its own column.
-          const fiber = ((cp && cp.admixtures) || []).find((a) => /fiber/i.test(a && a.label || ""));
-          const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
-          const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
-          const fiberLbs = lbM ? Number(lbM[1]) : 0;
-          return [o.ref, { billed, toHauler, yards, unit, ext, fiberAmt, fiberLbs }];
-        } catch {
-          return [o.ref, { billed: null, toHauler: null, yards: o.qty, error: true }];
-        }
+      // Map one order's backend pricing payload into the row shape this modal uses.
+      const shape = (o, p) => {
+        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, error: true };
+        const cp = p.customer, dl = p.delivery;
+        const billed = cp && cp.total != null ? Number(cp.total) : null;
+        // To the hauler = delivery/mileage cost + short-load fee + back-haul fee.
+        const haulMi = dl && dl.total != null ? Number(dl.total) : null;
+        const fees = cp ? (Number(cp.short_load) || 0) + (Number(cp.backhaul) || 0) : 0;
+        const toHauler = (haulMi != null || fees) ? (haulMi || 0) + fees : null;
+        const yards = p.billed_qty != null ? p.billed_qty : o.qty;
+        // base (pre-tax) price per yard: the sheet/override unit price, plus the
+        // concrete-only extended (unit × yards) so subtotals blend correctly.
+        const unit = cp && cp.unit_price != null ? Number(cp.unit_price) : null;
+        const ext = cp && cp.extended != null ? Number(cp.extended) : null;
+        // Fiber used — itemized from the admixture lines the backend already
+        // priced (label carries the lbs, e.g. "Fiber (60 lb @ $3.75/lb)"). It's
+        // included in `billed`; we surface it as its own column.
+        const fiber = ((cp && cp.admixtures) || []).find((a) => /fiber/i.test(a && a.label || ""));
+        const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
+        const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
+        const fiberLbs = lbM ? Number(lbM[1]) : 0;
+        return { billed, toHauler, yards, unit, ext, fiberAmt, fiberLbs };
       };
-      // Fetch in small concurrent batches rather than firing every order at once:
-      // the pricing endpoint can be slow (road-miles lookup), and flooding it with
-      // hundreds of simultaneous requests was leaving the screen stuck loading.
-      const BATCH = 6;
-      const entries = [];
-      for (let i = 0; i < list.length && live; i += BATCH) {
-        const chunk = await Promise.all(list.slice(i, i + BATCH).map(priceOne));
-        entries.push(...chunk);
-        if (live) setPx(Object.fromEntries(entries));   // fill rows in as they arrive
+      // ONE request prices every order server-side — firing one request per order
+      // used to flood the backend and lock the database, which broke the dispatch
+      // board's poll ("Couldn't load dispatch data") and stuck this screen loading.
+      try {
+        const byRef = await getOrdersPricingBulk(list.map((o) => o.ref));
+        if (live) setPx(Object.fromEntries(list.map((o) => [o.ref, shape(o, byRef[o.ref])])));
+      } catch {
+        if (live) setPx(Object.fromEntries(list.map((o) => [o.ref, { billed: null, toHauler: null, yards: o.qty, error: true }])));
       }
       if (live) setLoading(false);
     })();

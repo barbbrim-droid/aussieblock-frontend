@@ -476,6 +476,17 @@ export function getOrderPricing(ref) {
   // screen forever (the modal fetches pricing for every completed order at once).
   return request(`/orders/${encodeURIComponent(ref)}/pricing`, { timeoutMs: 25000 })
 }
+// Pricing for many completed orders in one request — the Costs screen uses this
+// instead of one request per order (which flooded the server and locked the DB,
+// breaking the dispatch board's poll). Returns { ref: pricingPayload }.
+export function getOrdersPricingBulk(refs) {
+  return request('/orders/pricing-bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refs: refs || null }),
+    timeoutMs: 60000,
+  })
+}
 export function setOrderDelivery(ref, { hauler, mileage }) {
   return request(`/orders/${ref}/delivery`, {
     method: 'PUT',
