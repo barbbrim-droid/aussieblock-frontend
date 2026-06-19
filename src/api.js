@@ -484,7 +484,7 @@ export function getOrdersPricingBulk(refs) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refs: refs || null }),
-    timeoutMs: 60000,
+    timeoutMs: 90000,   // generous: covers a backend cold-start + first-time mileage lookups
   })
 }
 export function setOrderDelivery(ref, { hauler, mileage }) {
