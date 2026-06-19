@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, saveDriverNotes, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, saveDriverNotes, signOffOrder, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -5433,6 +5433,10 @@ function DriverApp({ driver, onLogout }) {
 
   const orders = data?.orders || [];
   const active = orders.find((o) => o.ref === activeRef) || null;
+  // A continuous pour keeps its tickets on the loads, not the order — so look at
+  // both, otherwise pour deliveries (most of Rodney's) show "no batch ticket".
+  const ticketLoads = (active?.loads || []).filter((l) => l.has_batch_ticket);
+  const hasAnyTicket = !!active && (active.has_batch_ticket || ticketLoads.length > 0);
 
   // Load the saved notes into the editor when you open a delivery (only on open, so
   // the 20s background refresh never wipes out what the driver is mid-typing).
@@ -5452,8 +5456,19 @@ function DriverApp({ driver, onLogout }) {
   const openTicket = async () => {
     if (!active) return;
     setTicketBusy(true); setErr("");
-    try { setTicketPages((await getBatchTicketImages(active.ref)).pages || []); }   // show in-app images
-    catch (e) { setErr(e.message || "Could not open the ticket"); }
+    try {
+      let pages = [];
+      if (active.has_batch_ticket) {
+        pages = (await getBatchTicketImages(active.ref)).pages || [];          // single-delivery ticket
+      } else {
+        for (const l of ticketLoads) {                                          // pour: gather each load's ticket
+          try { pages.push(...((await getLoadBatchTicketImages(active.ref, l.seq)).pages || [])); }
+          catch { /* skip a load that fails, still show the rest */ }
+        }
+      }
+      if (!pages.length) { setErr("No batch ticket pages to show yet."); return; }
+      setTicketPages(pages);
+    } catch (e) { setErr(e.message || "Could not open the ticket"); }
     finally { setTicketBusy(false); }
   };
   const submitSignature = async (blob, name, water) => {
@@ -5566,8 +5581,8 @@ function DriverApp({ driver, onLogout }) {
                 </button>
               </div>
 
-              <button onClick={openTicket} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
-                {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {active.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
+              <button onClick={openTicket} disabled={ticketBusy || !hasAnyTicket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {hasAnyTicket ? (!active.has_batch_ticket && ticketLoads.length > 1 ? `View batch tickets · ${ticketLoads.length} loads` : "View batch ticket") : "No batch ticket yet"}
               </button>
 
               {active.has_signature ? (

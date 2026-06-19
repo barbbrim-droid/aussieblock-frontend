@@ -287,6 +287,11 @@ export async function fetchBatchTicketUrl(ref, variant = 'view') {
 export function getBatchTicketImages(ref) {
   return request(`/orders/${encodeURIComponent(ref)}/batch-ticket-images`)
 }
+// Same, but for one LOAD of a continuous pour (the ticket lives on the load, not
+// the order) — used by the driver tablet so pour tickets show up there too.
+export function getLoadBatchTicketImages(ref, seq) {
+  return request(`/orders/${encodeURIComponent(ref)}/loads/${seq}/batch-ticket-images`)
+}
 
 // Upload a batch ticket for ONE load of a pour (staff). Returns the updated order.
 export async function uploadLoadBatchTicket(ref, seq, file) {
