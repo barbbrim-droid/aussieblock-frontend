@@ -3206,16 +3206,20 @@ function FuelModal({ onClose }) {
 function MixerModal({ onClose }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
-  const [truck, setTruck] = useState("");   // "" = all trucks
 
   const load = async () => {
-    try { setRows(await getMixerReadings({ limit: 200 })); setErr(""); }
+    try { setRows(await getMixerReadings({ limit: 500 })); setErr(""); }
     catch (e) { setErr(e.message); }
   };
   useEffect(() => { load(); }, []);
 
-  const trucks = rows ? [...new Set(rows.map((r) => r.truck).filter((t) => t && t !== "—"))].sort() : [];
-  const shown = rows ? (truck ? rows.filter((r) => r.truck === truck) : rows) : [];
+  // One card per truck, always: collapse the reading log to each truck's LATEST
+  // reading (rows come newest-first, so the first one seen per truck is newest).
+  const latest = rows ? Object.values(rows.reduce((acc, r) => {
+    const k = r.truck || "—";
+    if (!acc[k]) acc[k] = r;
+    return acc;
+  }, {})).sort((a, b) => (a.truck || "").localeCompare(b.truck || "")) : [];
   const num = (v, d = 0) => (v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
   const card = { background: NAVY, border: "1px solid rgba(255,255,255,0.06)" };
   const metric = (label, value, unit) => (
@@ -3238,20 +3242,11 @@ function MixerModal({ onClose }) {
 
           {rows && (
             <>
-              {trucks.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  <button onClick={() => setTruck("")} className="rounded-full px-3 py-1 text-xs font-semibold active:scale-95 transition-transform" style={truck === "" ? { background: ORANGE, color: NAVY_DEEP } : { ...card, color: "#fff" }}>All</button>
-                  {trucks.map((t) => (
-                    <button key={t} onClick={() => setTruck(t)} className="rounded-full px-3 py-1 text-xs font-semibold active:scale-95 transition-transform" style={truck === t ? { background: ORANGE, color: NAVY_DEEP } : { ...card, color: "#fff" }}>{t}</button>
-                  ))}
-                </div>
-              )}
-
-              {shown.length === 0 ? (
+              {latest.length === 0 ? (
                 <div className="text-white/40 text-sm py-6 text-center" style={{ ...card, borderRadius: 12 }}>No mixer readings yet. Each truck's sensor sends one per load.</div>
               ) : (
-                shown.map((r) => (
-                  <div key={r.load_uid} className="rounded-lg mb-1.5 p-3" style={card}>
+                latest.map((r) => (
+                  <div key={r.truck || "—"} className="rounded-lg mb-1.5 p-3" style={card}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{r.truck || "—"}</div>
                       <div className="text-white/40 text-xs shrink-0 ml-2">{r.received_at ? timeAgo(r.received_at) : (r.ended_at ? timeAgo(r.ended_at) : "—")}</div>
@@ -3264,12 +3259,12 @@ function MixerModal({ onClose }) {
                       {metric("Max RPM", num(r.max_rpm, 1), "")}
                       {metric("Pressure", num(r.pressure_idx_avg, 2), "")}
                     </div>
-                    <div className="text-white/30 text-[10px] mt-2 truncate">{r.load_uid}{r.fw ? ` · fw ${r.fw}` : ""}{r.charge_revs != null || r.discharge_revs != null ? ` · chg ${num(r.charge_revs)}/dis ${num(r.discharge_revs)}` : ""}</div>
+                    <div className="text-white/30 text-[10px] mt-2 truncate">last load {r.load_uid}{r.fw ? ` · fw ${r.fw}` : ""}{r.charge_revs != null || r.discharge_revs != null ? ` · chg ${num(r.charge_revs)}/dis ${num(r.discharge_revs)}` : ""}</div>
                   </div>
                 ))
               )}
 
-              <p className="text-white/35 text-[11px] mt-3">Readings arrive automatically from each truck's mixer sensor. A reading shows under a truck name only when the device's truck # matches a truck's name in <span className="font-semibold">Manage trucks</span>.</p>
+              <p className="text-white/35 text-[11px] mt-3">One card per truck, showing its most recent load. Readings arrive automatically from each truck's mixer sensor; a card appears once the device's truck # matches a truck's name in <span className="font-semibold">Manage trucks</span>.</p>
             </>
           )}
         </div>
