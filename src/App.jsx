@@ -482,19 +482,26 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       {order.is_pour ? (
         // Continuous pour: show each truck-load delivered, its yards, status, and ticket.
         loads.length > 0 ? (
+          (() => {
+          const isReceived = (ld) => ld.has_signature || ld.status === "complete" || ld.status === "returning";
+          const receivedCount = loads.filter(isReceived).length;
+          return (
           <div className="mt-3 rounded-2xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)" }}>
-            <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: C.body }}>Loads · {fmtYards(live.yards_loaded || 0)} of {order.qty} yd delivered</div>
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <span className="text-white/55 text-xs font-semibold uppercase tracking-wide" style={{ fontFamily: C.body }}>Loads · {fmtYards(live.yards_loaded || 0)} of {order.qty} yd delivered</span>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN, fontFamily: C.body }}>{receivedCount} of {loads.length} received</span>
+            </div>
             <div className="flex flex-col gap-2">
               {loads.map((ld) => {
                 const meta = STATUS_META[ld.status] || STATUS_META.scheduled;
                 const eta = loadEta(ld);
+                const received = isReceived(ld);
                 return (
-                  <div key={ld.seq} className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div key={ld.seq} className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5" style={{ background: NAVY_DEEP, border: `1px solid ${received ? GREEN + "55" : "rgba(255,255,255,0.1)"}` }}>
                     <div className="min-w-0">
-                      <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Load #{ld.seq} · {ld.qty} yd</div>
-                      <div className="text-[11px] font-semibold mt-0.5" style={{ color: meta.color, fontFamily: C.body }}>
-                        {custLabel(ld.status)}
-                        {eta && <span className="text-white/45">{` · ${eta}`}</span>}
+                      <div className="text-white text-sm font-semibold flex items-center gap-1.5" style={{ fontFamily: C.cond }}>Load {ld.seq} of {loads.length} · {ld.qty} yd</div>
+                      <div className="text-[11px] font-semibold mt-0.5 flex items-center gap-1" style={{ color: received ? GREEN : meta.color, fontFamily: C.body }}>
+                        {received ? <><CheckCircle2 size={12} /> Received</> : <>{custLabel(ld.status)}{eta && <span className="text-white/45">{` · ${eta}`}</span>}</>}
                       </div>
                     </div>
                     {ld.has_batch_ticket && (
@@ -507,6 +514,8 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
               })}
             </div>
           </div>
+          );
+          })()
         ) : order.has_batch_ticket ? (
           // Legacy order: a pour with no loads but an order-level ticket (uploaded
           // before load-tracking). Show the order-level ticket so it stays reachable.
