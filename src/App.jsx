@@ -130,7 +130,14 @@ function forcedMixFor(name) {
   return "";
 }
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
-const ADMIXTURES = ["Set Control", "Accelerant", "Mac Matrix Fiber", "Color"];
+const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
+// Selectable fiber products + their standard dose (lbs/yd). MAC 330 is the TxDOT
+// standard; Mac Matrix 360 is the legacy macrofiber.
+const FIBER_PRODUCTS = [
+  { name: "MasterFiber MAC 330", dose: 4 },
+  { name: "Mac Matrix 360", dose: 4.5 },
+];
+const fiberDose = (name) => (FIBER_PRODUCTS.find((f) => f.name === name) || FIBER_PRODUCTS[0]).dose;
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Block Fill", "Other"];
 const DRIVERS = ["Rodney", "Brandon", "Henry"];   // current drivers (staff-assignable on an order)
@@ -616,14 +623,20 @@ function parseSpec(o = {}) {
   const uf = o.use_for || "";
   const useFor = !uf ? "" : (USES.includes(uf) ? uf : "Other");
   const useOther = useFor === "Other" ? uf : "";
-  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "";
+  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "", fiberType = FIBER_PRODUCTS[0].name;
   String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
     if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
-    else if (/fiber/i.test(p)) { admix.push("Mac Matrix Fiber"); const m = p.match(/([\d.]+)\s*lbs/); if (m) { const t = parseFloat(m[1]); if (t && t !== 4.5) fiberLbs = m[1]; } }   // matches "Mac Matrix Fiber: 4.5 lbs/yd"; blank field = the 4.5 standard
+    else if (/fiber|matrix|mac\s*3\d0/i.test(p)) {
+      admix.push("Fiber");
+      // Which product was chosen, and its dose (digit-safe: the lbs number, not 330/360).
+      fiberType = /360|matrix/i.test(p) ? "Mac Matrix 360" : "MasterFiber MAC 330";
+      const m = p.match(/([\d.]+)\s*lbs/i);
+      if (m) { const t = parseFloat(m[1]); if (t && t !== fiberDose(fiberType)) fiberLbs = m[1]; }   // blank field = the product's standard dose
+    }
     else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
     else if (p === "Accelerant") admix.push("Accelerant");
   });
-  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, colorDetail, project: o.project || "" };
+  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, project: o.project || "" };
 }
 
 function useConcreteSpec(initial, customerName) {
@@ -640,6 +653,7 @@ function useConcreteSpec(initial, customerName) {
   const [admix, setAdmix] = useState(p.admix);
   const [extraSet, setExtraSet] = useState(p.extraSet);
   const [fiberLbs, setFiberLbs] = useState(p.fiberLbs);
+  const [fiberType, setFiberType] = useState(p.fiberType);
   const [colorDetail, setColorDetail] = useState(p.colorDetail);
   const [project, setProject] = useState(p.project);
   const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
@@ -657,7 +671,7 @@ function useConcreteSpec(initial, customerName) {
     admixtures: admix.map((a) => {
       if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
-      if (a === "Mac Matrix Fiber") { const x = parseFloat(fiberLbs); return x > 0 ? `Mac Matrix Fiber: ${x} lbs/yd` : "Mac Matrix Fiber: 4.5 lbs/yd"; }
+      if (a === "Fiber") { const x = parseFloat(fiberLbs); const dose = x > 0 ? x : fiberDose(fiberType); return `${fiberType}: ${dose} lbs/yd`; }
       return a;
     }),
     project: project.trim(),
@@ -740,11 +754,15 @@ function useConcreteSpec(initial, customerName) {
           </select>
         </div>
       )}
-      {admix.includes("Mac Matrix Fiber") && (
+      {admix.includes("Fiber") && (
         <div className="mb-3">
-          <label className={lbl}>Mac Matrix Fiber — lbs/yd (4.5 is standard)</label>
+          <label className={lbl}>Fiber product</label>
+          <select value={fiberType} onChange={(e) => setFiberType(e.target.value)} className={inCls + " mb-2"} style={inSt}>
+            {FIBER_PRODUCTS.map((f) => <option key={f.name} value={f.name}>{f.name} ({f.dose} lbs/yd std)</option>)}
+          </select>
+          <label className={lbl}>Dose — lbs/yd ({fiberDose(fiberType)} is standard)</label>
           <div className="flex items-center rounded-lg" style={inSt}>
-            <input type="number" min="0" step="0.5" value={fiberLbs} onChange={(e) => setFiberLbs(e.target.value)} placeholder="4.5 (standard)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <input type="number" min="0" step="0.5" value={fiberLbs} onChange={(e) => setFiberLbs(e.target.value)} placeholder={`${fiberDose(fiberType)} (standard)`} className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
             <span className="px-3 text-white/55 text-sm">lbs/yd</span>
           </div>
         </div>
@@ -1930,9 +1948,13 @@ function BatchTicketForm({ o, onEdited }) {
   const [hauler, setHauler] = useState(o.hauler || "");
   const [mileage, setMileage] = useState(o.mileage != null ? String(o.mileage) : "");
   const [priceOv, setPriceOv] = useState(o.price_override != null ? String(o.price_override) : "");
-  // Mac Matrix Fiber dosage (lbs/yd), parsed from the order's admixtures string.
+  // Fiber dosage (lbs/yd), parsed from the order's admixtures string. Read the lbs
+  // from the fiber segment itself (not anchored to the name) so a product label with
+  // digits — "MasterFiber MAC 330: 4 lbs/yd" / "Mac Matrix 360: 4.5 lbs/yd" — yields
+  // the real dose, not the 330/360 in the name.
   const [fiberLbs, setFiberLbs] = useState(() => {
-    const m = /fiber[^\d]*([\d.]+)\s*lb/i.exec(o.admixtures || "");
+    const seg = (o.admixtures || "").split(",").find((p) => /fiber|matrix|mac\s*3\d0/i.test(p)) || "";
+    const m = /([\d.]+)\s*lb/i.exec(seg);
     return m ? m[1] : "";
   });
   // Custom fiber $/lb for this order (blank = price-sheet rate).
