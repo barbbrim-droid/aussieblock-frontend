@@ -389,6 +389,17 @@ export function deleteTruck(label) {
 export function getFuel() {
   return request('/fuel')
 }
+// Mixer-drum telemetry readings, newest first. Optional truck label filter.
+// Each row: { load_uid, truck, gallons, total_revs, charge_revs, discharge_revs,
+// max_rpm, avg_rpm, pressure_idx_avg, pressure_idx_max, mix_temp_c, mix_temp_f,
+// fw, started_at, ended_at, received_at } (staff).
+export function getMixerReadings({ limit = 100, truck = "" } = {}) {
+  const q = new URLSearchParams()
+  if (limit) q.set('limit', limit)
+  if (truck) q.set('truck', truck)
+  const qs = q.toString()
+  return request(`/api/mixer/readings${qs ? `?${qs}` : ''}`)
+}
 // The individual fuel fills for one truck, newest first (staff only).
 export function getTruckFuel(label) {
   return request(`/trucks/${encodeURIComponent(label)}/fuel`)

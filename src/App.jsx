@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3200,6 +3200,84 @@ function FuelModal({ onClose }) {
   );
 }
 
+// Staff modal: mixer-drum telemetry. Each truck's on-board sensor POSTs one
+// summary per load to /api/mixer/load; this lists them newest-first, filterable
+// by truck. Read-only — the data flows in from the trucks, not the app.
+function MixerModal({ onClose }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [truck, setTruck] = useState("");   // "" = all trucks
+
+  const load = async () => {
+    try { setRows(await getMixerReadings({ limit: 200 })); setErr(""); }
+    catch (e) { setErr(e.message); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const trucks = rows ? [...new Set(rows.map((r) => r.truck).filter((t) => t && t !== "—"))].sort() : [];
+  const shown = rows ? (truck ? rows.filter((r) => r.truck === truck) : rows) : [];
+  const num = (v, d = 0) => (v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
+  const card = { background: NAVY, border: "1px solid rgba(255,255,255,0.06)" };
+  const metric = (label, value, unit) => (
+    <div className="min-w-0">
+      <div className="text-white/40 text-[10px] uppercase tracking-wide truncate">{label}</div>
+      <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{value}{unit && value !== "—" ? <span className="text-white/45 text-[11px] font-normal"> {unit}</span> : ""}</div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Activity size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Mixer telemetry</span></div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {!rows && !err && <div className="text-white/50 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading readings…</div>}
+          {err && <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+
+          {rows && (
+            <>
+              {trucks.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <button onClick={() => setTruck("")} className="rounded-full px-3 py-1 text-xs font-semibold active:scale-95 transition-transform" style={truck === "" ? { background: ORANGE, color: NAVY_DEEP } : { ...card, color: "#fff" }}>All</button>
+                  {trucks.map((t) => (
+                    <button key={t} onClick={() => setTruck(t)} className="rounded-full px-3 py-1 text-xs font-semibold active:scale-95 transition-transform" style={truck === t ? { background: ORANGE, color: NAVY_DEEP } : { ...card, color: "#fff" }}>{t}</button>
+                  ))}
+                </div>
+              )}
+
+              {shown.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center" style={{ ...card, borderRadius: 12 }}>No mixer readings yet. Each truck's sensor sends one per load.</div>
+              ) : (
+                shown.map((r) => (
+                  <div key={r.load_uid} className="rounded-lg mb-1.5 p-3" style={card}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{r.truck || "—"}</div>
+                      <div className="text-white/40 text-xs shrink-0 ml-2">{r.received_at ? timeAgo(r.received_at) : (r.ended_at ? timeAgo(r.ended_at) : "—")}</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-y-2 gap-x-2">
+                      {metric("Water", num(r.gallons, 1), "gal")}
+                      {metric("Total revs", num(r.total_revs), "")}
+                      {metric("Temp", num(r.mix_temp_f, 1), "°F")}
+                      {metric("Avg RPM", num(r.avg_rpm, 1), "")}
+                      {metric("Max RPM", num(r.max_rpm, 1), "")}
+                      {metric("Pressure", num(r.pressure_idx_avg, 2), "")}
+                    </div>
+                    <div className="text-white/30 text-[10px] mt-2 truncate">{r.load_uid}{r.fw ? ` · fw ${r.fw}` : ""}{r.charge_revs != null || r.discharge_revs != null ? ` · chg ${num(r.charge_revs)}/dis ${num(r.discharge_revs)}` : ""}</div>
+                  </div>
+                ))
+              )}
+
+              <p className="text-white/35 text-[11px] mt-3">Readings arrive automatically from each truck's mixer sensor. A reading shows under a truck name only when the device's truck # matches a truck's name in <span className="font-semibold">Manage trucks</span>.</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Staff modal: add/reset/remove office logins — workers (concrete crew / TxDOT
 // engineers, no financials) and full staff — then text them their invite. Mirrors
 // the customer-login flow (ManageTrucksModal layout + CustomerLogins invite box).
@@ -4758,6 +4836,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showNew, setShowNew] = useState(false);   // "New order" modal
   const [showTrucks, setShowTrucks] = useState(false);   // "Manage trucks" modal
   const [showFuel, setShowFuel] = useState(false);       // "Fuel usage" modal
+  const [showMixer, setShowMixer] = useState(false);     // "Mixer telemetry" modal
   const [showCal, setShowCal] = useState(false);   // "Delivery calendar" modal
   const [showPast, setShowPast] = useState(false);   // "Past orders" modal
   const [showCosts, setShowCosts] = useState(false);   // "Customer costs" tracking modal
@@ -5000,6 +5079,7 @@ function DispatchApp({ email, role, onLogout }) {
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
       {showFuel && <FuelModal onClose={() => setShowFuel(false)} />}
+      {showMixer && <MixerModal onClose={() => setShowMixer(false)} />}
       {showNew && (
         <NewOrderModal
           trucks={trucks}
@@ -5104,6 +5184,9 @@ function DispatchApp({ email, role, onLogout }) {
               </button>
               <button onClick={() => setShowFuel(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <Droplets size={16} color={ORANGE} /> Fuel
+              </button>
+              <button onClick={() => setShowMixer(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <Activity size={16} color={ORANGE} /> Mixer
               </button>
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
                 <CalendarPlus size={16} /> New order
