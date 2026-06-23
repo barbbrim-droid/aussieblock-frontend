@@ -412,10 +412,22 @@ export function deleteTruck(label) {
 export function getFuel() {
   return request('/fuel')
 }
-// Assignable driver names (distinct names of driver logins) for the dispatch
-// dropdowns. Add a driver via a Driver login in Manage Staff. Staff-accessible.
+// Assignable driver names (driver logins + name-only roster) for the dispatch
+// dropdowns. Staff-accessible.
 export function getDrivers() {
   return request('/drivers')
+}
+// Add a name-only driver (no login/email) to the roster. Returns the merged list.
+export function addDriver(name) {
+  return request('/drivers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+}
+// Remove a name-only roster driver (drivers with a login are removed via Manage Staff).
+export function deleteDriver(name) {
+  return request(`/drivers/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
 // Mixer-drum telemetry readings, newest first. Optional truck label filter.
 // Each row: { load_uid, truck, gallons, total_revs, charge_revs, discharge_revs,

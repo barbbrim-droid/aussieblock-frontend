@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, resetMixerTotal, getDrivers, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3326,6 +3326,7 @@ function MixerModal({ onClose }) {
 // Full-staff only; the board only renders the button for finance users.
 function ManageStaffModal({ onClose }) {
   const [staff, setStaff] = useState([]);
+  const [allDrivers, setAllDrivers] = useState([]);   // merged driver names (logins + name-only roster)
   const [companies, setCompanies] = useState([]);   // customer names, for the "who they work for" suggestions
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -3346,6 +3347,7 @@ function ManageStaffModal({ onClose }) {
 
   const load = async () => {
     try { setStaff(await listStaff()); } catch (e) { setMsg({ ok: false, text: e.message }); }
+    try { setAllDrivers(await getDrivers()); } catch { /* drivers list is best-effort */ }
   };
   useEffect(() => {
     load();
@@ -3379,6 +3381,15 @@ function ManageStaffModal({ onClose }) {
     if (role === "driver" && !driverName.trim()) { setMsg({ ok: false, text: "Enter the driver's name (must match the name on their orders)." }); return; }
     setBusy(true); setMsg(null);
     try {
+      // Driver with no email → name-only roster entry (assignable, no tablet login).
+      if (role === "driver" && !email.trim()) {
+        await addDriver(driverName.trim());
+        setInvite(null);
+        setMsg({ ok: true, text: `Added driver "${driverName.trim()}" (no login). They're now assignable on orders.` });
+        setDriverName("");
+        await load();
+        return;
+      }
       const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(),
         (role === "worker" || role === "customer") ? Number(companyId) : null, project.trim(),
         role === "driver" ? driverName.trim() : "");
@@ -3420,6 +3431,24 @@ function ManageStaffModal({ onClose }) {
       await deleteStaff(target);
       setMsg({ ok: true, text: `Login removed for ${target}.` });
       if (email.trim().toLowerCase() === target) reset();
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Name-only driver names (roster entries) — drivers that aren't a login.
+  const loginDriverNames = new Set(staff.filter((u) => u.role === "driver").map((u) => (u.company || "").trim().toLowerCase()));
+  const rosterDrivers = allDrivers.filter((n) => !loginDriverNames.has((n || "").trim().toLowerCase()));
+
+  const removeDriver = async (name) => {
+    if (!window.confirm(`Remove driver "${name}" from the roster? They'll no longer be assignable on orders.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      await deleteDriver(name);
+      setMsg({ ok: true, text: `Removed driver "${name}".` });
       await load();
     } catch (e) {
       setMsg({ ok: false, text: e.message });
@@ -3478,6 +3507,24 @@ function ManageStaffModal({ onClose }) {
             </div>
           )}
 
+          {/* name-only drivers (assignable, no login) */}
+          {rosterDrivers.length > 0 && (
+            <div className="mb-4">
+              <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Drivers without a login ({rosterDrivers.length})</div>
+              {rosterDrivers.map((n) => (
+                <div key={n} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{n}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: ORANGE_HOT + "22", color: ORANGE_HOT }}>DRIVER · NO LOGIN</span>
+                  </div>
+                  <button onClick={() => removeDriver(n)} disabled={busy} title="Remove driver" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
+                    <Trash2 size={15} color="#ff8a85" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* add / reset form */}
           <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
             <div className="flex items-center justify-between mb-2">
@@ -3502,8 +3549,10 @@ function ManageStaffModal({ onClose }) {
                 <KeyRound size={13} /> Auto-generate login (no email/password to type)
               </button>
             )}
-            <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder="email" autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
-            <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder={role === "driver" ? "email (optional — leave blank for a name-only driver, no login)" : "email"} autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
+            {!(role === "driver" && !email.trim() && !editing) && (
+              <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
+            )}
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cell phone (for the invite text)" className={inCls + " mb-2"} style={inSt} />
             {(role === "worker" || role === "customer") && (
               <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inCls + " mb-2"} style={inSt}>
@@ -3514,11 +3563,25 @@ function ManageStaffModal({ onClose }) {
             {role === "driver" && (
               <input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="driver's name — must match the name on their orders (e.g. Rodney)" className={inCls + " mb-2"} style={inSt} />
             )}
+            {role === "driver" && !email.trim() && !editing && (
+              <p className="text-white/45 text-xs mb-2 -mt-1">No email = a name-only driver: assignable on orders, but no truck-tablet login. Add an email to also give them the driver app.</p>
+            )}
             {role !== "driver" && <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />}
             <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : role === "driver" ? "A driver uses the truck tablet — today's deliveries assigned to them, the batch ticket, and customer sign-off. No board, no billing, no other companies." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
-            <button onClick={submit} disabled={busy || !email.trim() || (pw.length > 0 && pw.length < 6) || (!editing && pw.length < 6) || ((role === "worker" || role === "customer") && !companyId) || (role === "driver" && !driverName.trim())} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
-              {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} {editing ? "Save changes" : "Create login"}
-            </button>
+            {(() => {
+              const driverNoLogin = role === "driver" && !email.trim() && !editing;
+              const disabled = busy
+                || (role === "driver" && !driverName.trim())
+                || (!driverNoLogin && !email.trim())
+                || (!driverNoLogin && !editing && pw.length < 6)
+                || (pw.length > 0 && pw.length < 6)
+                || ((role === "worker" || role === "customer") && !companyId);
+              return (
+                <button onClick={submit} disabled={disabled} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+                  {busy ? <Loader2 size={15} className="animate-spin" /> : driverNoLogin ? <Plus size={15} /> : <KeyRound size={15} />} {editing ? "Save changes" : driverNoLogin ? "Add driver (no login)" : "Create login"}
+                </button>
+              );
+            })()}
           </div>
 
           {msg && (
