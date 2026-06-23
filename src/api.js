@@ -481,6 +481,14 @@ export function saveDriverNotes(ref, notes) {
     body: JSON.stringify({ notes: notes || null }),
   })
 }
+// Driver logs a fuel fill by hand: truck number, gallons, optional mileage.
+export function logManualFuel({ truck_no, gallons, odometer }) {
+  return request('/fuel/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ truck_no, gallons, odometer: odometer === '' || odometer == null ? null : Number(odometer) }),
+  })
+}
 // Capture the customer's signature (a PNG Blob) + printed name + water added on
 // site (gal); marks the order Delivered/Complete and stores proof of delivery.
 export async function signOffOrder(ref, blob, signedBy, waterAdded = '') {

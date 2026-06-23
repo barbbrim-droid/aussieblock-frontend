@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -5808,6 +5808,23 @@ function DriverApp({ driver, onLogout }) {
   const [notesDraft, setNotesDraft] = useState("");        // driver's editable on-site notes
   const [notesBusy, setNotesBusy] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
+  // Manual fuel fill — driver enters truck #, gallons, optional mileage.
+  const [showFuel, setShowFuel] = useState(false);
+  const [fuelForm, setFuelForm] = useState({ truck_no: localStorage.getItem("driver_truck_no") || "", gallons: "", odometer: "" });
+  const [fuelBusy, setFuelBusy] = useState(false);
+  const [fuelMsg, setFuelMsg] = useState(null);
+  const submitFuel = async () => {
+    if (!fuelForm.truck_no.trim()) { setFuelMsg({ ok: false, text: "Enter your truck number." }); return; }
+    if (!(Number(fuelForm.gallons) > 0)) { setFuelMsg({ ok: false, text: "Enter the gallons filled." }); return; }
+    setFuelBusy(true); setFuelMsg(null);
+    try {
+      const r = await logManualFuel({ truck_no: fuelForm.truck_no.trim(), gallons: Number(fuelForm.gallons), odometer: fuelForm.odometer });
+      localStorage.setItem("driver_truck_no", fuelForm.truck_no.trim());
+      setFuelMsg({ ok: true, text: `Logged ${Number(fuelForm.gallons).toFixed(1)} gal${r && r.matched ? "" : " — truck # not recognized, saved as unmatched"}.` });
+      setFuelForm((f) => ({ ...f, gallons: "", odometer: "" }));
+    } catch (e) { setFuelMsg({ ok: false, text: e.message || "Could not log the fill" }); }
+    finally { setFuelBusy(false); }
+  };
 
   const load = async () => {
     try { setData(await getDriverOrders()); setErr(""); }
@@ -5884,7 +5901,11 @@ function DriverApp({ driver, onLogout }) {
           {!data ? (
             <div className="text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading deliveries…</div>
           ) : !active ? (
-            orders.length === 0 ? (
+            <>
+              <button onClick={() => { setFuelMsg(null); setShowFuel(true); }} className="w-full rounded-xl py-3.5 mb-3 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: ORANGE, color: NAVY_DEEP }}>
+                <Droplets size={18} /> Fuel up — log a fill
+              </button>
+              {orders.length === 0 ? (
               <div className="text-white/40 text-sm py-10 text-center">No deliveries assigned for today.</div>
             ) : (
               orders.map((o) => {
@@ -5901,7 +5922,8 @@ function DriverApp({ driver, onLogout }) {
                   </button>
                 );
               })
-            )
+              )}
+            </>
           ) : (
             <div>
               <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
@@ -6043,6 +6065,29 @@ function DriverApp({ driver, onLogout }) {
             ) : ticketPages.map((src, i) => (
               <img key={i} src={src} alt={`Ticket page ${i + 1}`} className="w-full rounded shadow-lg mb-2" style={{ background: "#fff" }} />
             ))}
+          </div>
+        </div>
+      )}
+      {showFuel && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowFuel(false)}>
+          <div className="w-full sm:max-w-sm rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+              <div className="flex items-center gap-2"><Droplets size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Log a fuel fill</span></div>
+              <button onClick={() => setShowFuel(false)} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+            </div>
+            <div className="p-5">
+              <label className="text-white/50 text-xs uppercase tracking-wide">Truck number</label>
+              <input value={fuelForm.truck_no} onChange={(e) => setFuelForm({ ...fuelForm, truck_no: e.target.value })} inputMode="numeric" placeholder="e.g. 4554" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+              <label className="text-white/50 text-xs uppercase tracking-wide">Gallons filled</label>
+              <input value={fuelForm.gallons} onChange={(e) => setFuelForm({ ...fuelForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="e.g. 45.0" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+              <label className="text-white/50 text-xs uppercase tracking-wide">Current mileage (odometer)</label>
+              <input value={fuelForm.odometer} onChange={(e) => setFuelForm({ ...fuelForm, odometer: e.target.value })} type="number" inputMode="numeric" placeholder="optional" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+              {fuelMsg && <div className="rounded-lg px-3 py-2 text-sm mb-3" style={{ background: fuelMsg.ok ? GREEN + "1f" : "rgba(239,83,80,0.14)", color: fuelMsg.ok ? GREEN : "#ff8a85" }}>{fuelMsg.text}</div>}
+              <button onClick={submitFuel} disabled={fuelBusy} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+                {fuelBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />} Log fill
+              </button>
+              <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 mt-2 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Done</button>
+            </div>
           </div>
         </div>
       )}
