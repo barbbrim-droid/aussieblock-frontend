@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3076,9 +3076,9 @@ function ManageTrucksModal({ onClose, onChanged }) {
             <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>{existing ? `Edit ${existing.label}` : "Add a truck"}</div>
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Truck name (e.g. RTS 4554)" className={inCls + " mb-2"} style={inSt} />
             <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-2"} style={inSt} />
-            <input value={fuelVehicle} onChange={(e) => setFuelVehicle(e.target.value)} placeholder="FluidSecure vehicle # (optional)" className={inCls + " mb-2"} style={inSt} />
+            <input value={fuelVehicle} onChange={(e) => setFuelVehicle(e.target.value)} placeholder="Fuel meter truck # (optional)" className={inCls + " mb-2"} style={inSt} />
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (driver, capacity, maintenance…)" className={inCls + " mb-1 resize-none"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking; FluidSecure vehicle # turns on fuel tracking — both optional.</p>
+            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking (optional). Fuel fills match this truck by its name/number automatically — set a fuel meter # only if the meter reports a different number.</p>
             <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {existing ? "Update truck" : "Add truck"}
             </button>
@@ -3102,28 +3102,12 @@ function FuelModal({ onClose }) {
   const [openLabel, setOpenLabel] = useState(null);   // truck whose fills are expanded
   const [fills, setFills] = useState(null);           // fills for the expanded truck
   const [loadingFills, setLoadingFills] = useState(false);
-  const [importing, setImporting] = useState(false);  // CSV upload in progress
-  const [importMsg, setImportMsg] = useState("");     // result of the last upload
-  const fileRef = useRef(null);
 
   const load = async () => {
     try { setData(await getFuel()); setErr(""); } catch (e) { setErr(e.message); }
   };
 
   useEffect(() => { load(); }, []);
-
-  const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";   // allow re-selecting the same file
-    if (!file) return;
-    setImporting(true); setImportMsg(""); setErr("");
-    try {
-      const r = await importFuel(file);
-      setImportMsg(`Imported ${r.added} new fill${r.added === 1 ? "" : "s"} of ${r.rows} row${r.rows === 1 ? "" : "s"}.`);
-      await load();
-    } catch (e) { setErr(e.message); }
-    finally { setImporting(false); }
-  };
 
   const toggle = async (label) => {
     if (openLabel === label) { setOpenLabel(null); setFills(null); return; }
@@ -3164,7 +3148,7 @@ function FuelModal({ onClose }) {
                         <div className="min-w-0">
                           <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
                           <div className="text-white/40 text-xs truncate">
-                            {t.fuel_vehicle ? `${t.fills} fill${t.fills === 1 ? "" : "s"}` : "No FluidSecure vehicle # — set one in Manage trucks"}
+                            {t.fills > 0 ? `${t.fills} fill${t.fills === 1 ? "" : "s"}` : "No fills yet"}
                             {t.last_fill ? ` · last ${timeAgo(t.last_fill)}` : ""}
                             {t.last_odometer != null ? ` · ${Number(t.last_odometer).toLocaleString()} odo` : ""}
                           </div>
@@ -3204,21 +3188,7 @@ function FuelModal({ onClose }) {
                 </div>
               )}
 
-              <div className="mt-3 rounded-lg px-3 py-3" style={card}>
-                <div className="text-white/80 text-xs font-semibold mb-1.5" style={{ fontFamily: C.cond }}>Import from FluidSecure</div>
-                <p className="text-white/40 text-[11px] mb-2">In the FluidSecure portal, export your transactions as a <span className="font-semibold">CSV</span>, then upload it here. Fills match to trucks by vehicle #; re-uploading the same file is safe.</p>
-                <input ref={fileRef} type="file" accept=".csv,.txt,.tsv,text/csv" onChange={onFile} className="hidden" />
-                <button onClick={() => fileRef.current?.click()} disabled={importing}
-                  className="w-full rounded-lg py-2 text-sm font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: ORANGE, color: NAVY_DEEP }}>
-                  {importing ? <><Loader2 size={14} className="animate-spin" /> Importing…</> : <><Droplets size={14} /> Upload fuel export (CSV)</>}
-                </button>
-                {importMsg && <div className="text-[11px] mt-2" style={{ color: GREEN }}>{importMsg}</div>}
-              </div>
-
-              {!data.live && (
-                <p className="text-white/35 text-[11px] mt-3">Live auto-pull needs <span className="font-semibold">FLUIDSECURE_TOKEN</span> on the API service — until then, use the CSV upload above. Either way, map each truck's FluidSecure vehicle # in <span className="font-semibold">Manage trucks</span>.</p>
-              )}
+              <p className="text-white/35 text-[11px] mt-3">Fuel fills arrive automatically from the on-truck meters. A fill that doesn't match a truck shows above — set that number on a truck in <span className="font-semibold">Manage trucks</span> to pull it in.</p>
             </>
           )}
         </div>
