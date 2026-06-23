@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3804,7 +3804,168 @@ function ReceiptPhotos({ receipt, onChanged }) {
   );
 }
 
+// Cement/slag purchase orders inside the Materials tab. Create an auto-numbered PO
+// (AB-CEM-NNNN) to email the supplier, track Open/Partial/Received from deliveries,
+// and reconcile each delivery's invoice — all wired into the receiving log.
+const PO_STATUS_STYLE = {
+  Open: { bg: ORANGE + "22", fg: ORANGE }, Partial: { bg: "#f59e0b22", fg: "#f59e0b" },
+  Received: { bg: GREEN + "22", fg: GREEN }, Closed: { bg: "#ffffff14", fg: "rgba(255,255,255,0.6)" },
+  Cancelled: { bg: "#ef444422", fg: "#ff8a85" },
+};
+function POPanel({ materials }) {
+  const [pos, setPos] = useState(null);
+  const [receipts, setReceipts] = useState([]);
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [expanded, setExpanded] = useState(null);
+  const matName = (id) => materials.find((m) => m.id === id)?.name || "—";
+  const blankPO = { vendor: "", material_id: materials[0]?.id ?? "", tons_ordered: "", fob_price: "", freight_terms: "Vendor Delivered", freight_cost: "", expected: localToday(), dest: "", notes: "" };
+  const [poForm, setPoForm] = useState(blankPO);
+  const blankDel = { tons: "", received_on: localToday(), invoice_no: "", ticket_no: "", supplier: "", unit_cost: "" };
+  const [delForm, setDelForm] = useState(blankDel);
+
+  const load = async () => {
+    try { const [p, rc] = await Promise.all([getPOs(), getReceipts()]); setPos(p); setReceipts(rc); }
+    catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const inCls = "w-full rounded-lg px-2.5 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+
+  const createPo = async () => {
+    if (!poForm.vendor.trim()) { setMsg({ ok: false, text: "Enter the vendor." }); return; }
+    if (!(Number(poForm.tons_ordered) > 0)) { setMsg({ ok: false, text: "Enter tons ordered." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const po = await createPO({
+        vendor: poForm.vendor.trim(), material_id: poForm.material_id ? Number(poForm.material_id) : null,
+        tons_ordered: Number(poForm.tons_ordered), fob_price: poForm.fob_price === "" ? null : Number(poForm.fob_price),
+        freight_terms: poForm.freight_terms, freight_cost: poForm.freight_cost === "" ? null : Number(poForm.freight_cost),
+        expected: poForm.expected || null, dest: poForm.dest.trim() || null, notes: poForm.notes.trim() || null,
+      });
+      setShowNew(false); setPoForm(blankPO);
+      setMsg({ ok: true, text: `Created ${po.po_number} — email it to ${po.vendor}.` });
+      await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+  const logDelivery = async (po) => {
+    if (!(Number(delForm.tons) > 0)) { setMsg({ ok: false, text: "Enter tons received." }); return; }
+    if (!po.material_id) { setMsg({ ok: false, text: "Set a material on this PO first." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      await addReceipt({
+        material_id: po.material_id, received_on: delForm.received_on || localToday(), tons: Number(delForm.tons),
+        supplier: (delForm.supplier || po.vendor).trim() || null, ticket_no: delForm.ticket_no.trim() || null,
+        invoice_no: delForm.invoice_no.trim() || null, unit_cost: delForm.unit_cost === "" ? null : Number(delForm.unit_cost),
+        po_id: po.id,
+      });
+      setDelForm(blankDel);
+      setMsg({ ok: true, text: "Delivery logged against " + po.po_number + "." });
+      await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+  const setStatus = async (po, status) => { try { await editPO(po.id, { status }); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  const toggleMatched = async (r) => { try { await editReceipt(r.id, { invoice_matched: !r.invoice_matched }); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  const removePo = async (po) => { if (!window.confirm("Delete " + po.po_number + "? Its deliveries stay in the receiving log but unlink.")) return; try { await deletePO(po.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+
+  if (!pos) return <div className="text-white/50 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading POs…</div>;
+
+  return (
+    <>
+      <button onClick={() => setShowNew((v) => !v)} className="w-full rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.99]" style={{ background: ORANGE, color: NAVY_DEEP }}>
+        <Plus size={15} /> {showNew ? "Cancel" : "New purchase order"}
+      </button>
+      {showNew && (
+        <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>New PO — number is assigned automatically</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <input placeholder="Vendor *" value={poForm.vendor} onChange={(e) => setPoForm({ ...poForm, vendor: e.target.value })} className={inCls} style={inSt} />
+            <select value={poForm.material_id} onChange={(e) => setPoForm({ ...poForm, material_id: e.target.value })} className={inCls} style={inSt}>
+              <option value="">Material…</option>
+              {materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <input type="number" placeholder="Tons *" value={poForm.tons_ordered} onChange={(e) => setPoForm({ ...poForm, tons_ordered: e.target.value })} className={inCls} style={inSt} />
+            <input type="number" placeholder="$/ton FOB" value={poForm.fob_price} onChange={(e) => setPoForm({ ...poForm, fob_price: e.target.value })} className={inCls} style={inSt} />
+            <select value={poForm.freight_terms} onChange={(e) => setPoForm({ ...poForm, freight_terms: e.target.value })} className={inCls} style={inSt}>
+              <option>Vendor Delivered</option><option>Self Pickup</option>
+            </select>
+            {poForm.freight_terms === "Vendor Delivered" && <input type="number" placeholder="Freight $/ton" value={poForm.freight_cost} onChange={(e) => setPoForm({ ...poForm, freight_cost: e.target.value })} className={inCls} style={inSt} />}
+            <input type="date" value={poForm.expected} onChange={(e) => setPoForm({ ...poForm, expected: e.target.value })} className={inCls} style={inSt} />
+            <input placeholder="Silo / destination" value={poForm.dest} onChange={(e) => setPoForm({ ...poForm, dest: e.target.value })} className={inCls} style={inSt} />
+            <input placeholder="Notes" value={poForm.notes} onChange={(e) => setPoForm({ ...poForm, notes: e.target.value })} className={inCls} style={inSt} />
+          </div>
+          <button onClick={createPo} disabled={busy} className="w-full mt-2 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Create PO</button>
+        </div>
+      )}
+      {pos.length === 0 ? (
+        <div className="text-white/40 text-sm py-6 text-center" style={{ background: NAVY, borderRadius: 12 }}>No purchase orders yet. Tap “New purchase order”.</div>
+      ) : pos.map((po) => {
+        const st = PO_STATUS_STYLE[po.status] || PO_STATUS_STYLE.Open;
+        const pct = po.tons_ordered ? Math.min((po.received_tons / po.tons_ordered) * 100, 100) : 0;
+        const open = expanded === po.id;
+        const dels = receipts.filter((r) => r.po_id === po.id);
+        return (
+          <div key={po.id} className="rounded-xl mb-2 overflow-hidden" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+            <button onClick={() => { setExpanded(open ? null : po.id); setDelForm(blankDel); }} className="w-full text-left p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-white font-bold text-sm" style={{ fontFamily: C.cond }}>{po.po_number} · {matName(po.material_id)}</div>
+                  <div className="text-white/45 text-xs truncate">{po.vendor}{po.expected ? " · exp " + (orderDateUS(po.expected) || po.expected) : ""}</div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0" style={{ background: st.bg, color: st.fg }}>{po.status}</span>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}><div className="h-full rounded-full" style={{ width: pct + "%", background: ORANGE }} /></div>
+              <div className="flex justify-between text-[11px] mt-1 text-white/55">
+                <span>{t1(po.received_tons)} / {t1(po.tons_ordered)} t{po.committed ? " · " + money(po.committed) : ""}</span>
+                <span style={{ color: po.deliveries > 0 && po.fully_matched ? GREEN : "rgba(255,255,255,0.55)" }}>{po.deliveries > 0 ? `invoices ${po.invoices_matched}/${po.deliveries}` : "no deliveries"}</span>
+              </div>
+            </button>
+            {open && (
+              <div className="px-3 pb-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                {dels.length > 0 && (
+                  <div className="mt-2 mb-2">
+                    {dels.map((r) => (
+                      <div key={r.id} className="flex items-center gap-2 text-xs py-1.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                        <span className="text-white/70 whitespace-nowrap">{r.received_on}</span>
+                        <span className="text-white font-semibold">{t1(r.tons)} t</span>
+                        <span className="text-white/45 truncate flex-1">{r.invoice_no ? "inv " + r.invoice_no : "no invoice"}{r.ticket_no ? " · tkt " + r.ticket_no : ""}</span>
+                        <button onClick={() => toggleMatched(r)} title="Invoice reconciled" className="inline-flex items-center justify-center w-5 h-5 rounded active:scale-90 shrink-0" style={{ background: r.invoice_matched ? GREEN : "transparent", border: `1px solid ${r.invoice_matched ? GREEN : "rgba(255,255,255,0.25)"}` }}>{r.invoice_matched && <Check size={12} color={NAVY_DEEP} />}</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="text-white/45 text-[11px] uppercase tracking-wide mt-2 mb-1">Log a delivery on this PO</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <input type="number" placeholder="Tons" value={delForm.tons} onChange={(e) => setDelForm({ ...delForm, tons: e.target.value })} className={inCls} style={inSt} />
+                  <input type="date" value={delForm.received_on} onChange={(e) => setDelForm({ ...delForm, received_on: e.target.value })} className={inCls} style={inSt} />
+                  <input placeholder="Invoice #" value={delForm.invoice_no} onChange={(e) => setDelForm({ ...delForm, invoice_no: e.target.value })} className={inCls} style={inSt} />
+                  <input placeholder="Ticket #" value={delForm.ticket_no} onChange={(e) => setDelForm({ ...delForm, ticket_no: e.target.value })} className={inCls} style={inSt} />
+                  <input type="number" placeholder="$/ton (optional)" value={delForm.unit_cost} onChange={(e) => setDelForm({ ...delForm, unit_cost: e.target.value })} className={inCls} style={inSt} />
+                  <button onClick={() => logDelivery(po)} disabled={busy} className="rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Log</button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {po.raw_status !== "closed" && <button onClick={() => setStatus(po, "closed")} className="text-xs px-2.5 py-1 rounded-lg text-white/70 active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>Close</button>}
+                  {po.raw_status !== "cancelled" && <button onClick={() => setStatus(po, "cancelled")} className="text-xs px-2.5 py-1 rounded-lg active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85" }}>Cancel PO</button>}
+                  {po.raw_status !== "open" && <button onClick={() => setStatus(po, "open")} className="text-xs px-2.5 py-1 rounded-lg text-white/70 active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>Reopen</button>}
+                  <button onClick={() => removePo(po)} title="Delete PO" className="ml-auto text-xs px-2 py-1 rounded-lg active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85" }}><Trash2 size={13} /></button>
+                </div>
+                {po.notes && <div className="text-white/45 text-[11px] mt-2">{po.notes}</div>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+    </>
+  );
+}
+
 function MaterialsModal({ onClose }) {
+  const [tab, setTab] = useState("inventory");
   const [summary, setSummary] = useState({ materials: [], unmapped_mixes: [] });
   const [receipts, setReceipts] = useState([]);
   const [msg, setMsg] = useState(null);
@@ -3880,6 +4041,13 @@ function MaterialsModal({ onClose }) {
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          <div className="flex gap-2 mb-4">
+            {[["inventory", "Inventory"], ["pos", "Purchase orders"]].map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)} className="rounded-lg px-3 py-1.5 text-sm font-semibold active:scale-95 transition-transform" style={tab === k ? { background: ORANGE, color: NAVY_DEEP } : { background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)" }}>{label}</button>
+            ))}
+          </div>
+          {tab === "pos" && <POPanel materials={summary.materials} />}
+          {tab === "inventory" && (<>
           {/* usage filters: material + completed-date window */}
           <div className="rounded-xl p-3 mb-4 flex flex-wrap items-center gap-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
             <span className="text-white/45 text-[11px] uppercase tracking-wide shrink-0" style={{ fontFamily: C.body }}>Show usage for</span>
@@ -3983,6 +4151,7 @@ function MaterialsModal({ onClose }) {
                 </div>
               )}
           </>
+          </>)}
 
           {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
         </div>

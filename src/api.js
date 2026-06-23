@@ -206,6 +206,29 @@ export function editReceipt(id, patch) {
 export function deleteReceipt(id) {
   return request(`/materials/receipts/${id}`, { method: 'DELETE' })
 }
+// Cement/slag purchase orders. getPOs() returns each PO with rolled-up
+// received_tons, status (Open/Partial/Received/Closed/Cancelled) and invoice-match
+// counts. createPO auto-assigns the AB-CEM-NNNN number.
+export function getPOs() {
+  return request('/materials/pos')
+}
+export function createPO(po) {
+  return request('/materials/pos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(po),
+  })
+}
+export function editPO(id, patch) {
+  return request(`/materials/pos/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+}
+export function deletePO(id) {
+  return request(`/materials/pos/${id}`, { method: 'DELETE' })
+}
 // Attach / view / remove a delivery photo on a receipt (staff). uploadReceiptPhoto
 // returns the updated receipt; fetchReceiptPhotoUrl returns an authed blob URL for
 // an <img> (revoke it when done).
