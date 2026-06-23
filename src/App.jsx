@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, resetMixerTotal, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3228,12 +3228,23 @@ function FuelModal({ onClose }) {
 function MixerModal({ onClose }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
+  const [resetting, setResetting] = useState("");   // `${truck}:${metric}` while a reset is in flight
 
   const load = async () => {
     try { setRows(await getMixerReadings({ limit: 500 })); setErr(""); }
     catch (e) { setErr(e.message); }
   };
   useEffect(() => { load(); }, []);
+
+  // Zero a truck's water or drum total (display only — readings/ticket water stay).
+  const doReset = async (truck, metric) => {
+    const label = metric === "water" ? "water (gallons)" : "drum (revolutions)";
+    if (!window.confirm(`Reset the ${label} total shown for ${truck} to 0?\n\nThis only clears the number on this screen — it won't change any saved load or batch ticket.`)) return;
+    setResetting(`${truck}:${metric}`); setErr("");
+    try { await resetMixerTotal(truck, metric); await load(); }
+    catch (e) { setErr(e.message); }
+    finally { setResetting(""); }
+  };
 
   // One card per truck, always: collapse the reading log to each truck's LATEST
   // reading (rows come newest-first, so the first one seen per truck is newest).
@@ -3282,6 +3293,15 @@ function MixerModal({ onClose }) {
                       {metric("Pressure", num(r.pressure_idx_avg, 2), "")}
                     </div>
                     <div className="text-white/30 text-[10px] mt-2 truncate">last load {r.load_uid}{r.fw ? ` · fw ${r.fw}` : ""}{r.charge_revs != null || r.discharge_revs != null ? ` · chg ${num(r.charge_revs)}/dis ${num(r.discharge_revs)}` : ""}</div>
+                    <div className="flex items-center gap-2 mt-2.5 pt-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      <span className="text-white/30 text-[10px] uppercase tracking-wide mr-auto">Reset total</span>
+                      <button onClick={() => doReset(r.truck, "water")} disabled={!!resetting} className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold active:scale-95 transition-transform disabled:opacity-50" style={{ background: "rgba(255,255,255,0.06)", color: "#cfe0ff", border: "1px solid rgba(255,255,255,0.10)" }}>
+                        {resetting === `${r.truck}:water` ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Water
+                      </button>
+                      <button onClick={() => doReset(r.truck, "drum")} disabled={!!resetting} className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold active:scale-95 transition-transform disabled:opacity-50" style={{ background: "rgba(255,255,255,0.06)", color: "#cfe0ff", border: "1px solid rgba(255,255,255,0.10)" }}>
+                        {resetting === `${r.truck}:drum` ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Drum
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

@@ -423,6 +423,16 @@ export function getMixerReadings({ limit = 100, truck = "" } = {}) {
   const qs = q.toString()
   return request(`/api/mixer/readings${qs ? `?${qs}` : ''}`)
 }
+// Zero a truck's displayed mixer total (staff). metric: 'water' | 'drum'. The panel
+// then shows 0 for that metric until the truck posts a newer load; readings and any
+// ticket's captured water are left untouched.
+export function resetMixerTotal(truck, metric) {
+  return request(`/api/mixer/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ truck, metric }),
+  })
+}
 // The individual fuel fills for one truck, newest first (staff only).
 export function getTruckFuel(label) {
   return request(`/trucks/${encodeURIComponent(label)}/fuel`)
