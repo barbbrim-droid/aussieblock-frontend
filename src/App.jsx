@@ -3960,6 +3960,47 @@ function POPanel({ materials }) {
   const toggleMatched = async (r) => { try { await editReceipt(r.id, { invoice_matched: !r.invoice_matched }); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
   const removePo = async (po) => { if (!window.confirm("Delete " + po.po_number + "? Its deliveries stay in the receiving log but unlink.")) return; try { await deletePO(po.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
 
+  // Plain-text purchase order for emailing to the vendor (company letterhead +
+  // the PO's material, tons, price, freight, destination, date and notes).
+  const poEmailText = (po) => {
+    const L = [
+      "AUSSIEBLOCK READY MIX",
+      "4264 S. Jackson St, San Angelo, TX 76903",
+      "(325) 213-5315",
+      "",
+      `PURCHASE ORDER   ${po.po_number}`,
+    ];
+    const d = (po.created_at || "").slice(0, 10);
+    L.push(`Date: ${orderDateUS(d) || d || ""}`);
+    L.push("", `Vendor:     ${po.vendor}`, "", `Material:   ${matName(po.material_id)}`,
+      `Quantity:   ${t1(po.tons_ordered)} tons`);
+    if (po.fob_price != null) L.push(`FOB price:  ${money(po.fob_price)} / ton`);
+    if (po.freight_terms) {
+      let ft = po.freight_terms;
+      if (po.freight_terms === "Vendor Delivered" && po.freight_cost) ft += ` (${money(po.freight_cost)}/ton)`;
+      L.push(`Freight:    ${ft}`);
+    }
+    if (po.dest) L.push(`Deliver to: ${po.dest}`);
+    if (po.expected) L.push(`Needed by:  ${orderDateUS(po.expected) || po.expected}`);
+    if (po.committed) L.push("", `Estimated total: ${money(po.committed)}  (${t1(po.tons_ordered)} tons @ ${money(po.unit_all)}/ton)`);
+    if (po.notes) L.push("", `Notes: ${po.notes}`);
+    L.push("", "Please confirm receipt of this order and the expected delivery date.",
+      "", "Thank you,", "Aussieblock Ready Mix", "dispatch@aussie-block.com");
+    return L.join("\n");
+  };
+  const emailPO = (po) => {
+    const subject = `Purchase Order ${po.po_number} — Aussieblock Ready Mix`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(poEmailText(po))}`;
+  };
+  const copyPO = async (po) => {
+    const text = poEmailText(po);
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+      setMsg({ ok: true, text: `${po.po_number} text copied — paste it into your email.` });
+    } catch (e) { setMsg({ ok: false, text: "Couldn't copy: " + (e.message || "") }); }
+  };
+
   if (!pos) return <div className="text-white/50 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading POs…</div>;
 
   return (
@@ -4036,6 +4077,8 @@ function POPanel({ materials }) {
                   <button onClick={() => logDelivery(po)} disabled={busy} className="rounded-lg py-2 flex items-center justify-center gap-1.5 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Log</button>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
+                  <button onClick={() => emailPO(po)} className="text-xs px-2.5 py-1 rounded-lg active:scale-95 inline-flex items-center gap-1 font-bold" style={{ background: ORANGE, color: NAVY_DEEP }}><Send size={13} /> Email vendor</button>
+                  <button onClick={() => copyPO(po)} className="text-xs px-2.5 py-1 rounded-lg text-white/70 active:scale-95 inline-flex items-center gap-1" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}><ClipboardList size={13} /> Copy text</button>
                   {po.raw_status !== "closed" && <button onClick={() => setStatus(po, "closed")} className="text-xs px-2.5 py-1 rounded-lg text-white/70 active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>Close</button>}
                   {po.raw_status !== "cancelled" && <button onClick={() => setStatus(po, "cancelled")} className="text-xs px-2.5 py-1 rounded-lg active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85" }}>Cancel PO</button>}
                   {po.raw_status !== "open" && <button onClick={() => setStatus(po, "open")} className="text-xs px-2.5 py-1 rounded-lg text-white/70 active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>Reopen</button>}
