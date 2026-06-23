@@ -481,12 +481,14 @@ export function saveDriverNotes(ref, notes) {
     body: JSON.stringify({ notes: notes || null }),
   })
 }
-// Driver logs a fuel fill by hand: truck number, gallons, optional mileage.
-export function logManualFuel({ truck_no, gallons, odometer }) {
-  return request('/fuel/manual', {
+// Driver adds the current mileage to their truck's latest meter fill (the
+// gallons come from the ESP fuel meter, not typed). Returns { ok, gallons } or
+// { ok: false, reason: 'no_fill' } if the meter hasn't reported a fill yet.
+export function attachFuelMileage({ truck_no, odometer }) {
+  return request('/fuel/mileage', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ truck_no, gallons, odometer: odometer === '' || odometer == null ? null : Number(odometer) }),
+    body: JSON.stringify({ truck_no, odometer: Number(odometer) }),
   })
 }
 // Capture the customer's signature (a PNG Blob) + printed name + water added on
