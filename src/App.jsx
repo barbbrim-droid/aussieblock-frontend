@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, resetMixerTotal, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, importFuel, getMixerReadings, resetMixerTotal, getDrivers, getDriverOrders, saveDriverNotes, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
 // by DispatchApp; components read it to hide COD/billing/account UI.
 const FinanceContext = createContext(true);
+// Assignable driver names, sourced from the driver logins (GET /drivers). Provided
+// at the board level so the order/load driver dropdowns share one fetched list —
+// add a driver in Manage Staff (Driver role) and they appear here.
+const DriversContext = createContext([]);
 
 // ── Aussieblock brand ────────────────────────────────────────────────
 const ORANGE = "#e7732a";
@@ -140,7 +144,6 @@ const FIBER_PRODUCTS = [
 const fiberDose = (name) => (FIBER_PRODUCTS.find((f) => f.name === name) || FIBER_PRODUCTS[0]).dose;
 const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Block Fill", "Other"];
-const DRIVERS = ["Rodney", "Brandon", "Henry"];   // current drivers (staff-assignable on an order)
 // When set (build-time), the job-site field uses Google Places for accurate
 // addresses; otherwise it falls back to the free OpenStreetMap source.
 const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
@@ -2185,6 +2188,7 @@ function LoadQtyInput({ qty, disabled, style, onSave }) {
 // The loads inside a continuous pour (>10 yd). Loads are added one at a time as
 // each truck is batched/loaded; the card rolls them up. Keeps a big pour to one card.
 function LoadsPanel({ o, trucks, onEdited }) {
+  const drivers = useContext(DriversContext);
   const [busy, setBusy] = useState(null);   // seq (or "add") currently saving
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
@@ -2278,7 +2282,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
               {/* Each load carries its own driver (one truck-load = one driver). Send "" to clear (the backend only clears on empty). */}
               <select value={ld.driver && ld.driver !== "—" ? ld.driver : ""} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { driver: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
                 <option value="">Driver</option>
-                {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
+                {drivers.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
               <select value={ld.status} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { status: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={{ ...selSt, color: meta.color || "#fff" }}>
                 {ORDER_STATUSES.filter((sx) => sx !== "requested" && sx !== "ongoing").map((sx) => <option key={sx} value={sx}>{STATUS_META[sx]?.label || sx}</option>)}
@@ -2319,7 +2323,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
           </select>
           <select value={nDriver} onChange={(e) => setNDriver(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
             <option value="">Driver…</option>
-            {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
+            {drivers.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
           <input value={nQty} onChange={(e) => setNQty(e.target.value)} inputMode="decimal" placeholder="yd" className="rounded-lg px-1.5 py-1 text-xs outline-none w-full" style={selSt} />
           <button onClick={add} disabled={busy === "add"} className="text-xs font-bold px-2.5 py-1 rounded-lg active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{busy === "add" ? "…" : "Add"}</button>
@@ -2338,6 +2342,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
   // Truck, Edit and Cancel; drop the Driver picker, "Order again" and "Ticket
   // details" (all day-of tasks) to cut the clutter.
   const canFinance = useContext(FinanceContext);   // workers don't see COD/payment bits
+  const drivers = useContext(DriversContext);
   const clash = o.clash && o.clash.length ? o.clash : null;   // shares a date+time with another order
   const pct = Math.round((o.progress || 0) * 100);
   // Staff controls drive the backend, which can reject a move (e.g. setting a
@@ -2520,7 +2525,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
               style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
             >
               <option value="—">Unassigned</option>
-              {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
+              {drivers.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </label>
         )}
@@ -4655,6 +4660,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
   // `initial` (from "Order again") pre-fills spec/site/notes/time and the
   // customer (matched by name once the roster loads). Date is always re-picked.
   const canFinance = useContext(FinanceContext);   // workers don't see the COD payment box
+  const drivers = useContext(DriversContext);
   const [customers, setCustomers] = useState([]);
   const [custFilter, setCustFilter] = useState("");
   const [customerId, setCustomerId] = useState(null);
@@ -4765,7 +4771,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
           <label className={lbl}>Driver (optional)</label>
           <select value={driver} onChange={(e) => setDriver(e.target.value)} className={inCls + " mb-3"} style={inSt}>
             <option value="">Unassigned</option>
-            {DRIVERS.map((d) => <option key={d} value={d}>{d}</option>)}
+            {drivers.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
 
           <label className={lbl}>Notes (optional)</label>
@@ -5037,6 +5043,7 @@ function DispatchApp({ email, role, onLogout }) {
   const canFinance = role !== "worker";   // full staff see financials/account info; workers don't
   const [orders, setOrders] = useState([]);
   const [trucks, setTrucks] = useState([]);
+  const [drivers, setDrivers] = useState([]);   // assignable driver names (from driver logins)
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [showNew, setShowNew] = useState(false);   // "New order" modal
@@ -5138,9 +5145,10 @@ function DispatchApp({ email, role, onLogout }) {
   // Pull orders + fleet at once, reusing the existing endpoints.
   const refresh = async () => {
     try {
-      const [os, ts] = await Promise.all([getOrders(), getTrucks()]);
+      const [os, ts, ds] = await Promise.all([getOrders(), getTrucks(), getDrivers().catch(() => [])]);
       setOrders(os);
       setTrucks(ts);
+      setDrivers(ds || []);
       setErr("");
     } catch (e) {
       setErr(e.message);
@@ -5260,6 +5268,7 @@ function DispatchApp({ email, role, onLogout }) {
 
   return (
     <FinanceContext.Provider value={canFinance}>
+    <DriversContext.Provider value={drivers}>
     <div className="h-screen w-full" style={{ background: "#0c1117" }}>
       <style>{FONT}</style>
       {showCal && (
@@ -5278,7 +5287,7 @@ function DispatchApp({ email, role, onLogout }) {
           </div>
         </div>
       )}
-      {showStaff && <ManageStaffModal onClose={() => setShowStaff(false)} />}
+      {showStaff && <ManageStaffModal onClose={() => { setShowStaff(false); refresh(); }} />}
       {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
       {showTrucks && (
@@ -5534,6 +5543,7 @@ function DispatchApp({ email, role, onLogout }) {
         </div>
       </div>
     </div>
+    </DriversContext.Provider>
     </FinanceContext.Provider>
   );
 }

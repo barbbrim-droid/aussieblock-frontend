@@ -412,6 +412,11 @@ export function deleteTruck(label) {
 export function getFuel() {
   return request('/fuel')
 }
+// Assignable driver names (distinct names of driver logins) for the dispatch
+// dropdowns. Add a driver via a Driver login in Manage Staff. Staff-accessible.
+export function getDrivers() {
+  return request('/drivers')
+}
 // Mixer-drum telemetry readings, newest first. Optional truck label filter.
 // Each row: { load_uid, truck, gallons, total_revs, charge_revs, discharge_revs,
 // max_rpm, avg_rpm, pressure_idx_avg, pressure_idx_max, mix_temp_c, mix_temp_f,
