@@ -5724,6 +5724,7 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
   const submit = () => {
     if (!hasInk) { setErr("Please have the customer sign above."); return; }
     if (!name.trim()) { setErr("Enter the name of who signed."); return; }
+    if (water.trim() === "" || isNaN(Number(water)) || Number(water) < 0) { setErr("Enter the water added in gallons (enter 0 if none)."); return; }
     setBusy(true); setErr("");
     canvasRef.current.toBlob((blob) => {
       Promise.resolve(onSubmit(blob, name.trim(), water.trim())).catch((e) => { setErr(e.message || "Could not save"); setBusy(false); });
@@ -5751,8 +5752,8 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
               <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-white/40 text-[10px] uppercase tracking-wide">Water added (gal)</span>
-              <input value={water} onChange={(e) => setWater(e.target.value)} placeholder="e.g. 5" inputMode="decimal" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span className="text-white/40 text-[10px] uppercase tracking-wide">Water added (gal) <span style={{ color: ORANGE }}>*</span></span>
+              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
             </label>
           </div>
           {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
