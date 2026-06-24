@@ -5821,10 +5821,12 @@ function DriverApp({ driver, onLogout }) {
       const r = await attachFuelMileage({ truck_no: fuelForm.truck_no.trim(), odometer: Number(fuelForm.odometer) });
       localStorage.setItem("driver_truck_no", fuelForm.truck_no.trim());
       if (r && r.ok) {
-        setFuelMsg({ ok: true, text: `Saved — ${Number(r.gallons || 0).toFixed(1)} gal from the meter at ${Number(fuelForm.odometer).toLocaleString()} mi.` });
+        setFuelMsg({ ok: true, text: `Logged ${Number(r.gallons || 0).toFixed(1)} gal to ${r.truck || fuelForm.truck_no.trim()} at ${Number(fuelForm.odometer).toLocaleString()} mi.` });
         setFuelForm((f) => ({ ...f, odometer: "" }));
+      } else if (r && r.reason === "no_truck") {
+        setFuelMsg({ ok: false, text: `Truck "${fuelForm.truck_no.trim()}" not found — check the number, or add it in Manage trucks.` });
       } else {
-        setFuelMsg({ ok: false, text: `No fill from the meter yet for truck ${fuelForm.truck_no.trim()} — finish pumping, then tap Save.` });
+        setFuelMsg({ ok: false, text: `No pump fill to log yet — finish pumping, then tap Save.` });
       }
     } catch (e) { setFuelMsg({ ok: false, text: e.message || "Could not save the mileage" }); }
     finally { setFuelBusy(false); }
