@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
 import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
@@ -4078,6 +4078,8 @@ function MaterialsModal({ onClose }) {
   const [form, setForm] = useState(blank);
   const [formPhotos, setFormPhotos] = useState([]);   // photos to attach to the delivery being logged
   const [openPhotos, setOpenPhotos] = useState(null);   // receipt id whose photo strip is expanded
+  const [editId, setEditId] = useState(null);           // receipt id being edited inline
+  const [editForm, setEditForm] = useState({});
   const [busy, setBusy] = useState(false);
   // Usage filters: a completed-date window (day or range) + a single-material focus.
   const [from, setFrom] = useState("");
@@ -4132,6 +4134,29 @@ function MaterialsModal({ onClose }) {
   const removeReceipt = async (r) => {
     if (!window.confirm(`Delete this ${r.material} delivery (${t1(r.tons)} ton${r.supplier ? ", " + r.supplier : ""})?`)) return;
     try { await deleteReceipt(r.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  const startEdit = (r) => {
+    setOpenPhotos(null);
+    setEditId(r.id);
+    setEditForm({ received_on: r.received_on || today, supplier: r.supplier || "", tons: r.tons ?? "",
+      ticket_no: r.ticket_no || "", invoice_no: r.invoice_no || "", unit_cost: r.unit_cost ?? "" });
+  };
+  const saveEdit = async (r) => {
+    if (!(Number(editForm.tons) > 0)) { setMsg({ ok: false, text: "Enter the tons." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const uc = editForm.unit_cost === "" || editForm.unit_cost == null ? null : Number(editForm.unit_cost);
+      const tons = Number(editForm.tons);
+      await editReceipt(r.id, {
+        received_on: editForm.received_on || today, tons,
+        supplier: editForm.supplier.trim() || null,
+        ticket_no: editForm.ticket_no.trim() || null,
+        invoice_no: editForm.invoice_no.trim() || null,
+        unit_cost: uc, total_cost: uc == null ? null : Math.round(tons * uc * 100) / 100,
+      });
+      setEditId(null); setMsg({ ok: true, text: "Delivery updated." }); await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
   };
 
   const inCls = "w-full rounded-lg px-2.5 py-2 text-sm text-white outline-none placeholder:text-white/30";
@@ -4240,9 +4265,29 @@ function MaterialsModal({ onClose }) {
                                 <Camera size={14} color={(r.photos || []).length ? ORANGE : "rgba(255,255,255,0.4)"} />
                                 {(r.photos || []).length > 0 && <span className="text-[10px] font-semibold" style={{ color: ORANGE }}>{r.photos.length}</span>}
                               </button>
+                              <button onClick={() => startEdit(r)} title="Edit" className="p-1 rounded active:scale-90 align-middle"><Pencil size={13} color={editId === r.id ? ORANGE : "rgba(255,255,255,0.55)"} /></button>
                               <button onClick={() => removeReceipt(r)} title="Delete" className="p-1 rounded active:scale-90 align-middle"><Trash2 size={13} color="#ff8a85" /></button>
                             </td>
                           </tr>
+                          {editId === r.id && (
+                            <tr style={{ background: NAVY }}>
+                              <td colSpan={9} className="px-2 py-2.5">
+                                <div className="text-white/55 text-[11px] uppercase tracking-wide mb-1.5">Edit this {r.material} delivery</div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                  <input type="date" value={editForm.received_on} onChange={(e) => setEditForm({ ...editForm, received_on: e.target.value })} className={inCls} style={inSt} />
+                                  <input type="number" placeholder="Tons" value={editForm.tons} onChange={(e) => setEditForm({ ...editForm, tons: e.target.value })} className={inCls} style={inSt} />
+                                  <input placeholder="Supplier" value={editForm.supplier} onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} className={inCls} style={inSt} />
+                                  <input placeholder="Ticket #" value={editForm.ticket_no} onChange={(e) => setEditForm({ ...editForm, ticket_no: e.target.value })} className={inCls} style={inSt} />
+                                  <input placeholder="Invoice #" value={editForm.invoice_no} onChange={(e) => setEditForm({ ...editForm, invoice_no: e.target.value })} className={inCls} style={inSt} />
+                                  <input type="number" placeholder="$/ton" value={editForm.unit_cost} onChange={(e) => setEditForm({ ...editForm, unit_cost: e.target.value })} className={inCls} style={inSt} />
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                  <button onClick={() => saveEdit(r)} disabled={busy} className="rounded-lg px-3 py-1.5 text-sm font-bold active:scale-95 inline-flex items-center gap-1.5 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save</button>
+                                  <button onClick={() => setEditId(null)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white/70 active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>Cancel</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                           {openPhotos === r.id && (
                             <tr style={{ background: NAVY }}>
                               <td colSpan={9} className="px-2"><ReceiptPhotos receipt={r} onChanged={load} /></td>
