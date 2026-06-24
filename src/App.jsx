@@ -146,7 +146,10 @@ const SET_TIMES = ["30 min", "1 hr", "1.5 hr", "2 hr", "3 hr", "4 hr"];
 const USES = ["Slab", "Flatwork", "Driveway", "Sidewalk", "Curbs", "Footings", "Foundation", "Patio", "Walls", "Precast", "Block Fill", "Other"];
 // When set (build-time), the job-site field uses Google Places for accurate
 // addresses; otherwise it falls back to the free OpenStreetMap source.
-const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
+// Falls back to the project key so the map/Places work even when the build-time
+// env var isn't set. This is a browser (client-side) key — it MUST be restricted
+// by HTTP referrer to this app's domain in Google Cloud Console.
+const GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "AIzaSyCw3ArUqZT7XHLujqAmrf6IpXGm1qNe9v4";
 
 const INV_STATUS = {
   paid: { label: "Paid", color: GREEN },
