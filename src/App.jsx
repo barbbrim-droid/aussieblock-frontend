@@ -91,7 +91,7 @@ const STATUS_META = {
   returning: { label: "Returning to yard", color: "#4da3ff" },
   complete: { label: "Complete", color: GREEN },
 };
-const STAGES = ["Loading at yard", "En route", "On site", "Pouring", "Returning", "Complete"];
+const STAGES = ["Loading at yard", "En route", "Delivered"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
 const ORDER_STATUSES = ["requested", "scheduled", "ongoing", "batched", "enroute", "onsite", "pouring", "returning", "complete"];
@@ -185,11 +185,11 @@ function bez(p0, p1, p2, t) {
   return { x, y, ang: (Math.atan2(dy, dx) * 180) / Math.PI };
 }
 
-function StatusPill({ status }) {
+function StatusPill({ status, label }) {
   const m = STATUS_META[status] || STATUS_META.scheduled;
   return (
     <span style={{ background: m.color + "22", color: m.color, fontFamily: C.body }} className="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide uppercase">
-      {m.label}
+      {label || m.label}
     </span>
   );
 }
@@ -409,11 +409,12 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const delivered = live.status === "complete" || trackStatus === "complete";
   const preparing = !arrived && (live.status === "ongoing" || trackStatus === "batched" || live.status === "batched");
   // Customer-friendly per-truck label — we don't surface "returning to yard" etc.
-  const custLabel = (st) => (st === "returning" || st === "complete") ? "Delivered"
-    : (st === "onsite" || st === "pouring") ? "On site"
-    : st === "enroute" ? "On the way"
+  // Worker/customer view collapses the truck's stages: once it arrives (on site /
+  // pouring / returning / complete) it's simply "Delivered".
+  const custLabel = (st) => ["onsite", "pouring", "returning", "complete"].includes(st) ? "Delivered"
+    : st === "enroute" ? "En route"
     : "Loading at yard";
-  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 3, returning: 4, complete: 5 };
+  const STATUS_STAGE = { batched: 0, enroute: 1, onsite: 2, pouring: 2, returning: 2, complete: 2 };
   const isLive = ["batched", "ongoing", "enroute", "onsite", "pouring", "returning", "complete"].includes(live.status);
   const tracking = trackStatus === "enroute";   // live map + ETA only while a truck is heading over
   const stageIdx = STATUS_STAGE[trackStatus] ?? -1;
@@ -423,7 +424,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       <button onClick={onBack} className="flex items-center gap-1 text-white/60 text-sm mb-3 active:opacity-60"><ChevronLeft size={18} /> Back</button>
       <div className="flex items-baseline justify-between">
         <span style={{ color: ORANGE, fontFamily: C.cond }} className="text-sm font-bold tracking-wider">{order.ref}</span>
-        <StatusPill status={trackStatus} />
+        <StatusPill status={trackStatus} label={["onsite", "pouring", "returning", "complete"].includes(trackStatus) ? "Delivered" : undefined} />
       </div>
       <h2 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold leading-tight mt-1">{order.project || order.site}</h2>
       {order.project && <p className="text-white/50 text-sm flex items-center gap-1"><MapPin size={13} /> {order.site}</p>}
@@ -460,8 +461,8 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
         // return-trip tracking; just confirm it's here / delivered.
         <div className="rounded-2xl p-6 mt-4 text-center" style={{ background: NAVY }}>
           <CheckCircle2 size={30} color={GREEN} className="mx-auto mb-2" />
-          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>{delivered ? "Delivered" : "On site"}</div>
-          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>{delivered ? "Your concrete has been delivered — thank you!" : "Your truck has arrived — your concrete is being delivered."}</div>
+          <div className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>Delivered</div>
+          <div className="text-white/55 text-sm mt-1" style={{ fontFamily: C.body }}>Your concrete has been delivered — thank you!</div>
         </div>
       ) : preparing ? (
         // Loading at the yard (or a pour underway) but no truck is en route yet —
