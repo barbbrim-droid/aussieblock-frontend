@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3103,9 +3103,12 @@ function ManageTrucksModal({ onClose, onChanged }) {
 function FuelModal({ onClose }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
-  const [openLabel, setOpenLabel] = useState(null);   // truck whose fills are expanded
+  const [openLabel, setOpenLabel] = useState(null);   // truck (or "__unmatched__") whose fills are expanded
   const [fills, setFills] = useState(null);           // fills for the expanded truck
   const [loadingFills, setLoadingFills] = useState(false);
+  const [editId, setEditId] = useState(null);         // fill being edited inline
+  const [editForm, setEditForm] = useState({ truck_label: "", gallons: "" });
+  const [busy, setBusy] = useState(false);            // an edit/delete is in flight
 
   const load = async () => {
     try { setData(await getFuel()); setErr(""); } catch (e) { setErr(e.message); }
@@ -3113,16 +3116,85 @@ function FuelModal({ onClose }) {
 
   useEffect(() => { load(); }, []);
 
+  // After an edit/delete, refresh the summary and re-pull the open truck's fills.
+  const refresh = async () => {
+    await load();
+    if (openLabel && openLabel !== "__unmatched__") {
+      try { setFills((await getTruckFuel(openLabel)).fills); } catch { /* keep prior */ }
+    }
+  };
+
   const toggle = async (label) => {
+    setEditId(null);
     if (openLabel === label) { setOpenLabel(null); setFills(null); return; }
-    setOpenLabel(label); setFills(null); setLoadingFills(true);
+    setOpenLabel(label); setFills(null);
+    if (label === "__unmatched__") return;            // unmatched fills come from data, no fetch
+    setLoadingFills(true);
     try { setFills((await getTruckFuel(label)).fills); }
     catch (e) { setErr(e.message); }
     finally { setLoadingFills(false); }
   };
 
+  const startEdit = (fill, currentLabel) => {
+    setEditId(fill.id);
+    setEditForm({ truck_label: currentLabel || "", gallons: fill.gallons != null ? String(fill.gallons) : "" });
+  };
+
+  const saveEdit = async (fill) => {
+    setBusy(true);
+    try {
+      const body = { truck_label: editForm.truck_label };   // "" = move to Unmatched
+      if (editForm.gallons !== "" && Number(editForm.gallons) >= 0) body.gallons = Number(editForm.gallons);
+      await editFuelFill(fill.id, body);
+      setEditId(null);
+      await refresh();
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const doDelete = async (fill) => {
+    if (!window.confirm(`Delete this fuel fill — ${(fill.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal${fill.when ? ` on ${formatOrderDate(fill.when)}` : ""}?\n\nThis can't be undone.`)) return;
+    setBusy(true);
+    try { await deleteFuelFill(fill.id); setEditId(null); await refresh(); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
   const totalGal = data ? data.trucks.reduce((a, t) => a + (t.gallons || 0), 0) : 0;
   const card = { background: NAVY, border: "1px solid rgba(255,255,255,0.06)" };
+  const truckLabels = data ? data.trucks.map((t) => t.label) : [];
+
+  // One fill row: details + edit/delete controls; expands to an inline editor.
+  // `currentLabel` is the truck the fill sits on now ("" when Unmatched).
+  const renderFill = (f, currentLabel, isLast) => {
+    const editing = editId === f.id;
+    const selSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body };
+    return (
+      <div key={f.id} style={{ borderBottom: !isLast ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+        <div className="flex items-center justify-between text-xs py-1.5 gap-2">
+          <span className="text-white/55 min-w-0 truncate">
+            {f.when ? formatOrderDate(f.when) : "—"}{f.fuel_type ? ` · ${f.fuel_type}` : ""}{f.driver ? ` · ${f.driver}` : ""}{f.odometer != null ? ` · ${Number(f.odometer).toLocaleString()} odo` : ""}{currentLabel === "" && f.vehicle_no ? ` · #${f.vehicle_no}` : ""}
+          </span>
+          <span className="flex items-center gap-1.5 shrink-0">
+            <span className="text-white font-semibold">{(f.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal</span>
+            <button onClick={() => (editing ? setEditId(null) : startEdit(f, currentLabel))} disabled={busy} title="Edit / reassign" className="p-1 rounded active:scale-90 disabled:opacity-40" style={{ background: "rgba(255,255,255,0.06)" }}><Pencil size={12} color="#cfe0ff" /></button>
+            <button onClick={() => doDelete(f)} disabled={busy} title="Delete fill" className="p-1 rounded active:scale-90 disabled:opacity-40" style={{ background: "rgba(239,83,80,0.14)" }}><Trash2 size={12} color="#ff8a85" /></button>
+          </span>
+        </div>
+        {editing && (
+          <div className="flex flex-wrap items-center gap-1.5 pb-2 pt-0.5">
+            <select value={editForm.truck_label} onChange={(e) => setEditForm({ ...editForm, truck_label: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={selSt}>
+              <option value="">Unmatched</option>
+              {truckLabels.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+            <input value={editForm.gallons} onChange={(e) => setEditForm({ ...editForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="gal" className="w-16 rounded-md px-2 py-1 text-xs outline-none" style={selSt} />
+            <button onClick={() => saveEdit(f)} disabled={busy} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save</button>
+            <button onClick={() => setEditId(null)} disabled={busy} className="rounded-md px-2 py-1 text-xs text-white/55 active:scale-95" style={{ background: "rgba(255,255,255,0.06)" }}>Cancel</button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
@@ -3169,12 +3241,7 @@ function FuelModal({ onClose }) {
                           ) : !fills || fills.length === 0 ? (
                             <div className="text-white/40 text-xs py-2">No fills recorded.</div>
                           ) : (
-                            fills.map((f, i) => (
-                              <div key={i} className="flex items-center justify-between text-xs py-1" style={{ borderBottom: i < fills.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                <span className="text-white/55">{f.when ? formatOrderDate(f.when) : "—"}{f.fuel_type ? ` · ${f.fuel_type}` : ""}{f.driver ? ` · ${f.driver}` : ""}{f.odometer != null ? ` · ${Number(f.odometer).toLocaleString()} odo` : ""}</span>
-                                <span className="text-white font-semibold shrink-0 ml-2">{(f.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal</span>
-                              </div>
-                            ))
+                            fills.map((f, i) => renderFill(f, t.label, i === fills.length - 1))
                           )}
                         </div>
                       )}
@@ -3184,10 +3251,21 @@ function FuelModal({ onClose }) {
               )}
 
               {data.unmatched.fills > 0 && (
-                <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(255,170,60,0.10)", border: "1px solid rgba(255,170,60,0.25)" }}>
-                  <div className="text-xs font-semibold flex items-center gap-1.5" style={{ color: ORANGE }}><AlertTriangle size={13} /> {data.unmatched.fills} fill{data.unmatched.fills === 1 ? "" : "s"} ({data.unmatched.gallons.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal) not matched to a truck</div>
-                  {data.unmatched.vehicles.length > 0 && (
-                    <div className="text-white/55 text-[11px] mt-1">Vehicle #s: {data.unmatched.vehicles.join(", ")} — set the matching number on a truck in <span className="font-semibold">Manage trucks</span> to pull these in.</div>
+                <div className="rounded-lg overflow-hidden" style={{ background: "rgba(255,170,60,0.10)", border: "1px solid rgba(255,170,60,0.25)" }}>
+                  <button onClick={() => toggle("__unmatched__")} className="w-full text-left px-3 py-2.5">
+                    <div className="text-xs font-semibold flex items-center gap-1.5" style={{ color: ORANGE }}><AlertTriangle size={13} /> {data.unmatched.fills} fill{data.unmatched.fills === 1 ? "" : "s"} ({data.unmatched.gallons.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal) not matched to a truck — tap to {openLabel === "__unmatched__" ? "hide" : "fix"}</div>
+                    {data.unmatched.vehicles.length > 0 && (
+                      <div className="text-white/55 text-[11px] mt-1">Vehicle #s: {data.unmatched.vehicles.join(", ")} — reassign each below, or set the number on a truck in <span className="font-semibold">Manage trucks</span>.</div>
+                    )}
+                  </button>
+                  {openLabel === "__unmatched__" && (
+                    <div className="px-3 pb-2.5 pt-0.5" style={{ borderTop: "1px solid rgba(255,170,60,0.20)" }}>
+                      {(data.unmatched.list || []).length === 0 ? (
+                        <div className="text-white/40 text-xs py-2">No fills.</div>
+                      ) : (
+                        data.unmatched.list.map((f, i) => renderFill(f, "", i === data.unmatched.list.length - 1))
+                      )}
+                    </div>
                   )}
                 </div>
               )}

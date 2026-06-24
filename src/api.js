@@ -454,6 +454,19 @@ export function resetMixerTotal(truck, metric) {
 export function getTruckFuel(label) {
   return request(`/trucks/${encodeURIComponent(label)}/fuel`)
 }
+// Edit one fuel fill (staff): reassign to another truck (truck_label; "" = back to
+// Unmatched), and/or correct gallons/odometer. Omit a field to leave it unchanged.
+export function editFuelFill(id, body) {
+  return request(`/fuel/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+// Delete one fuel fill by id (staff) — a duplicate or a fill logged in error.
+export function deleteFuelFill(id) {
+  return request(`/fuel/${id}`, { method: 'DELETE' })
+}
 // Import a FluidSecure transaction export (CSV) when the API token isn't
 // available (staff). Returns { rows, added }.
 export async function importFuel(file) {
