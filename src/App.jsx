@@ -2189,6 +2189,28 @@ function LoadQtyInput({ qty, disabled, style, onSave }) {
   );
 }
 
+// Live "time on site" pill. Ticks while the truck is on site (onsiteAt set, no
+// departedAt), then freezes at the total once it leaves. Timestamps are UTC ISO.
+function OnSiteTime({ onsiteAt, departedAt, prefix = "On site" }) {
+  const [, force] = useState(0);
+  const live = !!onsiteAt && !departedAt;
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => force((n) => n + 1), 30000);   // refresh every 30s
+    return () => clearInterval(id);
+  }, [live]);
+  if (!onsiteAt) return null;
+  const start = new Date(onsiteAt).getTime();
+  const end = departedAt ? new Date(departedAt).getTime() : Date.now();
+  const mins = Math.max(0, Math.round((end - start) / 60000));
+  const txt = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: live ? GREEN + "22" : "rgba(255,255,255,0.08)", color: live ? GREEN : "rgba(255,255,255,0.6)", fontFamily: C.body }}>
+      <Clock size={11} /> {prefix ? `${prefix} ` : ""}{txt}{live ? " · live" : ""}
+    </span>
+  );
+}
+
 // The loads inside a continuous pour (>10 yd). Loads are added one at a time as
 // each truck is batched/loaded; the card rolls them up. Keeps a big pour to one card.
 function LoadsPanel({ o, trucks, onEdited }) {
@@ -2293,8 +2315,9 @@ function LoadsPanel({ o, trucks, onEdited }) {
               </select>
               <button onClick={() => del(ld.seq)} disabled={busy === ld.seq} title="Remove load" className="p-1 rounded active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}><X size={12} color="#ff8a85" /></button>
             </div>
-            {/* this load's own batch ticket */}
+            {/* this load's own batch ticket + time on site for this truck */}
             <div className="flex items-center gap-1.5 flex-wrap mt-1" style={{ paddingLeft: 60 }}>
+              {ld.onsite_at && <OnSiteTime onsiteAt={ld.onsite_at} departedAt={ld.departed_at} prefix="" />}
               {ld.has_batch_ticket ? (
                 <>
                   <button onClick={() => openLoadBatchTicket(o.ref, ld.seq).catch((e) => setErr(e.message))} className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95" style={{ color: GREEN, background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
@@ -2488,6 +2511,11 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
           </div>
           <div className="text-white/35 text-[11px] mt-1" style={{ fontFamily: C.body }}>{o.status === "onsite" ? "On site" : `${pct}% to site`}</div>
         </div>
+      )}
+
+      {/* time on site (single delivery) — live while on site, total once it leaves */}
+      {!o.is_pour && o.onsite_at && (
+        <div className="mt-2"><OnSiteTime onsiteAt={o.onsite_at} departedAt={o.departed_at} /></div>
       )}
 
       {/* staff controls — a pour shows its loads; a single delivery shows one set */}
