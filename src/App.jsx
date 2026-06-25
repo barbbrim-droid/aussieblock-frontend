@@ -4634,7 +4634,7 @@ function CostsModal({ orders, onClose }) {
       const list = orders || [];
       // Map one order's backend pricing payload into the row shape this modal uses.
       const shape = (o, p) => {
-        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", invoice: (p && p.invoice) || null, error: true };
+        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", invoice: (p && p.invoice) || null, onsite: (p && p.onsite) || null, error: true };
         const cp = p.customer, dl = p.delivery;
         // hauler bucket for the "by hauler" view — computed server-side from the
         // delivering truck (RTS 4554/7329/7336 → RTS; other → P&L Concrete) with
@@ -4657,7 +4657,7 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null };
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -4677,6 +4677,7 @@ function CostsModal({ orders, onClose }) {
   const Drow = ({ label, val }) => (
     <div className="flex justify-between gap-2"><span className="text-white/40">{label}</span><span className="text-white/85 text-right truncate ml-2">{val == null || val === "" ? "—" : val}</span></div>
   );
+  const fmtMins = (m) => { const h = Math.floor(m / 60); const mm = Math.round(m % 60); return h ? `${h}h ${mm}m` : `${mm}m`; };
 
   const needle = q.trim().toLowerCase();
   const inText = (o) => !needle ||
@@ -4988,6 +4989,8 @@ function CostsModal({ orders, onClose }) {
                                   <Drow label="Yards" val={r.yards != null ? `${r.yards} yd` : o.qty} />
                                   <Drow label="Base $/yd" val={r.unit != null ? `${money(r.unit)}/yd` : "—"} />
                                   <Drow label="Fiber" val={r.fiberAmt ? `${r.fiberLbs ? r.fiberLbs + " lb · " : ""}${money(r.fiberAmt)}` : "—"} />
+                                  <Drow label="On site" val={r.onsite && r.onsite.minutes ? `${fmtMins(r.onsite.minutes)}${r.onsite.trucks > 1 ? ` · ${r.onsite.trucks} trucks` : ""}` : "—"} />
+                                  <Drow label="Standby" val={r.onsite && r.onsite.standby ? money(r.onsite.standby) : (r.onsite && r.onsite.minutes ? "$0 (under 1 hr)" : "—")} />
                                   <Drow label="Billed" val={r.error ? "—" : money(r.billed)} />
                                   <Drow label="To hauler" val={money(r.toHauler)} />
                                 </div>
@@ -5392,6 +5395,8 @@ function PriceSheetModal({ onClose }) {
         short_load_under_yd: Number(sheet.short_load_under_yd) || 0,
         backhaul_per_yd: Number(sheet.backhaul_per_yd) || 0,
         backhaul_under_yd: Number(sheet.backhaul_under_yd) || 0,
+        standby_per_hour: Number(sheet.standby_per_hour) || 0,
+        standby_free_hours: Number(sheet.standby_free_hours) || 0,
         mixes: (sheet.mixes || []).filter((m) => (m.mix || "").trim()).map((m) => ({ mix: m.mix.trim(), price: Number(m.price) || 0, haul: Number(m.haul) || 0 })),
         overrides: (sheet.overrides || []).filter((o) => (o.customer || "").trim()).map((o) => ({ customer: o.customer.trim(), mix: (o.mix || "").trim(), price: Number(o.price) || 0 })),
         admixtures: (sheet.admixtures || []).filter((a) => (a.name || "").trim()).map((a) => ({ name: a.name.trim(), rate: Number(a.rate) || 0, per: a.per === "lb" ? "lb" : "yard" })),
@@ -5422,9 +5427,11 @@ function PriceSheetModal({ onClose }) {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
               <label><span className={lbl}>Sales tax %</span><input type="number" step="0.01" value={sheet.tax_pct} onChange={(e) => set("tax_pct", e.target.value)} className={inCls} style={inSt} /></label>
               <label><span className={lbl}>Short-load fee $</span><input type="number" value={sheet.short_load_fee} onChange={(e) => set("short_load_fee", e.target.value)} className={inCls} style={inSt} /></label>
-              <label><span className={lbl}>…when order under (yd)</span><input type="number" value={sheet.short_load_under_yd} onChange={(e) => set("short_load_under_yd", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>…order ≤ (yd)</span><input type="number" value={sheet.short_load_under_yd} onChange={(e) => set("short_load_under_yd", e.target.value)} className={inCls} style={inSt} /></label>
               <label><span className={lbl}>Back-haul $/yd</span><input type="number" value={sheet.backhaul_per_yd} onChange={(e) => set("backhaul_per_yd", e.target.value)} className={inCls} style={inSt} /></label>
-              <label><span className={lbl}>…when load under (yd)</span><input type="number" value={sheet.backhaul_under_yd} onChange={(e) => set("backhaul_under_yd", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>…load ≤ (yd)</span><input type="number" value={sheet.backhaul_under_yd} onChange={(e) => set("backhaul_under_yd", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>Standby $/hr (after free)</span><input type="number" value={sheet.standby_per_hour} onChange={(e) => set("standby_per_hour", e.target.value)} className={inCls} style={inSt} /></label>
+              <label><span className={lbl}>Free hours on site</span><input type="number" step="0.25" value={sheet.standby_free_hours} onChange={(e) => set("standby_free_hours", e.target.value)} className={inCls} style={inSt} /></label>
             </div>
 
             {/* mixes */}
