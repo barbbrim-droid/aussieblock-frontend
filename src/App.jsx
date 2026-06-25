@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -5938,25 +5938,39 @@ function DriverApp({ driver, onLogout }) {
   const [notesSaved, setNotesSaved] = useState(false);
   // Manual fuel fill — driver enters truck #, gallons, optional mileage.
   const [showFuel, setShowFuel] = useState(false);
-  const [fuelForm, setFuelForm] = useState({ truck_no: localStorage.getItem("driver_truck_no") || "", odometer: "" });
+  const [fuelForm, setFuelForm] = useState({ truck_no: localStorage.getItem("driver_truck_no") || "", odometer: "", gallons: "" });
   const [fuelBusy, setFuelBusy] = useState(false);
   const [fuelMsg, setFuelMsg] = useState(null);
   const submitFuel = async () => {
-    if (!fuelForm.truck_no.trim()) { setFuelMsg({ ok: false, text: "Enter your truck number." }); return; }
+    const truck = fuelForm.truck_no.trim();
+    if (!truck) { setFuelMsg({ ok: false, text: "Enter your truck number." }); return; }
     if (!(Number(fuelForm.odometer) > 0)) { setFuelMsg({ ok: false, text: "Enter the current mileage." }); return; }
+    const gal = Number(fuelForm.gallons);
     setFuelBusy(true); setFuelMsg(null);
     try {
-      const r = await attachFuelMileage({ truck_no: fuelForm.truck_no.trim(), odometer: Number(fuelForm.odometer) });
-      localStorage.setItem("driver_truck_no", fuelForm.truck_no.trim());
+      localStorage.setItem("driver_truck_no", truck);
+      // Prefer the meter: try to claim a fill it already posted (most accurate).
+      const r = await attachFuelMileage({ truck_no: truck, odometer: Number(fuelForm.odometer) });
       if (r && r.ok) {
-        setFuelMsg({ ok: true, text: `Logged ${Number(r.gallons || 0).toFixed(1)} gal to ${r.truck || fuelForm.truck_no.trim()} at ${Number(fuelForm.odometer).toLocaleString()} mi.` });
-        setFuelForm((f) => ({ ...f, odometer: "" }));
+        setFuelMsg({ ok: true, text: `Logged ${Number(r.gallons || 0).toFixed(1)} gal to ${r.truck || truck} at ${Number(fuelForm.odometer).toLocaleString()} mi.` });
+        setFuelForm((f) => ({ ...f, odometer: "", gallons: "" }));
       } else if (r && r.reason === "no_truck") {
-        setFuelMsg({ ok: false, text: `Truck "${fuelForm.truck_no.trim()}" not found — check the number, or add it in Manage trucks.` });
+        setFuelMsg({ ok: false, text: `Truck "${truck}" not found — check the number, or add it in Manage trucks.` });
+      } else if (gal > 0) {
+        // Meter didn't record a fill — log the gallons the driver entered by hand.
+        const m = await logManualFuel({ truck_no: truck, gallons: gal, odometer: Number(fuelForm.odometer) });
+        if (m && m.ok) {
+          setFuelMsg({ ok: true, text: `Logged ${Number(m.gallons || 0).toFixed(1)} gal to ${m.truck || truck} by hand at ${Number(fuelForm.odometer).toLocaleString()} mi.` });
+          setFuelForm((f) => ({ ...f, odometer: "", gallons: "" }));
+        } else if (m && m.reason === "no_truck") {
+          setFuelMsg({ ok: false, text: `Truck "${truck}" not found — check the number, or add it in Manage trucks.` });
+        } else {
+          setFuelMsg({ ok: false, text: "Couldn't log that fill — try again." });
+        }
       } else {
-        setFuelMsg({ ok: false, text: `No pump fill to log yet — finish pumping, then tap Save.` });
+        setFuelMsg({ ok: false, text: "The meter hasn't recorded a fill. If it missed this one, enter the gallons below and tap Save again." });
       }
-    } catch (e) { setFuelMsg({ ok: false, text: e.message || "Could not save the mileage" }); }
+    } catch (e) { setFuelMsg({ ok: false, text: e.message || "Could not save the fuel fill" }); }
     finally { setFuelBusy(false); }
   };
 
@@ -6210,14 +6224,16 @@ function DriverApp({ driver, onLogout }) {
               <button onClick={() => setShowFuel(false)} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
             </div>
             <div className="p-5">
-              <p className="text-white/45 text-xs mb-3">After you finish pumping, enter your truck number and current mileage. The gallons come from the fuel meter automatically.</p>
+              <p className="text-white/45 text-xs mb-3">After you finish pumping, enter your truck number and current mileage. The gallons come from the fuel meter automatically — only fill in gallons below if the meter missed this fill.</p>
               <label className="text-white/50 text-xs uppercase tracking-wide">Truck number</label>
               <input value={fuelForm.truck_no} onChange={(e) => setFuelForm({ ...fuelForm, truck_no: e.target.value })} inputMode="numeric" placeholder="e.g. 4554" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
               <label className="text-white/50 text-xs uppercase tracking-wide">Current mileage (odometer)</label>
               <input value={fuelForm.odometer} onChange={(e) => setFuelForm({ ...fuelForm, odometer: e.target.value })} type="number" inputMode="numeric" placeholder="e.g. 123456" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+              <label className="text-white/50 text-xs uppercase tracking-wide">Gallons <span className="text-white/30 normal-case">— only if the meter missed it</span></label>
+              <input value={fuelForm.gallons} onChange={(e) => setFuelForm({ ...fuelForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="leave blank to use the meter" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
               {fuelMsg && <div className="rounded-lg px-3 py-2 text-sm mb-3" style={{ background: fuelMsg.ok ? GREEN + "1f" : "rgba(239,83,80,0.14)", color: fuelMsg.ok ? GREEN : "#ff8a85" }}>{fuelMsg.text}</div>}
               <button onClick={submitFuel} disabled={fuelBusy} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
-                {fuelBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />} Save mileage
+                {fuelBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />} Save fill
               </button>
               <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 mt-2 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Done</button>
             </div>

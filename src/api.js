@@ -504,6 +504,15 @@ export function attachFuelMileage({ truck_no, odometer }) {
     body: JSON.stringify({ truck_no, odometer: Number(odometer) }),
   })
 }
+// Driver logs a fill BY HAND when the meter missed it — gallons are typed, not
+// pulled from the meter. Returns { ok, gallons, truck } or { ok:false, reason }.
+export function logManualFuel({ truck_no, gallons, odometer }) {
+  return request('/fuel/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ truck_no, gallons: Number(gallons), odometer: odometer ? Number(odometer) : null }),
+  })
+}
 // Capture the customer's signature (a PNG Blob) + printed name + water added on
 // site (gal); marks the order Delivered/Complete and stores proof of delivery.
 export async function signOffOrder(ref, blob, signedBy, waterAdded = '') {
