@@ -2210,10 +2210,13 @@ function OnSiteTime({ onsiteAt, departedAt, prefix = "On site" }) {
   const start = new Date(onsiteAt).getTime();
   const end = departedAt ? new Date(departedAt).getTime() : Date.now();
   const mins = Math.max(0, Math.round((end - start) / 60000));
-  const txt = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+  const dur = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+  // Actual arrival/leave clock times, pinned to US Central regardless of device.
+  const ct = (iso) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z").toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" });
+  const times = departedAt ? `${ct(onsiteAt)}–${ct(departedAt)}` : ct(onsiteAt);
   return (
     <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: live ? GREEN + "22" : "rgba(255,255,255,0.08)", color: live ? GREEN : "rgba(255,255,255,0.6)", fontFamily: C.body }}>
-      <Clock size={11} /> {prefix ? `${prefix} ` : ""}{txt}{live ? " · live" : ""}
+      <Clock size={11} /> {prefix ? `${prefix} ` : ""}{times} CT · {dur}{live ? " · live" : ""}
     </span>
   );
 }
