@@ -157,6 +157,13 @@ const INV_STATUS = {
   overdue: { label: "Past due", color: "#ef5350" },
 };
 const usd = (n) => (n ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+// Render a UTC timestamp as a US Central clock time (the plant's zone), labelled
+// "CT", so a time reads the same regardless of the viewing device's timezone.
+const fmtDateTime = (iso) => {
+  if (!iso) return "";
+  const s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z";   // treat naive timestamps as UTC
+  return new Date(s).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " CT";
+};
 
 // "3m ago" style label. The backend sends naive UTC (datetime.utcnow), so mark
 // it as UTC before parsing — otherwise the browser reads it as local time and
@@ -6172,7 +6179,7 @@ function DeliveryTicketModal({ order, onClose }) {
     return () => { live = false; };
   }, [order.ref, order.has_signature]);
 
-  const signedAt = order.signed_at ? new Date(order.signed_at + "Z").toLocaleString() : "";
+  const signedAt = fmtDateTime(order.signed_at);
   const Row = ({ label, val }) => (val ? (
     <div className="flex justify-between gap-3 py-1.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
       <span className="text-white/45 text-xs uppercase tracking-wide" style={{ fontFamily: C.body }}>{label}</span>
@@ -6470,7 +6477,7 @@ function DriverApp({ driver, onLogout }) {
                             <CheckCircle2 size={18} color={GREEN} />
                             <div>
                               <div className="text-white font-bold text-sm">Signed — {l.signed_by}</div>
-                              <div className="text-white/50 text-xs">{l.signed_at ? new Date(l.signed_at + "Z").toLocaleString() : ""}{l.water_added ? ` · ${l.water_added} gal water` : ""}</div>
+                              <div className="text-white/50 text-xs">{fmtDateTime(l.signed_at)}{l.water_added ? ` · ${l.water_added} gal water` : ""}</div>
                             </div>
                           </div>
                         ) : (
@@ -6493,7 +6500,7 @@ function DriverApp({ driver, onLogout }) {
                         <CheckCircle2 size={20} color={GREEN} />
                         <div>
                           <div className="text-white font-bold text-sm">Customer signed — {active.signed_by}</div>
-                          <div className="text-white/50 text-xs">{active.signed_at ? new Date(active.signed_at + "Z").toLocaleString() : ""}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
+                          <div className="text-white/50 text-xs">{fmtDateTime(active.signed_at)}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
                         </div>
                       </div>
                       <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
