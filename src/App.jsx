@@ -4619,7 +4619,10 @@ function CostsModal({ orders, onClose }) {
       const shape = (o, p) => {
         if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", error: true };
         const cp = p.customer, dl = p.delivery;
-        const hauler = (dl && dl.hauler) || o.hauler || "";
+        // hauler bucket for the "by hauler" view — computed server-side from the
+        // delivering truck (RTS 4554/7329/7336 → RTS; other → P&L Concrete) with
+        // self-haul customers grouped under their own name.
+        const hauler = (dl && dl.hauler_group) || (dl && dl.hauler) || o.hauler || "";
         const billed = cp && cp.total != null ? Number(cp.total) : null;
         // To the hauler = delivery/mileage cost + short-load fee + back-haul fee.
         const haulMi = dl && dl.total != null ? Number(dl.total) : null;
