@@ -4588,6 +4588,23 @@ function CostsModal({ orders, onClose }) {
   const [editPrice, setEditPrice] = useState(false);
   const [priceVal, setPriceVal] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
+  const [openOrder, setOpenOrder] = useState(null);   // cost row expanded for detail
+  const [payingOrder, setPayingOrder] = useState(""); // order ref whose paid status is toggling
+  const [reloadKey, setReloadKey] = useState(0);       // bump to re-pull pricing
+
+  // Mark/unmark the order's invoice paid (Costs tab). QBO-paid invoices can't be
+  // un-paid here; only staff "mark paid" overrides toggle.
+  const togglePaidOrder = async (o, inv) => {
+    if (!inv || !inv.number) return;
+    setPayingOrder(o.ref); setErr("");
+    try {
+      if (inv.manually_paid) await unmarkInvoicePaid(inv.number);       // undo → outstanding
+      else if (inv.status !== "paid") await markInvoicePaid(inv.number); // mark paid
+      else { setPayingOrder(""); return; }                              // genuinely QBO-paid
+      setReloadKey((k) => k + 1);
+    } catch (e) { setErr(e.message); }
+    finally { setPayingOrder(""); }
+  };
 
   const reloadFuel = () => getFuel({ frm: from, to: to }).then(setFuel).catch(() => setFuel(null));
   // Fuel cost for the same date range as the orders (its own request — fuel isn't
@@ -4617,7 +4634,7 @@ function CostsModal({ orders, onClose }) {
       const list = orders || [];
       // Map one order's backend pricing payload into the row shape this modal uses.
       const shape = (o, p) => {
-        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", error: true };
+        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", invoice: (p && p.invoice) || null, error: true };
         const cp = p.customer, dl = p.delivery;
         // hauler bucket for the "by hauler" view — computed server-side from the
         // delivering truck (RTS 4554/7329/7336 → RTS; other → P&L Concrete) with
@@ -4640,7 +4657,7 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs };
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -4654,9 +4671,12 @@ function CostsModal({ orders, onClose }) {
       if (live) setLoading(false);
     })();
     return () => { live = false; };
-  }, [orders]);
+  }, [orders, reloadKey]);
 
   const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
+  const Drow = ({ label, val }) => (
+    <div className="flex justify-between gap-2"><span className="text-white/40">{label}</span><span className="text-white/85 text-right truncate ml-2">{val == null || val === "" ? "—" : val}</span></div>
+  );
 
   const needle = q.trim().toLowerCase();
   const inText = (o) => !needle ||
@@ -4937,16 +4957,60 @@ function CostsModal({ orders, onClose }) {
                     <div className="mt-1.5 mb-1">
                       {list.map((o) => {
                         const r = px[o.ref] || {};
+                        const oOpen = openOrder === o.ref;
+                        const inv = r.invoice;
+                        const paid = inv && inv.status === "paid";
+                        const payingThis = payingOrder === o.ref;
                         return (
-                          <div key={o.ref} className="grid items-center gap-2 px-3 py-1.5" style={{ gridTemplateColumns: "1fr auto", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <div className="min-w-0">
-                              <div className="text-white/85 text-xs font-semibold truncate" style={{ fontFamily: C.body }}>{orderDateUS(o.when) || o.when || "—"} · {o.ref}</div>
-                              <div className="text-white/40 text-[11px] truncate" style={{ fontFamily: C.body }}>{o.mix || "—"} · {r.yards != null ? `${r.yards} yd` : o.qty}{o.site ? ` · ${o.site}` : ""}</div>
-                            </div>
-                            <div className="text-right shrink-0 leading-tight">
-                              <span className="block text-sm font-bold" style={{ color: r.error ? "#ff8a85" : "#fff", fontFamily: C.body }}>{r.error ? "error" : money(r.billed)}</span>
-                              <span className="block text-[10px] text-white/45" style={{ fontFamily: C.body }}>to hauler {money(r.toHauler)}</span>
-                            </div>
+                          <div key={o.ref} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <button onClick={() => setOpenOrder(oOpen ? null : o.ref)} className="w-full grid items-center gap-2 px-3 py-1.5 text-left active:scale-[0.99]" style={{ gridTemplateColumns: "1fr auto" }}>
+                              <div className="min-w-0">
+                                <div className="text-white/85 text-xs font-semibold truncate" style={{ fontFamily: C.body }}>
+                                  {orderDateUS(o.when) || o.when || "—"} · {o.ref}
+                                  {inv && <span className="ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded uppercase" style={{ background: paid ? GREEN + "22" : "rgba(255,170,60,0.16)", color: paid ? GREEN : ORANGE }}>{paid ? "paid" : "outstanding"}</span>}
+                                </div>
+                                <div className="text-white/40 text-[11px] truncate" style={{ fontFamily: C.body }}>{o.mix || "—"} · {r.yards != null ? `${r.yards} yd` : o.qty}{o.site ? ` · ${o.site}` : ""}</div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-right leading-tight">
+                                  <span className="block text-sm font-bold" style={{ color: r.error ? "#ff8a85" : "#fff", fontFamily: C.body }}>{r.error ? "error" : money(r.billed)}</span>
+                                  <span className="block text-[10px] text-white/45" style={{ fontFamily: C.body }}>to hauler {money(r.toHauler)}</span>
+                                </span>
+                                <ChevronRight size={14} className="text-white/40" style={{ transform: oOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+                              </div>
+                            </button>
+                            {oOpen && (
+                              <div className="px-3 pb-2.5 pt-0.5" style={{ background: "rgba(255,255,255,0.02)" }}>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] mb-2" style={{ fontFamily: C.body }}>
+                                  <Drow label="Customer" val={o.customer} />
+                                  <Drow label="Job" val={o.site} />
+                                  <Drow label="Mix" val={o.mix} />
+                                  <Drow label="Yards" val={r.yards != null ? `${r.yards} yd` : o.qty} />
+                                  <Drow label="Base $/yd" val={r.unit != null ? `${money(r.unit)}/yd` : "—"} />
+                                  <Drow label="Fiber" val={r.fiberAmt ? `${r.fiberLbs ? r.fiberLbs + " lb · " : ""}${money(r.fiberAmt)}` : "—"} />
+                                  <Drow label="Billed" val={r.error ? "—" : money(r.billed)} />
+                                  <Drow label="To hauler" val={money(r.toHauler)} />
+                                </div>
+                                {inv ? (
+                                  <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5" style={{ background: NAVY }}>
+                                    <span className="text-[11px] min-w-0 truncate" style={{ fontFamily: C.body }}>
+                                      <span className="text-white/45">Invoice {inv.number} · </span>
+                                      <span style={{ color: paid ? GREEN : ORANGE, fontWeight: 700 }}>{inv.manually_paid ? "paid (manual)" : inv.status}</span>
+                                    </span>
+                                    {paid && !inv.manually_paid ? (
+                                      <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>QB PAID</span>
+                                    ) : (
+                                      <button onClick={() => togglePaidOrder(o, inv)} disabled={payingThis} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-bold active:scale-95 disabled:opacity-50 flex items-center gap-1" style={inv.manually_paid ? { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontFamily: C.body } : { background: GREEN + "22", color: GREEN, border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
+                                        {payingThis ? <Loader2 size={11} className="animate-spin" /> : (inv.manually_paid ? null : <Check size={11} />)}
+                                        {inv.manually_paid ? "Mark outstanding" : "Mark paid"}
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-white/35 text-[11px] rounded-lg px-2.5 py-1.5" style={{ background: NAVY, fontFamily: C.body }}>No invoice for this order yet — it can be marked paid once it's invoiced in QuickBooks.</div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
