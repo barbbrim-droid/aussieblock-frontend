@@ -454,6 +454,15 @@ export function resetMixerTotal(truck, metric) {
 export function getTruckFuel(label) {
   return request(`/trucks/${encodeURIComponent(label)}/fuel`)
 }
+// Staff add a fuel fill by hand (e.g. fuel pumped overnight when the meter was
+// off). body: { truck_label, gallons, odometer?, occurred_at? }.
+export function addFuelFill(body) {
+  return request('/fuel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
 // Edit one fuel fill (staff): reassign to another truck (truck_label; "" = back to
 // Unmatched), and/or correct gallons/odometer. Omit a field to leave it unchanged.
 export function editFuelFill(id, body) {

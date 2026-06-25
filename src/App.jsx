@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3109,6 +3109,8 @@ function FuelModal({ onClose }) {
   const [editId, setEditId] = useState(null);         // fill being edited inline
   const [editForm, setEditForm] = useState({ truck_label: "", gallons: "" });
   const [busy, setBusy] = useState(false);            // an edit/delete is in flight
+  const [addOpen, setAddOpen] = useState(false);      // "add fuel fill" form open
+  const [addForm, setAddForm] = useState({ truck_label: "", gallons: "", odometer: "", occurred_at: "" });
 
   const load = async () => {
     try { setData(await getFuel()); setErr(""); } catch (e) { setErr(e.message); }
@@ -3157,6 +3159,25 @@ function FuelModal({ onClose }) {
     setBusy(true);
     try { await deleteFuelFill(fill.id); setEditId(null); await refresh(); }
     catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const submitAdd = async () => {
+    const lbl = addForm.truck_label.trim();
+    const gal = Number(addForm.gallons);
+    if (!lbl) { setErr("Pick a truck for the fill."); return; }
+    if (!(gal > 0)) { setErr("Enter the gallons."); return; }
+    setBusy(true); setErr("");
+    try {
+      await addFuelFill({
+        truck_label: lbl, gallons: gal,
+        odometer: addForm.odometer.trim() ? Number(addForm.odometer) : null,
+        occurred_at: addForm.occurred_at || null,
+      });
+      setAddForm({ truck_label: "", gallons: "", odometer: "", occurred_at: "" });
+      setAddOpen(false);
+      await refresh();
+    } catch (e) { setErr(e.message); }
     finally { setBusy(false); }
   };
 
@@ -3209,10 +3230,31 @@ function FuelModal({ onClose }) {
 
           {data && (
             <>
-              <div className="mb-3">
-                <div className="text-white/50 text-xs uppercase tracking-wide">Total fuel — all trucks</div>
-                <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span></div>
+              <div className="mb-3 flex items-end justify-between gap-2">
+                <div>
+                  <div className="text-white/50 text-xs uppercase tracking-wide">Total fuel — all trucks</div>
+                  <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span></div>
+                </div>
+                <button onClick={() => { setAddOpen((v) => !v); setErr(""); }} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold active:scale-95 shrink-0" style={{ background: addOpen ? "rgba(255,255,255,0.08)" : ORANGE, color: addOpen ? "#cfe0ff" : NAVY_DEEP }}>
+                  {addOpen ? <X size={13} /> : <Plus size={13} />} {addOpen ? "Cancel" : "Add fill"}
+                </button>
               </div>
+
+              {addOpen && (
+                <div className="rounded-lg p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,170,60,0.30)" }}>
+                  <div className="text-white/55 text-[11px] mb-2">Log a fill the meter didn't catch (e.g. pumped overnight). Date defaults to today.</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select value={addForm.truck_label} onChange={(e) => setAddForm({ ...addForm, truck_label: e.target.value })} className="col-span-2 rounded-md px-2 py-2 text-sm outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body }}>
+                      <option value="">Pick a truck…</option>
+                      {truckLabels.map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                    <input value={addForm.gallons} onChange={(e) => setAddForm({ ...addForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="Gallons" className="rounded-md px-2 py-2 text-sm outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body }} />
+                    <input value={addForm.odometer} onChange={(e) => setAddForm({ ...addForm, odometer: e.target.value })} type="number" inputMode="numeric" placeholder="Odometer (opt.)" className="rounded-md px-2 py-2 text-sm outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body }} />
+                    <input value={addForm.occurred_at} onChange={(e) => setAddForm({ ...addForm, occurred_at: e.target.value })} type="date" className="col-span-2 rounded-md px-2 py-2 text-sm outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body }} />
+                    <button onClick={submitAdd} disabled={busy} className="col-span-2 flex items-center justify-center gap-1 rounded-md py-2 text-sm font-bold active:scale-[0.98] disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Add fuel fill</button>
+                  </div>
+                </div>
+              )}
 
               {data.trucks.length === 0 ? (
                 <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ ...card, borderRadius: 12 }}>No trucks yet.</div>
