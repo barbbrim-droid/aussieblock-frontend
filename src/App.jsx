@@ -4717,7 +4717,7 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null };
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul: !!(dl && dl.self_haul) };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -4998,18 +4998,20 @@ function CostsModal({ orders, onClose }) {
               const open = openCust === name || autoOpen;
               const t = sumFor(list);
               const last = ci === custNames.length - 1;
+              // Self-pickup bucket (they OWE us for concrete) vs a real hauler (we pay them).
+              const selfPickup = view === "hauler" && list.some((o) => (px[o.ref] || {}).selfHaul);
               return (
                 <div key={name} className={last ? "mb-2" : "mb-4 pb-4"} style={last ? undefined : { borderBottom: "2px solid rgba(255,255,255,0.12)" }}>
                   <button onClick={() => setOpenCust(open && openCust === name ? null : name)} className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                     <span className="flex items-center gap-2 min-w-0">
-                      {view === "hauler" ? <Truck size={15} className="shrink-0" style={{ color: ORANGE }} /> : <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />}
+                      {selfPickup ? <Package size={15} className="shrink-0" style={{ color: GREEN }} /> : view === "hauler" ? <Truck size={15} className="shrink-0" style={{ color: ORANGE }} /> : <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />}
                       <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{name}</span>
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: ORANGE + "22", color: ORANGE }}>{list.length}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="text-right leading-tight">
-                        <span className="block text-xs font-bold" style={{ color: ORANGE }}>{view === "hauler" ? money(t.toHauler) : money(t.billed)}</span>
-                        <span className="block text-[10px] text-white/45">{view === "hauler" ? `billed ${money(t.billed)}` : `to hauler ${money(t.toHauler)}`}</span>
+                        <span className="block text-xs font-bold" style={{ color: selfPickup ? GREEN : ORANGE }}>{selfPickup ? money(t.billed) : view === "hauler" ? money(t.toHauler) : money(t.billed)}</span>
+                        <span className="block text-[10px] text-white/45">{selfPickup ? "they owe (self-pickup)" : view === "hauler" ? `billed ${money(t.billed)}` : `to hauler ${money(t.toHauler)}`}</span>
                       </span>
                       <ChevronRight size={16} className="text-white/40" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
                     </span>
