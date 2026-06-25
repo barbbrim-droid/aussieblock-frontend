@@ -408,9 +408,25 @@ export function addTruck(label, gps_device_id, notes, fluidsecure_vehicle_id) {
 export function deleteTruck(label) {
   return request(`/trucks/${encodeURIComponent(label)}`, { method: 'DELETE' })
 }
-// Per-truck fuel usage rolled up from FluidSecure (staff only).
-export function getFuel() {
-  return request('/fuel')
+// Per-truck fuel usage (staff only). Optional { frm, to } (yyyy-mm-dd) restrict
+// the rollup to fills in that date window — used by the Costs screen.
+export function getFuel({ frm = "", to = "" } = {}) {
+  const q = new URLSearchParams()
+  if (frm) q.set('frm', frm)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return request(`/fuel${qs ? `?${qs}` : ''}`)
+}
+// Set the fuel price ($/gal) staff use to cost fuel. Pass just { fuel_price_default }
+// to update the default and keep any per-product rates. Staff only.
+export function saveFuelPrices({ fuel_price_default, fuel_prices }) {
+  const body = { fuel_price_default: Number(fuel_price_default) || 0 }
+  if (fuel_prices != null) body.fuel_prices = fuel_prices
+  return request('/fuel/prices', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 // Assignable driver names (driver logins + name-only roster) for the dispatch
 // dropdowns. Staff-accessible.
@@ -568,6 +584,15 @@ export async function getSignatureDataUrl(ref) {
 
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)
+}
+// Staff (dispatch board): mark an invoice paid so it drops out of the customer's
+// owed balance. App-only override — survives QuickBooks syncs, doesn't post a
+// payment to QBO. unmark undoes it.
+export function markInvoicePaid(number) {
+  return request(`/billing/invoices/${encodeURIComponent(number)}/paid`, { method: 'POST' })
+}
+export function unmarkInvoicePaid(number) {
+  return request(`/billing/invoices/${encodeURIComponent(number)}/paid`, { method: 'DELETE' })
 }
 // Pull the latest A/R from QuickBooks into the app now (staff). The "Sync now"
 // button calls this; billing also auto-syncs when opened.

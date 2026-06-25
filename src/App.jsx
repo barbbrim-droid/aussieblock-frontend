@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -2722,9 +2722,28 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const [codOnly, setCodOnly] = useState(false);   // filter list to COD customers
 
   const [syncing, setSyncing] = useState(false);
+  const [acct, setAcct] = useState(null);          // selected customer's billing (invoices + balance)
+  const [acctBusy, setAcctBusy] = useState(false);
+  const [payBusy, setPayBusy] = useState("");      // invoice number being toggled
   const load = async () => {
     try { setCustomers(await getCustomers()); }
     catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  const loadAcct = async (id) => {
+    setAcctBusy(true);
+    try { setAcct(await getBilling(id)); }
+    catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setAcctBusy(false); }
+  };
+  // Mark an invoice paid (or undo) so it drops out of the customer's owed balance.
+  const togglePaid = async (inv) => {
+    setPayBusy(inv.id);
+    try {
+      if (inv.manually_paid) await unmarkInvoicePaid(inv.id);
+      else await markInvoicePaid(inv.id);
+      await loadAcct(sel);
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setPayBusy(""); }
   };
   const syncNow = async () => {
     setSyncing(true);
@@ -2756,6 +2775,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
     setInvite(null);
     setCopied(false);
     setSent(false);
+    setAcct(null); loadAcct(c.id);   // pull this customer's invoices for the billing panel
   };
 
   const submit = async () => {
@@ -2932,6 +2952,51 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
             >
               Remove login
             </button>
+          )}
+        </div>
+      )}
+
+      {/* selected customer's billing — invoices + mark-paid (app-only override) */}
+      {selCust && (
+        <div className="rounded-xl p-3 mt-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Billing — {selCust.name}</div>
+            {acct && (
+              <div className="text-right">
+                <div className="text-white/40 text-[10px] uppercase tracking-wide">Owed</div>
+                <div className="text-white text-sm font-bold leading-none" style={{ fontFamily: C.cond, color: (acct.balance || 0) > 0 ? "#fff" : GREEN }}>{usd(acct.balance)}</div>
+              </div>
+            )}
+          </div>
+          {acctBusy && !acct ? (
+            <div className="text-white/40 text-xs py-2 flex items-center gap-2" style={{ fontFamily: C.body }}><Loader2 size={13} className="animate-spin" /> Loading invoices…</div>
+          ) : !acct || (acct.invoices || []).length === 0 ? (
+            <div className="text-white/35 text-xs py-1" style={{ fontFamily: C.body }}>No invoices on file.</div>
+          ) : (
+            <>
+              {acct.invoices.map((inv) => {
+                const paid = inv.status === "paid";
+                const busyRow = payBusy === inv.id;
+                return (
+                  <div key={inv.id} className="flex items-center justify-between gap-2 py-1.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div className="min-w-0">
+                      <div className="text-white text-xs font-semibold truncate" style={{ fontFamily: C.body }}>{inv.id} · {usd(inv.amount)}</div>
+                      <div className="text-white/40 text-[11px] truncate">{inv.date || ""}{inv.order ? ` · ${inv.order}` : ""} · <span style={{ color: inv.manually_paid ? GREEN : (inv.status === "overdue" ? "#ff8a85" : "rgba(255,255,255,0.5)") }}>{inv.manually_paid ? "paid (manual)" : inv.status}</span></div>
+                    </div>
+                    {paid ? (
+                      inv.manually_paid ? (
+                        <button onClick={() => togglePaid(inv)} disabled={busyRow} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold active:scale-95 disabled:opacity-50" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", fontFamily: C.body }}>{busyRow ? "…" : "Undo"}</button>
+                      ) : (
+                        <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>PAID</span>
+                      )
+                    ) : (
+                      <button onClick={() => togglePaid(inv)} disabled={busyRow} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-bold active:scale-95 disabled:opacity-50 flex items-center gap-1" style={{ background: GREEN + "22", color: GREEN, border: `1px solid ${GREEN}55`, fontFamily: C.body }}>{busyRow ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Mark paid</button>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="text-white/30 text-[10px] mt-1.5" style={{ fontFamily: C.body }}>Marking paid here only clears it in the app — record the real payment in QuickBooks too.</div>
+            </>
           )}
         </div>
       )}
@@ -4517,6 +4582,34 @@ function CostsModal({ orders, onClose }) {
   const [to, setTo] = useState(() => monthBounds().last);
   const [openCust, setOpenCust] = useState(null);
   const [err, setErr] = useState("");
+  const [view, setView] = useState("customer");   // group by "customer" | "hauler"
+  const [fuel, setFuel] = useState(null);          // fuel rollup for the date window
+  const [showFuel, setShowFuel] = useState(false); // fuel card expanded (per-truck)
+  const [editPrice, setEditPrice] = useState(false);
+  const [priceVal, setPriceVal] = useState("");
+  const [savingPrice, setSavingPrice] = useState(false);
+
+  const reloadFuel = () => getFuel({ frm: from, to: to }).then(setFuel).catch(() => setFuel(null));
+  // Fuel cost for the same date range as the orders (its own request — fuel isn't
+  // tied to a customer order). Re-pulls whenever the From/To range changes.
+  useEffect(() => {
+    let live = true;
+    getFuel({ frm: from, to: to }).then((f) => { if (live) setFuel(f); }).catch(() => { if (live) setFuel(null); });
+    return () => { live = false; };
+  }, [from, to]);
+
+  // Save the $/gal staff use to cost fuel (default rate; per-product rates untouched).
+  const savePrice = async () => {
+    const v = Number(priceVal);
+    if (!(v >= 0)) { setErr("Enter a valid price per gallon."); return; }
+    setSavingPrice(true); setErr("");
+    try {
+      await saveFuelPrices({ fuel_price_default: v });
+      setEditPrice(false);
+      await reloadFuel();   // re-cost fuel at the new rate
+    } catch (e) { setErr(e.message); }
+    finally { setSavingPrice(false); }
+  };
 
   useEffect(() => {
     let live = true;
@@ -4524,8 +4617,9 @@ function CostsModal({ orders, onClose }) {
       const list = orders || [];
       // Map one order's backend pricing payload into the row shape this modal uses.
       const shape = (o, p) => {
-        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, error: true };
+        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", error: true };
         const cp = p.customer, dl = p.delivery;
+        const hauler = (dl && dl.hauler) || o.hauler || "";
         const billed = cp && cp.total != null ? Number(cp.total) : null;
         // To the hauler = delivery/mileage cost + short-load fee + back-haul fee.
         const haulMi = dl && dl.total != null ? Number(dl.total) : null;
@@ -4543,7 +4637,7 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, unit, ext, fiberAmt, fiberLbs };
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -4573,9 +4667,12 @@ function CostsModal({ orders, onClose }) {
   };
   const filtered = (orders || []).filter((o) => inText(o) && inRange(o));
 
-  // group by customer (alphabetical), each list earliest order first
+  // group by customer OR hauler (alphabetical), each list earliest order first
+  const groupKey = (o) => view === "hauler"
+    ? (((px[o.ref] && px[o.ref].hauler) || o.hauler || "").trim() || "No hauler / self-haul")
+    : (o.customer || "—");
   const groups = {};
-  filtered.forEach((o) => { (groups[o.customer || "—"] = groups[o.customer || "—"] || []).push(o); });
+  filtered.forEach((o) => { const k = groupKey(o); (groups[k] = groups[k] || []).push(o); });
   Object.values(groups).forEach((list) => list.sort((a, b) => String(a.when).localeCompare(String(b.when))));
   const custNames = Object.keys(groups).sort((a, b) => a.localeCompare(b));
   const autoOpen = needle && custNames.length <= 4;
@@ -4691,12 +4788,13 @@ function CostsModal({ orders, onClose }) {
     <div><div class="lab">Period</div><div class="big" style="font-size:15px;">${esc(period)}</div></div>
     <div><div class="lab">Total billed</div><div class="big">${m(grand.billed)}</div></div>
     <div><div class="lab">Total to hauler</div><div class="big">${m(grand.toHauler)}</div></div>
+    ${fuel && fuel.fleet && (fuel.fleet.gallons > 0 || fuel.fleet.cost > 0) ? `<div><div class="lab">Fuel</div><div class="big">${m(fuel.fleet.cost)}</div><div class="lab" style="margin-top:2px;">${Number(fuel.fleet.gallons || 0).toLocaleString("en-US", { maximumFractionDigits: 1 })} gal</div></div>` : ""}
     <div><div class="lab">Orders</div><div class="big">${filtered.length}</div></div>
   </div>
   ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
-  <div class="sec-title">Summary by customer</div>
+  <div class="sec-title">Summary by ${view === "hauler" ? "hauler" : "customer"}</div>
   <table>
-    <thead><tr><th>Customer</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">Fiber</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
+    <thead><tr><th>${view === "hauler" ? "Hauler" : "Customer"}</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">Fiber</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
     <tbody>${summaryRows}</tbody>
     <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${fiberCell(grand.fiber, grand.fiberLbs)}</td><td class="r">${groupBase(grand)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
   </table>
@@ -4716,7 +4814,7 @@ function CostsModal({ orders, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><ClipboardList size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Customer costs · {filtered.length}</span></div>
+          <div className="flex items-center gap-2"><ClipboardList size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">{view === "hauler" ? "Hauler" : "Customer"} costs · {filtered.length}</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
 
@@ -4740,6 +4838,11 @@ function CostsModal({ orders, onClose }) {
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
             {(from || to) && <button onClick={() => { setFrom(""); setTo(""); }} className="text-white/45 text-xs px-2 py-1 rounded-lg active:scale-95 shrink-0" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>Clear</button>}
           </div>
+          {/* group-by toggle: customers vs haulers */}
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <button onClick={() => { setView("customer"); setOpenCust(null); }} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full active:scale-95" style={{ background: view === "customer" ? ORANGE + "22" : NAVY, color: view === "customer" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${view === "customer" ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}><Building2 size={12} /> By customer</button>
+            <button onClick={() => { setView("hauler"); setOpenCust(null); }} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full active:scale-95" style={{ background: view === "hauler" ? ORANGE + "22" : NAVY, color: view === "hauler" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${view === "hauler" ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}><Truck size={12} /> By hauler</button>
+          </div>
           {/* grand totals */}
           <div className="flex items-center gap-3 rounded-xl px-3 py-2 mb-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
             <span className="text-white/45 text-[11px] uppercase tracking-wide" style={{ fontFamily: C.body }}>All shown</span>
@@ -4750,6 +4853,54 @@ function CostsModal({ orders, onClose }) {
               <span className="text-white/45">To hauler </span><span className="font-bold text-white">{money(grand.toHauler)}</span>
             </span>
           </div>
+          {/* fuel cost for this date range (its own rollup, not per-order) */}
+          {fuel && fuel.fleet && (fuel.fleet.gallons > 0 || fuel.fleet.cost > 0) && (
+            <div className="rounded-xl mt-1 overflow-hidden" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <button onClick={() => setShowFuel((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2 active:scale-[0.99]">
+                <Droplets size={14} className="shrink-0" style={{ color: ORANGE }} />
+                <span className="text-white/45 text-[11px] uppercase tracking-wide" style={{ fontFamily: C.body }}>Fuel{from || to ? " (range)" : ""}</span>
+                <span className="ml-auto text-xs" style={{ fontFamily: C.body }}>
+                  <span className="text-white/45">{Number(fuel.fleet.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal · </span>
+                  <span className="font-bold" style={{ color: ORANGE }}>{money(fuel.fleet.cost)}</span>
+                </span>
+                <ChevronRight size={14} className="text-white/40 shrink-0" style={{ transform: showFuel ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+              </button>
+              {showFuel && (
+                <div className="px-3 pb-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="flex items-center gap-2 mt-1.5 mb-1.5">
+                    <span className="text-white/40 text-[11px]" style={{ fontFamily: C.body }}>Price / gallon</span>
+                    {editPrice ? (
+                      <>
+                        <span className="text-white/50 text-xs">$</span>
+                        <input value={priceVal} onChange={(e) => setPriceVal(e.target.value)} type="number" inputMode="decimal" step="0.01" autoFocus className="w-20 rounded-md px-2 py-1 text-xs text-white outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+                        <button onClick={savePrice} disabled={savingPrice} className="rounded-md px-2 py-1 text-[11px] font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{savingPrice ? "…" : "Save"}</button>
+                        <button onClick={() => setEditPrice(false)} disabled={savingPrice} className="rounded-md px-2 py-1 text-[11px] text-white/55 active:scale-95" style={{ background: "rgba(255,255,255,0.06)", fontFamily: C.body }}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-white font-semibold text-xs" style={{ fontFamily: C.body }}>${Number(fuel.fuel_price_default || 0).toFixed(2)}/gal</span>
+                        <button onClick={() => { setPriceVal(String(fuel.fuel_price_default || "")); setEditPrice(true); }} className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold active:scale-95" style={{ background: "rgba(255,255,255,0.06)", color: "#cfe0ff", fontFamily: C.body }}><Pencil size={11} /> Edit</button>
+                      </>
+                    )}
+                  </div>
+                  {(fuel.trucks || []).filter((t) => t.gallons > 0).length === 0 ? (
+                    <div className="text-white/35 text-[11px] py-1">No truck fills in this range.</div>
+                  ) : fuel.trucks.filter((t) => t.gallons > 0).map((t) => (
+                    <div key={t.label} className="flex items-center justify-between py-1 text-[11px]" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <span className="text-white/70 truncate" style={{ fontFamily: C.body }}>{t.label}</span>
+                      <span className="shrink-0 ml-2" style={{ fontFamily: C.body }}><span className="text-white/45">{Number(t.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal · </span><span className="text-white font-semibold">{money(t.cost)}</span></span>
+                    </div>
+                  ))}
+                  {fuel.unmatched && fuel.unmatched.gallons > 0 && (
+                    <div className="flex items-center justify-between py-1 text-[11px]">
+                      <span style={{ color: ORANGE, fontFamily: C.body }}>Unmatched</span>
+                      <span className="shrink-0 ml-2" style={{ fontFamily: C.body }}><span className="text-white/45">{Number(fuel.unmatched.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal · </span><span className="text-white font-semibold">{money(fuel.unmatched.cost)}</span></span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="p-4 pt-2 overflow-y-auto" style={{ fontFamily: C.body }}>
@@ -4767,14 +4918,14 @@ function CostsModal({ orders, onClose }) {
                 <div key={name} className={last ? "mb-2" : "mb-4 pb-4"} style={last ? undefined : { borderBottom: "2px solid rgba(255,255,255,0.12)" }}>
                   <button onClick={() => setOpenCust(open && openCust === name ? null : name)} className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                     <span className="flex items-center gap-2 min-w-0">
-                      <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />
+                      {view === "hauler" ? <Truck size={15} className="shrink-0" style={{ color: ORANGE }} /> : <Building2 size={15} className="shrink-0" style={{ color: ORANGE }} />}
                       <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{name}</span>
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: ORANGE + "22", color: ORANGE }}>{list.length}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="text-right leading-tight">
-                        <span className="block text-xs font-bold" style={{ color: ORANGE }}>{money(t.billed)}</span>
-                        <span className="block text-[10px] text-white/45">to hauler {money(t.toHauler)}</span>
+                        <span className="block text-xs font-bold" style={{ color: ORANGE }}>{view === "hauler" ? money(t.toHauler) : money(t.billed)}</span>
+                        <span className="block text-[10px] text-white/45">{view === "hauler" ? `billed ${money(t.billed)}` : `to hauler ${money(t.toHauler)}`}</span>
                       </span>
                       <ChevronRight size={16} className="text-white/40" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
                     </span>
