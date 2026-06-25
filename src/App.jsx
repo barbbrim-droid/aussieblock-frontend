@@ -4989,8 +4989,8 @@ function CostsModal({ orders, onClose }) {
                                   <Drow label="Yards" val={r.yards != null ? `${r.yards} yd` : o.qty} />
                                   <Drow label="Base $/yd" val={r.unit != null ? `${money(r.unit)}/yd` : "—"} />
                                   <Drow label="Fiber" val={r.fiberAmt ? `${r.fiberLbs ? r.fiberLbs + " lb · " : ""}${money(r.fiberAmt)}` : "—"} />
-                                  <Drow label="On site" val={r.onsite && r.onsite.minutes ? `${fmtMins(r.onsite.minutes)}${r.onsite.trucks > 1 ? ` · ${r.onsite.trucks} trucks` : ""}` : "—"} />
-                                  <Drow label="Standby" val={r.onsite && r.onsite.standby ? money(r.onsite.standby) : (r.onsite && r.onsite.minutes ? "$0 (under 1 hr)" : "—")} />
+                                  <Drow label="On site" val={r.onsite && r.onsite.minutes ? `${fmtMins(r.onsite.minutes)}${r.onsite.trucks > 1 ? ` total · ${r.onsite.trucks} trucks` : ""}` : "—"} />
+                                  <Drow label={r.onsite && r.onsite.trucks > 1 ? "Standby (per truck)" : "Standby"} val={r.onsite && r.onsite.standby ? money(r.onsite.standby) : (r.onsite && r.onsite.minutes ? "$0 (under 1 hr)" : "—")} />
                                   <Drow label="Billed" val={r.error ? "—" : money(r.billed)} />
                                   <Drow label="To hauler" val={money(r.toHauler)} />
                                 </div>
