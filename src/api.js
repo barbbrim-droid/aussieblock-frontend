@@ -360,6 +360,14 @@ export function setCustomerCod(customerId, cod) {
     body: JSON.stringify({ cod }),
   })
 }
+// Set (or clear) a customer's flat $/yd price — a price-sheet override for all
+// their mixes (staff). Pass 0/null to clear.
+export function setCustomerPrice(customerId, price) {
+  return request(`/customers/${customerId}/price`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ price: price == null || price === '' ? null : Number(price) }),
+  })
+}
 // Create a pay link for a COD load from the customer's existing QuickBooks
 // invoice (staff only). The amount comes from that invoice — no amount entered.
 // Returns { amount, link, doc_number }.

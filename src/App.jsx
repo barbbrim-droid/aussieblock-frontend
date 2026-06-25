@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -2753,6 +2753,7 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
   const [acct, setAcct] = useState(null);          // selected customer's billing (invoices + balance)
   const [acctBusy, setAcctBusy] = useState(false);
   const [payBusy, setPayBusy] = useState("");      // invoice number being toggled
+  const [priceInput, setPriceInput] = useState(""); // selected customer's flat $/yd set price
   const load = async () => {
     try { setCustomers(await getCustomers()); }
     catch (e) { setMsg({ ok: false, text: e.message }); }
@@ -2803,7 +2804,19 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
     setInvite(null);
     setCopied(false);
     setSent(false);
+    setPriceInput(c.set_price != null ? String(c.set_price) : "");
     setAcct(null); loadAcct(c.id);   // pull this customer's invoices for the billing panel
+  };
+
+  // Save (or clear) the selected customer's flat $/yd price.
+  const savePrice = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await setCustomerPrice(sel, priceInput.trim() === "" ? null : Number(priceInput));
+      await load();
+      setMsg({ ok: true, text: r.set_price ? `Set price $${Number(r.set_price).toFixed(2)}/yd for ${r.customer}.` : `Cleared set price for ${r.customer}.` });
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
   };
 
   const submit = async () => {
@@ -2938,6 +2951,15 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
           <button onClick={toggleCod} disabled={busy} className="w-full mb-2 rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.98] disabled:opacity-50" style={{ background: selCust.cod ? "#6aa9ff22" : NAVY_DEEP, border: `1px solid ${selCust.cod ? "#6aa9ff" : "rgba(255,255,255,0.12)"}`, color: selCust.cod ? "#6aa9ff" : "#fff", fontFamily: C.body }}>
             {selCust.cod ? <CheckCircle2 size={15} /> : <Circle size={15} className="text-white/30" />} COD — pay before delivery
           </button>
+          {/* flat $/yd set price for this customer (all mixes) */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-white/50 text-xs shrink-0" style={{ fontFamily: C.body }}>Set price</span>
+            <span className="text-white/40 text-sm">$</span>
+            <input value={priceInput} onChange={(e) => setPriceInput(e.target.value)} type="number" inputMode="decimal" step="0.01" placeholder="sheet rate" className="w-24 rounded-lg px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            <span className="text-white/40 text-xs">/yd</span>
+            <button onClick={savePrice} disabled={busy} className="ml-auto rounded-lg px-3 py-1.5 text-xs font-bold active:scale-95 disabled:opacity-50 flex items-center gap-1" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save</button>
+          </div>
+          <p className="text-white/30 text-[10px] mb-2" style={{ fontFamily: C.body }}>Flat $/yd for all this customer's mixes (overrides the sheet rate). Leave blank + Save to clear. Per-mix prices: Price sheet → Customer overrides.</p>
           <input
             value={emailVal}
             onChange={(e) => setEmailVal(e.target.value)}
