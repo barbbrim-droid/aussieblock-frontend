@@ -4796,15 +4796,22 @@ function CostsModal({ orders, onClose }) {
     Object.values(haulerGroups).forEach((list) => list.sort((a, b) => String(a.when).localeCompare(String(b.when))));
   }
   const haulerNames = Object.keys(haulerGroups).sort((a, b) => (haulerAmt[b].total - haulerAmt[a].total) || a.localeCompare(b));
-  // Net position with any party that is BOTH a hauler (we owe them) AND a
-  // self-pickup customer (they owe us) — e.g. P&L Concrete.
-  const netPairs = view !== "hauler" ? [] : Object.keys(haulerAmt)
-    .filter((h) => !h.includes("· self-pickup") && haulerAmt[`${h} · self-pickup`])
-    .map((h) => {
-      const owe = haulerAmt[h].total;                       // we owe them for hauling
-      const owed = haulerAmt[`${h} · self-pickup`].total;   // they owe us for concrete
-      return { name: h, owe, owed, net: owed - owe };
+  // Net with P&L — the same business hauls for us (we owe) AND self-picks-up
+  // concrete (they owe us), but under different names ("P&L Concrete" hauler vs
+  // "P&L Trucking Services" customer). Match any P&L-named bucket on either side.
+  const isPL = (s) => /p\s*&?\s*l\b/i.test(s || "") || /\bpl\b/i.test(s || "");
+  const netPairs = (() => {
+    if (view !== "hauler") return [];
+    let owe = 0, owed = 0, has = false;
+    Object.keys(haulerAmt).forEach((h) => {
+      const sp = h.includes("· self-pickup");
+      const base = sp ? h.replace(/ · self-pickup$/, "") : h;
+      if (!isPL(base)) return;
+      has = true;
+      if (sp) owed += haulerAmt[h].total; else owe += haulerAmt[h].total;
     });
+    return has ? [{ name: "P&L", owe, owed, net: owed - owe }] : [];
+  })();
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
   // customer SUMMARY page, then a page break and the per-customer DETAIL tables.
