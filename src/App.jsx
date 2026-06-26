@@ -6649,11 +6649,12 @@ function DriverApp({ driver, onLogout }) {
                 </div>
                 <textarea
                   value={notesDraft}
-                  onChange={(e) => { setNotesDraft(e.target.value); setNotesSaved(false); }}
+                  onChange={(e) => { setNotesDraft(e.target.value); setNotesSaved(false); const el = e.target; el.style.height = "auto"; el.style.height = Math.max(el.scrollHeight, 140) + "px"; }}
+                  onFocus={(e) => { const el = e.target; el.style.height = "auto"; el.style.height = Math.max(el.scrollHeight, 180) + "px"; setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 60); }}
                   rows={3}
                   placeholder="Notes from the site — gate code, where to pour, who received it, any issues…"
-                  className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none resize-none placeholder:text-white/30"
-                  style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.14)", fontFamily: C.body }}
+                  className="w-full rounded-lg px-3 py-2.5 lg:py-3 text-base lg:text-xl leading-relaxed text-white outline-none resize-none placeholder:text-white/30"
+                  style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.14)", fontFamily: C.body, minHeight: 140 }}
                 />
                 <button onClick={saveNotes} disabled={notesBusy || notesDraft === (active.driver_notes || "")} className="w-full mt-2 rounded-lg py-2.5 text-sm font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP }}>
                   {notesBusy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save notes
