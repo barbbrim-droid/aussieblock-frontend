@@ -6514,14 +6514,17 @@ function DriverApp({ driver, onLogout }) {
   return (
     <div className="w-full flex justify-center sm:items-center sm:p-4 overflow-hidden" style={{ height: "100dvh", background: "#0c1117" }}>
       <style>{FONT}</style>
-      <div className="w-full sm:max-w-xl h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
+      <div className="w-full sm:max-w-xl lg:max-w-none h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {Header}
         {err && <div className="px-4 py-2 text-xs shrink-0" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
-        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-4">
+        <div className="flex-1 min-h-0 flex overflow-hidden">
           {!data ? (
-            <div className="text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading deliveries…</div>
-          ) : !active ? (
+            <div className="flex-1 text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading deliveries…</div>
+          ) : (
             <>
+            {/* LEFT pane — delivery list. Full width on a phone (hidden once a job is
+                open); a fixed sidebar on a landscape tablet (always visible). */}
+            <div className={`overflow-y-auto overscroll-contain p-4 lg:w-96 lg:shrink-0 lg:border-r lg:border-white/10 ${active ? "hidden lg:block" : "w-full"}`}>
               <button onClick={() => { setFuelMsg(null); setShowFuel(true); }} className="w-full rounded-xl py-3.5 mb-3 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: ORANGE, color: NAVY_DEEP }}>
                 <Droplets size={18} /> Fuel up — log a fill
               </button>
@@ -6543,10 +6546,14 @@ function DriverApp({ driver, onLogout }) {
                 );
               })
               )}
-            </>
-          ) : (
-            <div>
-              <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
+            </div>
+            {/* RIGHT pane — the open delivery; on a landscape tablet shows a prompt when none is open. */}
+            <div className={`flex-1 min-w-0 overflow-y-auto overscroll-contain p-4 ${active ? "" : "hidden lg:flex lg:items-center lg:justify-center"}`}>
+            {!active ? (
+              <div className="text-white/35 text-sm text-center" style={{ fontFamily: C.body }}><Truck size={40} className="mx-auto mb-2 opacity-40" /><div>Select a delivery to view it here.</div></div>
+            ) : (
+            <div className="lg:max-w-2xl lg:mx-auto">
+              <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3 lg:hidden" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
 
               {/* payment alert — drivers must know whether to collect before unloading */}
               {active.prepay_required && (
@@ -6668,6 +6675,9 @@ function DriverApp({ driver, onLogout }) {
                 <Phone size={17} color={ORANGE} /> Call dispatch · {DISPATCH_PHONE}
               </a>
             </div>
+            )}
+            </div>
+            </>
           )}
         </div>
       </div>
