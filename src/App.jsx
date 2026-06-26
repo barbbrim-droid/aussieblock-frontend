@@ -6595,8 +6595,11 @@ function DriverApp({ driver, onLogout }) {
             {!active ? (
               <div className="text-white/35 text-sm text-center" style={{ fontFamily: C.body }}><Truck size={40} className="mx-auto mb-2 opacity-40" /><div>Select a delivery to view it here.</div></div>
             ) : (
-            <div className="lg:max-w-2xl lg:mx-auto">
+            <div className="lg:max-w-6xl lg:mx-auto">
               <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3 lg:hidden" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
+              {/* On a landscape tablet: two columns so the driver sees everything without scrolling. */}
+              <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+              <div className="lg:min-w-0">
 
               {/* payment alert — drivers must know whether to collect before unloading */}
               {active.prepay_required && (
@@ -6635,6 +6638,8 @@ function DriverApp({ driver, onLogout }) {
                 {active.admixtures && <div className="mt-3 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
                 {active.notes && <div className="mt-3 rounded-lg px-3 py-2 text-sm" style={{ background: ORANGE + "14", color: "#ffd9bf" }}><span className="font-semibold uppercase text-[10px] tracking-wide block mb-0.5" style={{ color: ORANGE }}>Dispatch instructions</span>{active.notes}</div>}
               </div>
+              </div>{/* end left column */}
+              <div className="lg:min-w-0">
 
               {/* driver's on-site notes — saved to the order, visible to dispatch */}
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -6719,6 +6724,8 @@ function DriverApp({ driver, onLogout }) {
               <a href={`tel:${DISPATCH_TEL}`} className="w-full rounded-xl py-3 lg:py-5 mt-2.5 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                 <Phone size={17} color={ORANGE} /> Call dispatch · {DISPATCH_PHONE}
               </a>
+              </div>{/* end right column */}
+              </div>{/* end two-column grid */}
             </div>
             )}
             </div>
