@@ -6235,42 +6235,59 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
+  // Size the canvas buffer to its DISPLAYED size (× device pixel ratio) and prime
+  // it white. Run AFTER layout (rAF) and on resize/rotate — the old code measured
+  // once on mount before layout settled, so the first stroke could land offset
+  // until the pad was reopened. setTransform (not scale) keeps it idempotent.
+  const setup = () => {
     const c = canvasRef.current;
     if (!c) return;
-    const ratio = window.devicePixelRatio || 1;
     const rect = c.getBoundingClientRect();
-    c.width = rect.width * ratio;
-    c.height = rect.height * ratio;
+    if (!rect.width || !rect.height) return;
+    const ratio = window.devicePixelRatio || 1;
+    c.width = Math.round(rect.width * ratio);
+    c.height = Math.round(rect.height * ratio);
     const ctx = c.getContext("2d");
-    ctx.scale(ratio, ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
-    ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.strokeStyle = "#0c1117";
+  };
+
+  useEffect(() => {
+    const id = requestAnimationFrame(setup);
+    const onResize = () => setup();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => { cancelAnimationFrame(id); window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize); };
   }, []);
 
   const pos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    const p = e.touches ? e.touches[0] : e;
-    return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
-  const start = (e) => { e.preventDefault(); drawing.current = true; last.current = pos(e); };
+  const start = (e) => {
+    e.preventDefault();
+    try { canvasRef.current.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
+    drawing.current = true;
+    last.current = pos(e);
+    // ink a dot so a single tap/short sign still registers
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.fillStyle = "#0c1117";
+    ctx.beginPath(); ctx.arc(last.current.x, last.current.y, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill();
+    if (!hasInk) setHasInk(true);
+  };
   const move = (e) => {
     if (!drawing.current) return;
     e.preventDefault();
     const ctx = canvasRef.current.getContext("2d");
     const p = pos(e);
     ctx.beginPath(); ctx.moveTo(last.current.x, last.current.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    last.current = p; if (!hasInk) setHasInk(true);
+    last.current = p;
   };
   const end = () => { drawing.current = false; };
-  const clear = () => {
-    const c = canvasRef.current; const ctx = c.getContext("2d");
-    const ratio = window.devicePixelRatio || 1;
-    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width / ratio, c.height / ratio);
-    setHasInk(false); setErr("");
-  };
+  const clear = () => { setup(); setHasInk(false); setErr(""); };
   const submit = () => {
     if (!hasInk) { setErr("Please have the customer sign above."); return; }
     if (!name.trim()) { setErr("Enter the name of who signed."); return; }
@@ -6283,31 +6300,30 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
-      <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
-        <div className="px-5 py-3.5 flex items-center justify-between" style={{ background: ORANGE }}>
-          <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Customer sign-off · {orderRef}</span>
-          <button onClick={onCancel} disabled={busy} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+      <div className="w-full max-w-lg lg:max-w-4xl rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
+        <div className="px-5 py-3.5 lg:py-5 flex items-center justify-between" style={{ background: ORANGE }}>
+          <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg lg:text-2xl font-bold">Customer sign-off · {orderRef}</span>
+          <button onClick={onCancel} disabled={busy} className="p-1 lg:p-2 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5" style={{ fontFamily: C.body }}>
-          <div className="text-white/60 text-xs mb-2">Have the customer sign below to confirm delivery.</div>
-          <canvas ref={canvasRef} className="w-full rounded-xl touch-none" style={{ height: 200, background: "#fff", border: "2px solid rgba(255,255,255,0.15)" }}
-            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
-            onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+          <div className="text-white/60 text-xs lg:text-base mb-2">Have the customer sign below to confirm delivery.</div>
+          <canvas ref={canvasRef} className="w-full h-56 lg:h-96 rounded-xl touch-none" style={{ background: "#fff", border: "2px solid rgba(255,255,255,0.15)" }}
+            onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} onPointerCancel={end} />
           <div className="flex justify-end mt-1.5">
-            <button onClick={clear} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear</button>
+            <button onClick={clear} disabled={busy} className="text-xs lg:text-base font-semibold px-2.5 py-1 lg:px-4 lg:py-2 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear &amp; redo</button>
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="grid grid-cols-2 gap-2 lg:gap-4 mt-3">
             <label className="flex flex-col gap-1">
-              <span className="text-white/40 text-[10px] uppercase tracking-wide">Printed name</span>
-              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span className="text-white/40 text-[10px] lg:text-xs uppercase tracking-wide">Printed name</span>
+              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 lg:py-3.5 text-base lg:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-white/40 text-[10px] uppercase tracking-wide">Water added (gal) <span style={{ color: ORANGE }}>*</span></span>
-              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 text-base outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span className="text-white/40 text-[10px] lg:text-xs uppercase tracking-wide">Water added (gal) <span style={{ color: ORANGE }}>*</span></span>
+              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 lg:py-3.5 text-base lg:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
             </label>
           </div>
-          {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
-          <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 text-base font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
+          {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs lg:text-base" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 lg:py-5 text-base lg:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
             {busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : <><CheckCircle2 size={18} /> Confirm delivery</>}
           </button>
         </div>
