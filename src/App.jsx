@@ -4796,6 +4796,15 @@ function CostsModal({ orders, onClose }) {
     Object.values(haulerGroups).forEach((list) => list.sort((a, b) => String(a.when).localeCompare(String(b.when))));
   }
   const haulerNames = Object.keys(haulerGroups).sort((a, b) => (haulerAmt[b].total - haulerAmt[a].total) || a.localeCompare(b));
+  // Net position with any party that is BOTH a hauler (we owe them) AND a
+  // self-pickup customer (they owe us) — e.g. P&L Concrete.
+  const netPairs = view !== "hauler" ? [] : Object.keys(haulerAmt)
+    .filter((h) => !h.includes("· self-pickup") && haulerAmt[`${h} · self-pickup`])
+    .map((h) => {
+      const owe = haulerAmt[h].total;                       // we owe them for hauling
+      const owed = haulerAmt[`${h} · self-pickup`].total;   // they owe us for concrete
+      return { name: h, owe, owed, net: owed - owe };
+    });
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
   // customer SUMMARY page, then a page break and the per-customer DETAIL tables.
@@ -5016,7 +5025,20 @@ function CostsModal({ orders, onClose }) {
           ) : (view === "hauler" ? haulerNames : custNames).length === 0 ? (
             <div className="text-white/40 text-sm py-8 text-center">{needle ? "No matches." : "No completed orders yet."}</div>
           ) : (
-            (view === "hauler" ? haulerNames : custNames).map((name, ci) => {
+            <>
+            {netPairs.map((np) => (
+              <div key={"net-" + np.name} className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: `1px solid ${(np.net >= 0 ? GREEN : ORANGE)}55` }}>
+                <div className="text-white/55 text-[11px] uppercase tracking-wide mb-1.5" style={{ fontFamily: C.body }}>Net with {np.name}</div>
+                <div className="flex items-center justify-between text-[11px] mb-1.5" style={{ fontFamily: C.body }}>
+                  <span className="text-white/55">They owe you <span className="font-bold" style={{ color: GREEN }}>{money(np.owed)}</span></span>
+                  <span className="text-white/55">You owe them <span className="font-bold" style={{ color: ORANGE }}>{money(np.owe)}</span></span>
+                </div>
+                <div className="text-sm font-bold" style={{ color: np.net >= 0 ? GREEN : ORANGE, fontFamily: C.cond }}>
+                  {np.net >= 0 ? `Net ${money(np.net)} — in your favor` : `Net ${money(-np.net)} — you owe`}
+                </div>
+              </div>
+            ))}
+            {(view === "hauler" ? haulerNames : custNames).map((name, ci) => {
               const names = view === "hauler" ? haulerNames : custNames;
               const list = view === "hauler" ? haulerGroups[name] : groups[name];
               const amt = view === "hauler" ? haulerAmt[name] : null;
@@ -5120,7 +5142,8 @@ function CostsModal({ orders, onClose }) {
                   )}
                 </div>
               );
-            })
+            })}
+            </>
           )}
         </div>
       </div>
