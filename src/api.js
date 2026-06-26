@@ -527,6 +527,14 @@ export function saveDriverNotes(ref, notes) {
     body: JSON.stringify({ notes: notes || null }),
   })
 }
+// Driver pushes their on-site status when the geofence misses it: "onsite",
+// "washout", or "returning". For a pour, pass the load seq (their truck).
+export function setDriverStatus(ref, status, seq) {
+  return request(`/orders/${encodeURIComponent(ref)}/driver-status`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(seq != null ? { status, seq } : { status }),
+  })
+}
 // Driver adds the current mileage to their truck's latest meter fill (the
 // gallons come from the ESP fuel meter, not typed). Returns { ok, gallons } or
 // { ok: false, reason: 'no_fill' } if the meter hasn't reported a fill yet.

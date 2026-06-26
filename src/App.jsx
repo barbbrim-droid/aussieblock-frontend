@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -88,13 +88,14 @@ const STATUS_META = {
   enroute: { label: "En route", color: ORANGE_HOT },
   onsite: { label: "On site", color: GREEN },
   pouring: { label: "Pouring", color: GREEN },
+  washout: { label: "Washing out", color: "#e3c04a" },
   returning: { label: "Returning to yard", color: "#4da3ff" },
   complete: { label: "Complete", color: GREEN },
 };
 const STAGES = ["Loading at yard", "En route", "Delivered"];
 // The delivery stages staff can set from the dispatch board, in order. Mirrors
 // ORDER_STATUSES in the backend — keep the two in sync.
-const ORDER_STATUSES = ["requested", "scheduled", "ongoing", "batched", "enroute", "onsite", "pouring", "returning", "complete"];
+const ORDER_STATUSES = ["requested", "scheduled", "ongoing", "batched", "enroute", "onsite", "pouring", "washout", "returning", "complete"];
 // A continuous pour rolls up to one of these umbrella states (the per-load rows
 // carry the individual truck stages). "ongoing" is set automatically by the
 // backend while loads are in flight; staff can also set scheduled/complete.
@@ -6462,6 +6463,32 @@ function DriverApp({ driver, onLogout }) {
     finally { setFuelBusy(false); }
   };
 
+  const [statusBusy, setStatusBusy] = useState("");
+  const pushStatus = async (ref, status, seq) => {
+    setStatusBusy(`${seq ?? "o"}:${status}`); setErr("");
+    try { await setDriverStatus(ref, status, seq); await load(); }
+    catch (e) { setErr(e.message || "Could not update status"); }
+    finally { setStatusBusy(""); }
+  };
+  // Driver status buttons (backup for when the geofence misses it).
+  const StatusRow = ({ orderRef, current, seq }) => (
+    <div className="mb-3">
+      <div className="text-white/45 text-[10px] lg:text-xs uppercase tracking-wide mb-1.5">Update status (if GPS misses it)</div>
+      <div className="grid grid-cols-3 gap-2">
+        {[["onsite", "On site"], ["washout", "Washing out"], ["returning", "Returning"]].map(([sv, label]) => {
+          const on = current === sv;
+          return (
+            <button key={sv} onClick={() => pushStatus(orderRef, sv, seq)} disabled={!!statusBusy}
+              className="rounded-xl py-3 lg:py-4 text-sm lg:text-base font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
+              style={on ? { background: GREEN, color: NAVY_DEEP } : { background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+              {statusBusy === `${seq ?? "o"}:${sv}` ? <Loader2 size={14} className="animate-spin" /> : null}{label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const load = async () => {
     try { setData(await getDriverOrders()); setErr(""); }
     catch (e) { setErr(e.message); }
@@ -6640,6 +6667,7 @@ function DriverApp({ driver, onLogout }) {
                           <span className="text-white font-bold text-base" style={{ fontFamily: C.cond }}>Load {l.seq}{l.truck && l.truck !== "—" ? ` · ${l.truck}` : ""}</span>
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
                         </div>
+                        <StatusRow orderRef={active.ref} current={l.status} seq={l.seq} />
                         <button onClick={() => openTicket(l.seq)} disabled={ticketBusy || !l.has_batch_ticket} className="w-full rounded-lg py-2.5 lg:py-4 mb-2 text-sm lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                           {ticketBusy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={16} />} {l.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
                         </button>
@@ -6662,6 +6690,7 @@ function DriverApp({ driver, onLogout }) {
                 </div>
               ) : (
                 <>
+                  <StatusRow orderRef={active.ref} current={active.status} />
                   <button onClick={() => openTicket()} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 lg:py-4 mb-2.5 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                     {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {active.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
                   </button>
