@@ -6525,7 +6525,7 @@ function DriverApp({ driver, onLogout }) {
             {/* LEFT pane — delivery list. Full width on a phone (hidden once a job is
                 open); a fixed sidebar on a landscape tablet (always visible). */}
             <div className={`overflow-y-auto overscroll-contain p-4 lg:w-96 lg:shrink-0 lg:border-r lg:border-white/10 ${active ? "hidden lg:block" : "w-full"}`}>
-              <button onClick={() => { setFuelMsg(null); setShowFuel(true); }} className="w-full rounded-xl py-3.5 mb-3 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: ORANGE, color: NAVY_DEEP }}>
+              <button onClick={() => { setFuelMsg(null); setShowFuel(true); }} className="w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: ORANGE, color: NAVY_DEEP }}>
                 <Droplets size={18} /> Fuel up — log a fill
               </button>
               {orders.length === 0 ? (
@@ -6534,13 +6534,13 @@ function DriverApp({ driver, onLogout }) {
               orders.map((o) => {
                 const sm = STATUS_META[o.status] || { label: o.status, color: "#7c8794" };
                 return (
-                  <button key={o.ref} onClick={() => setActiveRef(o.ref)} className="w-full text-left rounded-xl mb-2.5 p-3.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <button key={o.ref} onClick={() => setActiveRef(o.ref)} className={`w-full text-left rounded-xl mb-2.5 p-3.5 lg:p-4 active:scale-[0.99] ${activeRef === o.ref ? "lg:ring-2" : ""}`} style={{ background: activeRef === o.ref ? ORANGE + "1f" : NAVY, border: `1px solid ${activeRef === o.ref ? ORANGE : "rgba(255,255,255,0.08)"}` }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-white font-bold text-base" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</span>
+                      <span className="text-white font-bold text-base lg:text-lg" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</span>
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
                     </div>
-                    <div className="text-white/55 text-xs mt-1 flex items-center gap-1"><MapPin size={12} /> {o.site}</div>
-                    <div className="text-white/70 text-sm mt-1.5">{o.mix} · {o.qty} yd{o.time ? ` · ${o.time}` : ""}</div>
+                    <div className="text-white/55 text-xs lg:text-sm mt-1 flex items-center gap-1"><MapPin size={12} /> {o.site}</div>
+                    <div className="text-white/70 text-sm lg:text-base mt-1.5">{o.mix} · {o.qty} yd{o.time ? ` · ${o.time}` : ""}</div>
                     {o.has_signature && <div className="text-xs mt-1 flex items-center gap-1" style={{ color: GREEN }}><CheckCircle2 size={13} /> Signed by {o.signed_by}</div>}
                   </button>
                 );
@@ -6572,21 +6572,21 @@ function DriverApp({ driver, onLogout }) {
 
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="text-white font-bold text-lg leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
+                  <div className="text-white font-bold text-lg lg:text-3xl leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
                   {(() => { const sm = STATUS_META[active.status] || { label: active.status, color: "#7c8794" }; return <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>; })()}
                 </div>
                 {/* tappable address → opens turn-by-turn directions */}
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
-                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs font-semibold shrink-0"><Navigation size={13} /> Directions</span>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 lg:py-4 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
+                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm lg:text-lg flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs lg:text-base font-semibold shrink-0"><Navigation size={13} /> Directions</span>
                 </a>
-                <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3.5 text-sm">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 lg:gap-y-4 gap-x-3 mt-3.5 text-sm lg:text-lg">
                   {[
                     ["Customer", active.customer], ["Order #", active.ref],
                     ["Mix", active.mix], ["Quantity", active.qty ? `${active.qty} yd` : null],
                     ["Time", active.time], ["Slump", active.slump],
                     ["For", active.use_for], ["Truck", active.truck && active.truck !== "—" ? active.truck : null],
                   ].filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k}><div className="text-white/35 text-[10px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold">{v}</div></div>
+                    <div key={k}><div className="text-white/35 text-[10px] lg:text-[11px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold lg:text-lg">{v}</div></div>
                   ))}
                 </div>
                 {active.admixtures && <div className="mt-3 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
@@ -6624,7 +6624,7 @@ function DriverApp({ driver, onLogout }) {
                           <span className="text-white font-bold text-base" style={{ fontFamily: C.cond }}>Load {l.seq}{l.truck && l.truck !== "—" ? ` · ${l.truck}` : ""}</span>
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
                         </div>
-                        <button onClick={() => openTicket(l.seq)} disabled={ticketBusy || !l.has_batch_ticket} className="w-full rounded-lg py-2.5 mb-2 text-sm font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                        <button onClick={() => openTicket(l.seq)} disabled={ticketBusy || !l.has_batch_ticket} className="w-full rounded-lg py-2.5 lg:py-4 mb-2 text-sm lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                           {ticketBusy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={16} />} {l.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
                         </button>
                         {l.has_signature ? (
@@ -6636,7 +6636,7 @@ function DriverApp({ driver, onLogout }) {
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 lg:py-5 text-base lg:text-xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                             <ClipboardList size={17} /> Get customer signature
                           </button>
                         )}
@@ -6646,7 +6646,7 @@ function DriverApp({ driver, onLogout }) {
                 </div>
               ) : (
                 <>
-                  <button onClick={() => openTicket()} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 mb-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                  <button onClick={() => openTicket()} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 lg:py-4 mb-2.5 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                     {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {active.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
                   </button>
                   {active.has_signature ? (
@@ -6658,12 +6658,12 @@ function DriverApp({ driver, onLogout }) {
                           <div className="text-white/50 text-xs">{fmtDateTime(active.signed_at)}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
                         </div>
                       </div>
-                      <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                      <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 lg:py-4 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                         <FileText size={18} /> View signed delivery ticket
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 lg:py-6 text-base lg:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                       <ClipboardList size={18} /> Get customer signature
                     </button>
                   )}
@@ -6671,7 +6671,7 @@ function DriverApp({ driver, onLogout }) {
               )}
 
               {/* always-available help line */}
-              <a href={`tel:${DISPATCH_TEL}`} className="w-full rounded-xl py-3 mt-2.5 text-base font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+              <a href={`tel:${DISPATCH_TEL}`} className="w-full rounded-xl py-3 lg:py-5 mt-2.5 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                 <Phone size={17} color={ORANGE} /> Call dispatch · {DISPATCH_PHONE}
               </a>
             </div>
