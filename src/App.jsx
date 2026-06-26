@@ -4717,7 +4717,7 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul: !!(dl && dl.self_haul), haulerSplit: p.hauler_split || {} };
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul: !!(dl && dl.self_haul), haulerSplit: p.hauler_split || {}, miles: (dl && dl.mileage) != null ? dl.mileage : null };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -4784,7 +4784,7 @@ function CostsModal({ orders, onClose }) {
       const r = px[o.ref] || {};
       const split = r.haulerSplit || {};
       const entries = Object.keys(split).length
-        ? Object.entries(split)
+        ? Object.entries(split).map(([h, v]) => [h, (v && v.total) || 0])
         : (r.selfHaul ? [[((r.hauler || "").trim() || "Self-pickup"), r.billed || 0]] : [["No hauler", 0]]);
       entries.forEach(([h, share]) => {
         (haulerGroups[h] = haulerGroups[h] || []).push(o);
@@ -4933,6 +4933,68 @@ function CostsModal({ orders, onClose }) {
     w.document.close();
   };
 
+  // Hauler statement PDF — one page per hauler (page-break), only what they need:
+  // date, ticket #, job, yards they hauled, miles, short-load + back-haul fees, pay.
+  // Self-pickup buckets are excluded (those are what customers owe us, not haul pay).
+  const exportHaulerPdf = () => {
+    const w = window.open("", "_blank");
+    if (!w) { setErr("Allow pop-ups to open the PDF."); return; }
+    setErr("");
+    const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const m = (v) => (v == null || v === 0 ? (v === 0 ? "—" : "—") : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    const m0 = (v) => `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    const period = (from || to) ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}` : "All dates";
+    const payHaulers = haulerNames.filter((h) => !haulerAmt[h].selfPickup);
+    const sections = payHaulers.map((h) => {
+      const list = haulerGroups[h];
+      let yd = 0;
+      const rows = list.map((o) => {
+        const r = px[o.ref] || {};
+        const sp = (r.haulerSplit && r.haulerSplit[h]) || {};
+        yd += Number(sp.yards) || 0;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td class="job">${esc(o.site || "")}</td><td class="r">${sp.yards != null ? (Number(sp.yards) % 1 ? Number(sp.yards).toFixed(1) : Number(sp.yards)) : ""}</td><td class="r">${r.miles != null ? Number(r.miles) : "—"}</td><td class="r">${sp.short ? m0(sp.short) : "—"}</td><td class="r">${sp.backhaul ? m0(sp.backhaul) : "—"}</td><td class="r">${m0(sp.total)}</td></tr>`;
+      }).join("");
+      return `<section class="hauler"><h2>${esc(h)} <span class="ct">· ${list.length} job${list.length === 1 ? "" : "s"}</span></h2>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Miles</th><th class="r">Short&#8209;load</th><th class="r">Back&#8209;haul</th><th class="r">Pay</th></tr></thead>
+<tbody>${rows}</tbody>
+<tfoot><tr><td colspan="3" class="r">Total — ${list.length} job${list.length === 1 ? "" : "s"}</td><td class="r">${yd % 1 ? yd.toFixed(1) : yd}</td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r">${m0(haulerAmt[h].total)}</td></tr></tfoot></table></section>`;
+    }).join("");
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hauler statement — ${esc(period)}</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:28px;font-size:13px;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #e7732a;padding-bottom:14px;}
+  .brand .logo{height:52px;width:auto;display:block;}.brand-words{flex:1;}
+  .brand-name{font-size:22px;font-weight:bold;letter-spacing:.06em;color:#161d27;}
+  .brand-sub{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#e7732a;font-weight:bold;margin-top:3px;}
+  .brand-meta{text-align:right;font-size:11px;color:#667;line-height:1.7;}.brand-meta .ml{text-transform:uppercase;letter-spacing:.05em;color:#9aa1ab;font-size:9.5px;}
+  h2{font-size:16px;margin:18px 0 6px;color:#161d27;border-left:4px solid #e7732a;padding-left:8px;}h2 .ct{color:#889;font-size:12px;font-weight:normal;}
+  table{width:100%;border-collapse:collapse;margin-top:4px;}th,td{text-align:left;padding:7px 8px;}
+  thead th{color:#667;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid #c9ced4;}
+  tbody td{border-bottom:1px solid #eceef1;}tbody tr:nth-child(even){background:#f7f8fa;}
+  .r{text-align:right;white-space:nowrap;}.job{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tfoot td{border-top:2px solid #c9ced4;font-weight:bold;padding-top:8px;}
+  .hauler{page-break-inside:auto;page-break-before:always;margin-bottom:6px;}.hauler:first-of-type{page-break-before:avoid;}
+  thead{display:table-header-group;}.muted{color:#667;font-size:11px;margin-top:10px;}
+  .foot{margin-top:24px;border-top:1px solid #e2e6ea;padding-top:10px;color:#667;font-size:11px;display:flex;justify-content:space-between;}.foot .co{font-weight:bold;color:#161d27;}
+  button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:26px;}
+  @media print{button{display:none;}body{margin:0;}}
+</style></head>
+<body>
+  <header class="brand">
+    <svg class="logo" viewBox="54 54 517 374" xmlns="http://www.w3.org/2000/svg"><path d="${LOGO_TILE}" fill="#161d27"/><path d="${LOGO_ROO}" fill="#e7732a"/></svg>
+    <div class="brand-words"><div class="brand-name">AUSSIEBLOCK READY MIX</div><div class="brand-sub">Hauler Statement</div></div>
+    <div class="brand-meta"><div><span class="ml">Generated</span> ${stamp}</div><div><span class="ml">Period</span> ${esc(period)}</div></div>
+  </header>
+  ${payHaulers.length ? sections : `<p class="muted" style="margin-top:24px;">No hauler activity in this period.</p>`}
+  <div class="muted">"Pay" = delivery (miles × $/yd) + short-load + back-haul, for the loads this hauler ran. One page per hauler — send each their page.</div>
+  <div class="foot"><span class="co">Aussieblock Ready Mix</span><span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span></div>
+  <button onclick="window.print()">Print / Save as PDF</button>
+  <button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
+</body></html>`);
+    w.document.close();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
@@ -4948,8 +5010,8 @@ function CostsModal({ orders, onClose }) {
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customer, ticket #, job, mix…" className="bg-transparent outline-none text-sm text-white w-full" style={{ fontFamily: C.body }} />
               {q && <button onClick={() => setQ("")} className="text-white/40 active:scale-90 shrink-0"><X size={14} /></button>}
             </div>
-            <button onClick={exportPdf} disabled={loading || filtered.length === 0} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform disabled:opacity-40" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
-              <Printer size={15} /> PDF
+            <button onClick={() => (view === "hauler" ? exportHaulerPdf() : exportPdf())} disabled={loading || filtered.length === 0} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform disabled:opacity-40" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
+              <Printer size={15} /> {view === "hauler" ? "Hauler PDF" : "PDF"}
             </button>
           </div>
           {err && <div className="rounded-lg px-2.5 py-1.5 text-xs mb-2" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
