@@ -4694,7 +4694,7 @@ function CostsModal({ orders, onClose }) {
       const list = orders || [];
       // Map one order's backend pricing payload into the row shape this modal uses.
       const shape = (o, p) => {
-        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", invoice: (p && p.invoice) || null, onsite: (p && p.onsite) || null, error: true };
+        if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", invoice: (p && p.invoice) || null, onsite: (p && p.onsite) || null, haulerSplit: (p && p.hauler_split) || {}, error: true };
         const cp = p.customer, dl = p.delivery;
         // hauler bucket for the "by hauler" view — computed server-side from the
         // delivering truck (RTS 4554/7329/7336 → RTS; other → P&L Concrete) with
@@ -4717,7 +4717,7 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul: !!(dl && dl.self_haul) };
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul: !!(dl && dl.self_haul), haulerSplit: p.hauler_split || {} };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -4773,6 +4773,29 @@ function CostsModal({ orders, onClose }) {
     return acc;
   }, { billed: 0, toHauler: 0, yards: 0, ext: 0, fiber: 0, fiberLbs: 0, units: new Set() });
   const grand = sumFor(filtered);
+
+  // "By hauler" splits each order across the haulers that ran its loads (per-load
+  // haul $), so a mixed pour shows under EACH hauler with that hauler's share.
+  // Self-pickup buckets ("… · self-pickup") show what the customer owes us.
+  const haulerGroups = {};   // name -> [orders]
+  const haulerAmt = {};      // name -> { total, selfPickup, [ref]: share }
+  if (view === "hauler") {
+    filtered.forEach((o) => {
+      const r = px[o.ref] || {};
+      const split = r.haulerSplit || {};
+      const entries = Object.keys(split).length
+        ? Object.entries(split)
+        : (r.selfHaul ? [[((r.hauler || "").trim() || "Self-pickup"), r.billed || 0]] : [["No hauler", 0]]);
+      entries.forEach(([h, share]) => {
+        (haulerGroups[h] = haulerGroups[h] || []).push(o);
+        const a = (haulerAmt[h] = haulerAmt[h] || { total: 0, selfPickup: !Object.keys(split).length && !!r.selfHaul });
+        a[o.ref] = (a[o.ref] || 0) + share;
+        a.total += share;
+      });
+    });
+    Object.values(haulerGroups).forEach((list) => list.sort((a, b) => String(a.when).localeCompare(String(b.when))));
+  }
+  const haulerNames = Object.keys(haulerGroups).sort((a, b) => (haulerAmt[b].total - haulerAmt[a].total) || a.localeCompare(b));
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
   // customer SUMMARY page, then a page break and the per-customer DETAIL tables.
@@ -4990,16 +5013,18 @@ function CostsModal({ orders, onClose }) {
         <div className="p-4 pt-2 overflow-y-auto" style={{ fontFamily: C.body }}>
           {loading ? (
             <div className="text-white/45 text-sm py-8 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Pulling pricing for {orders.length} order{orders.length === 1 ? "" : "s"}…</div>
-          ) : custNames.length === 0 ? (
+          ) : (view === "hauler" ? haulerNames : custNames).length === 0 ? (
             <div className="text-white/40 text-sm py-8 text-center">{needle ? "No matches." : "No completed orders yet."}</div>
           ) : (
-            custNames.map((name, ci) => {
-              const list = groups[name];
+            (view === "hauler" ? haulerNames : custNames).map((name, ci) => {
+              const names = view === "hauler" ? haulerNames : custNames;
+              const list = view === "hauler" ? haulerGroups[name] : groups[name];
+              const amt = view === "hauler" ? haulerAmt[name] : null;
+              const t = view === "hauler" ? null : sumFor(list);
               const open = openCust === name || autoOpen;
-              const t = sumFor(list);
-              const last = ci === custNames.length - 1;
-              // Self-pickup bucket (they OWE us for concrete) vs a real hauler (we pay them).
-              const selfPickup = view === "hauler" && list.some((o) => (px[o.ref] || {}).selfHaul);
+              const last = ci === names.length - 1;
+              const selfPickup = view === "hauler" && amt.selfPickup;
+              const headTotal = view === "hauler" ? amt.total : t.billed;
               return (
                 <div key={name} className={last ? "mb-2" : "mb-4 pb-4"} style={last ? undefined : { borderBottom: "2px solid rgba(255,255,255,0.12)" }}>
                   <button onClick={() => setOpenCust(open && openCust === name ? null : name)} className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -5010,8 +5035,8 @@ function CostsModal({ orders, onClose }) {
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="text-right leading-tight">
-                        <span className="block text-xs font-bold" style={{ color: selfPickup ? GREEN : ORANGE }}>{selfPickup ? money(t.billed) : view === "hauler" ? money(t.toHauler) : money(t.billed)}</span>
-                        <span className="block text-[10px] text-white/45">{selfPickup ? "they owe (self-pickup)" : view === "hauler" ? `billed ${money(t.billed)}` : `to hauler ${money(t.toHauler)}`}</span>
+                        <span className="block text-xs font-bold" style={{ color: selfPickup ? GREEN : ORANGE }}>{money(headTotal)}</span>
+                        <span className="block text-[10px] text-white/45">{selfPickup ? "they owe (self-pickup)" : view === "hauler" ? "to hauler" : `to hauler ${money(t.toHauler)}`}</span>
                       </span>
                       <ChevronRight size={16} className="text-white/40" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
                     </span>
@@ -5020,13 +5045,15 @@ function CostsModal({ orders, onClose }) {
                     <div className="mt-1.5 mb-1">
                       {list.map((o) => {
                         const r = px[o.ref] || {};
-                        const oOpen = openOrder === o.ref;
+                        const rowKey = name + "|" + o.ref;
+                        const oOpen = openOrder === rowKey;
                         const inv = r.invoice;
                         const paid = inv && inv.status === "paid";
                         const payingThis = payingOrder === o.ref;
+                        const share = view === "hauler" ? (amt[o.ref] || 0) : null;
                         return (
-                          <div key={o.ref} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <button onClick={() => setOpenOrder(oOpen ? null : o.ref)} className="w-full grid items-center gap-2 px-3 py-1.5 text-left active:scale-[0.99]" style={{ gridTemplateColumns: "1fr auto" }}>
+                          <div key={rowKey} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <button onClick={() => setOpenOrder(oOpen ? null : rowKey)} className="w-full grid items-center gap-2 px-3 py-1.5 text-left active:scale-[0.99]" style={{ gridTemplateColumns: "1fr auto" }}>
                               <div className="min-w-0">
                                 <div className="text-white/85 text-xs font-semibold truncate" style={{ fontFamily: C.body }}>
                                   {orderDateUS(o.when) || o.when || "—"} · {o.ref}
@@ -5036,8 +5063,17 @@ function CostsModal({ orders, onClose }) {
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="text-right leading-tight">
-                                  <span className="block text-sm font-bold" style={{ color: r.error ? "#ff8a85" : "#fff", fontFamily: C.body }}>{r.error ? "error" : money(r.billed)}</span>
-                                  <span className="block text-[10px] text-white/45" style={{ fontFamily: C.body }}>to hauler {money(r.toHauler)}</span>
+                                  {view === "hauler" ? (
+                                    <>
+                                      <span className="block text-sm font-bold" style={{ color: selfPickup ? GREEN : "#fff", fontFamily: C.body }}>{money(share)}</span>
+                                      <span className="block text-[10px] text-white/45" style={{ fontFamily: C.body }}>{selfPickup ? "owes" : "to hauler"}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="block text-sm font-bold" style={{ color: r.error ? "#ff8a85" : "#fff", fontFamily: C.body }}>{r.error ? "error" : money(r.billed)}</span>
+                                      <span className="block text-[10px] text-white/45" style={{ fontFamily: C.body }}>to hauler {money(r.toHauler)}</span>
+                                    </>
+                                  )}
                                 </span>
                                 <ChevronRight size={14} className="text-white/40" style={{ transform: oOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
                               </div>
@@ -5054,7 +5090,8 @@ function CostsModal({ orders, onClose }) {
                                   <Drow label="On site" val={r.onsite && r.onsite.minutes ? `${fmtMins(r.onsite.minutes)}${r.onsite.trucks > 1 ? ` total · ${r.onsite.trucks} trucks` : ""}` : "—"} />
                                   <Drow label={r.onsite && r.onsite.trucks > 1 ? "Standby (per truck)" : "Standby"} val={r.onsite && r.onsite.standby ? money(r.onsite.standby) : (r.onsite && r.onsite.minutes ? "$0 (under 1 hr)" : "—")} />
                                   <Drow label="Billed" val={r.error ? "—" : money(r.billed)} />
-                                  <Drow label="To hauler" val={money(r.toHauler)} />
+                                  <Drow label="To hauler (order)" val={money(r.toHauler)} />
+                                  {view === "hauler" && !selfPickup && <Drow label={`This hauler (${name})`} val={money(share)} />}
                                 </div>
                                 {inv ? (
                                   <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5" style={{ background: NAVY }}>
