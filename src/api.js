@@ -598,6 +598,11 @@ export async function getSignatureDataUrl(ref) {
   })
 }
 
+// As-you-type job-site address suggestions, proxied through our backend (keeps
+// the Google key off the browser). Returns { suggestions: [str, ...] }.
+export function placeSuggestions(q) {
+  return request(`/places/autocomplete?q=${encodeURIComponent(q)}`)
+}
 export function getBilling(customerId) {
   return request(`/billing/${customerId}`)
 }
