@@ -4318,6 +4318,18 @@ function useTitleFlash(count, text) {
   }, [count, text]);
 }
 
+// Play the message chime whenever the unread count RISES (a new message arrived
+// between polls). The first observed value is taken as a baseline so we never
+// chime for messages that were already unread when the app loaded.
+function useUnreadChime(count) {
+  const prev = useRef(null);
+  useEffect(() => {
+    if (prev.current === null) { prev.current = count; return; }
+    if (count > prev.current) messageChime();
+    prev.current = count;
+  }, [count]);
+}
+
 // Dispatch ↔ driver chat. Left column = driver list (roster ∪ anyone with a
 // thread) with unread badges; right column = the selected thread + compose box.
 // Polls the threads list every 8s, and the open thread every 5s, so a reply
@@ -5665,6 +5677,28 @@ function desktopNotify(o) {
     }
   } catch { /* ignore */ }
 }
+// A gentle rising "ding-dong" for new chat messages — deliberately softer and
+// distinct from the order buzzer (orderChime) so staff can tell them apart.
+function messageChime() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const play = () => {
+      const start = ctx.currentTime + 0.05;
+      [660, 880].forEach((freq, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = freq;
+        const t = start + i * 0.16;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+        o.start(t); o.stop(t + 0.32);
+      });
+    };
+    if (ctx.state === "suspended") ctx.resume().then(play).catch(() => {});
+    else play();
+  } catch { /* audio blocked — title flash + badge still show */ }
+}
 
 // Staff price sheet: rates that fill the batch-ticket pricing block. Base $/yd by
 // mix (+ internal haul), per-customer overrides, and the fee/tax settings.
@@ -5958,6 +5992,7 @@ function DispatchApp({ email, role, onLogout }) {
     return () => { alive = false; };
   }, [showMessages]);
   useTitleFlash(msgUnread, `${msgUnread} new message${msgUnread > 1 ? "s" : ""}`);
+  useUnreadChime(msgUnread);   // chime when a driver message arrives
 
   // Drop a freshly-updated order (returned by the status/assign endpoints) back
   // into the list so the row reflects it immediately, without waiting for the
@@ -6624,6 +6659,20 @@ function DriverApp({ driver, onLogout }) {
   };
   useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, []);
 
+  // Unlock audio on the first tap so the new-message chime can play on the tablet
+  // (browsers keep the AudioContext suspended until a user gesture).
+  useEffect(() => {
+    const arm = () => unlockAudio();
+    window.addEventListener("pointerdown", arm);
+    window.addEventListener("touchstart", arm);
+    window.addEventListener("keydown", arm);
+    return () => {
+      window.removeEventListener("pointerdown", arm);
+      window.removeEventListener("touchstart", arm);
+      window.removeEventListener("keydown", arm);
+    };
+  }, []);
+
   // Messaging — load the thread while the chat is open (marks dispatch's messages
   // read), and poll the unread count for the button badge while it's closed.
   const loadMsgs = async () => {
@@ -6646,6 +6695,7 @@ function DriverApp({ driver, onLogout }) {
     tick(); const t = setInterval(tick, 12000); return () => { alive = false; clearInterval(t); };
   }, [showMsgs]);   // eslint-disable-line react-hooks/exhaustive-deps
   useTitleFlash(driverUnread, `${driverUnread} message${driverUnread > 1 ? "s" : ""} from dispatch`);
+  useUnreadChime(driverUnread);   // chime when dispatch messages the driver
   useEffect(() => { if (msgScrollRef.current) msgScrollRef.current.scrollTop = msgScrollRef.current.scrollHeight; }, [driverMsgs]);
 
   const orders = data?.orders || [];
