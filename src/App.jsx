@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, logout, isLoggedIn } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -4334,6 +4334,25 @@ function useUnreadChime(count) {
 // thread) with unread badges; right column = the selected thread + compose box.
 // Polls the threads list every 8s, and the open thread every 5s, so a reply
 // shows up without a manual refresh.
+// A chat photo: fetched as an authed blob (the GET needs the bearer token, so a
+// plain <img src> won't work). Shows a thumbnail; tap to open full size.
+function MsgImage({ id }) {
+  const [url, setUrl] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let alive = true, made = null;
+    fetchMessageImageUrl(id).then((u) => { if (alive) { made = u; setUrl(u); } }).catch(() => alive && setErr(true));
+    return () => { alive = false; if (made) URL.revokeObjectURL(made); };
+  }, [id]);
+  if (err) return <div className="text-xs opacity-60" style={{ fontFamily: C.body }}>Photo unavailable</div>;
+  if (!url) return <div className="w-40 h-40 rounded-lg flex items-center justify-center" style={{ background: "rgba(0,0,0,0.15)" }}><Loader2 size={18} className="animate-spin opacity-60" /></div>;
+  return (
+    <button onClick={() => window.open(url, "_blank")} className="block active:scale-95 transition-transform">
+      <img src={url} alt="photo" className="rounded-lg max-w-[15rem] max-h-[15rem] object-cover" />
+    </button>
+  );
+}
+
 function MessagesModal({ onClose }) {
   const roster = useContext(DriversContext);
   const [threads, setThreads] = useState([]);
@@ -4364,6 +4383,7 @@ function MessagesModal({ onClose }) {
   const byDriver = {}; threads.forEach((t) => { byDriver[t.driver] = t; });
   const names = [...new Set([...(roster || []), ...threads.map((t) => t.driver)])];
 
+  const fileRef = useRef(null);
   const send = async () => {
     const body = draft.trim();
     if (!body || !sel || busy) return;
@@ -4373,6 +4393,16 @@ function MessagesModal({ onClose }) {
       setMsgs((xs) => [...xs, m]); setDraft("");
       loadThreads();
     } catch (e) { alert(e.message || "Couldn't send"); }
+    setBusy(false);
+  };
+  const sendPhoto = async (file) => {
+    if (!file || !sel || busy) return;
+    setBusy(true);
+    try {
+      const m = await sendMessagePhoto(sel, file, draft.trim());
+      setMsgs((xs) => [...xs, m]); setDraft("");
+      loadThreads();
+    } catch (e) { alert(e.message || "Couldn't send photo"); }
     setBusy(false);
   };
 
@@ -4411,12 +4441,15 @@ function MessagesModal({ onClose }) {
                   {msgs.length === 0 && <div className="text-white/40 text-sm text-center my-auto" style={{ fontFamily: C.body }}>No messages yet — say hello to {sel}.</div>}
                   {msgs.map((m) => (
                     <div key={m.id} className={"max-w-[75%] rounded-2xl px-3 py-2 " + (m.from_dispatch ? "self-end" : "self-start")} style={{ background: m.from_dispatch ? ORANGE : NAVY, color: m.from_dispatch ? NAVY_DEEP : "#fff", border: m.from_dispatch ? "none" : "1px solid rgba(255,255,255,0.12)" }}>
-                      <div className="text-sm whitespace-pre-wrap break-words" style={{ fontFamily: C.body }}>{m.body}</div>
+                      {m.has_image && <div className={m.body ? "mb-1.5" : ""}><MsgImage id={m.id} /></div>}
+                      {m.body && <div className="text-sm whitespace-pre-wrap break-words" style={{ fontFamily: C.body }}>{m.body}</div>}
                       <div className="text-[10px] opacity-60 mt-0.5" style={{ fontFamily: C.body }}>{fmtDateTime(m.at)}</div>
                     </div>
                   ))}
                 </div>
                 <div className="shrink-0 p-3 flex items-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) sendPhoto(f); }} />
+                  <button onClick={() => fileRef.current?.click()} disabled={busy} title="Send a photo" className="shrink-0 rounded-xl p-2.5 active:scale-95 disabled:opacity-40" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", color: ORANGE }}><Camera size={17} /></button>
                   <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} rows={1} placeholder={`Message ${sel}…`} className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white resize-none outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body, maxHeight: "8rem" }} />
                   <button onClick={send} disabled={busy || !draft.trim()} className="rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 flex items-center gap-1.5 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Send size={15} /> Send</button>
                 </div>
@@ -6686,6 +6719,14 @@ function DriverApp({ driver, onLogout }) {
     catch (e) { setErr(e.message || "Couldn't send"); }
     setMsgBusy(false);
   };
+  const msgFileRef = useRef(null);
+  const sendMsgPhoto = async (file) => {
+    if (!file || msgBusy) return;
+    setMsgBusy(true);
+    try { const m = await sendDriverPhoto(file, msgDraft.trim()); setDriverMsgs((xs) => [...xs, m]); setMsgDraft(""); }
+    catch (e) { setErr(e.message || "Couldn't send photo"); }
+    setMsgBusy(false);
+  };
   useEffect(() => {
     let alive = true;
     if (showMsgs) {
@@ -6993,12 +7034,15 @@ function DriverApp({ driver, onLogout }) {
               {driverMsgs.length === 0 && <div className="text-white/40 text-sm text-center my-auto" style={{ fontFamily: C.body }}>No messages yet. Send dispatch a note below.</div>}
               {driverMsgs.map((m) => (
                 <div key={m.id} className={"max-w-[80%] rounded-2xl px-3.5 py-2.5 " + (m.from_dispatch ? "self-start" : "self-end")} style={{ background: m.from_dispatch ? NAVY : ORANGE, color: m.from_dispatch ? "#fff" : NAVY_DEEP, border: m.from_dispatch ? "1px solid rgba(255,255,255,0.12)" : "none" }}>
-                  <div className="text-base whitespace-pre-wrap break-words" style={{ fontFamily: C.body }}>{m.body}</div>
+                  {m.has_image && <div className={m.body ? "mb-1.5" : ""}><MsgImage id={m.id} /></div>}
+                  {m.body && <div className="text-base whitespace-pre-wrap break-words" style={{ fontFamily: C.body }}>{m.body}</div>}
                   <div className="text-[10px] opacity-60 mt-0.5" style={{ fontFamily: C.body }}>{m.from_dispatch ? "Dispatch" : "You"} · {fmtDateTime(m.at)}</div>
                 </div>
               ))}
             </div>
             <div className="shrink-0 p-3 flex items-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+              <input ref={msgFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) sendMsgPhoto(f); }} />
+              <button onClick={() => msgFileRef.current?.click()} disabled={msgBusy} title="Send a photo" className="shrink-0 rounded-xl p-3 active:scale-95 disabled:opacity-40" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", color: ORANGE }}><Camera size={18} /></button>
               <textarea value={msgDraft} onChange={(e) => setMsgDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} rows={1} placeholder="Message dispatch…" className="flex-1 rounded-xl px-3 py-3 text-base text-white resize-none outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body, maxHeight: "9rem" }} />
               <button onClick={sendMsg} disabled={msgBusy || !msgDraft.trim()} className="rounded-xl px-4 py-3 text-base font-bold active:scale-95 flex items-center gap-1.5 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Send size={17} /> Send</button>
             </div>

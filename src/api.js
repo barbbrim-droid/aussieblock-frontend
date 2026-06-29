@@ -609,6 +609,29 @@ export function getDriverUnread() { return request('/driver/messages/unread') }
 export function sendDriverMessage(body) {
   return request('/driver/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) })
 }
+// Send a photo (with optional caption). Multipart, so it bypasses `request`'s
+// JSON wrapper but still carries the bearer token.
+export async function sendMessagePhoto(driver, file, body = '') {
+  const fd = new FormData(); fd.append('file', file)
+  const q = `?driver=${encodeURIComponent(driver)}&body=${encodeURIComponent(body)}`
+  const res = await fetch(`${API_BASE}/messages/photo${q}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd })
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Could not send photo')
+  return res.json()
+}
+export async function sendDriverPhoto(file, body = '') {
+  const fd = new FormData(); fd.append('file', file)
+  const res = await fetch(`${API_BASE}/driver/messages/photo?body=${encodeURIComponent(body)}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd })
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Could not send photo')
+  return res.json()
+}
+// An authed blob URL for a chat photo (works for both staff and driver).
+export async function fetchMessageImageUrl(id) {
+  const res = await fetch(`${API_BASE}/messages/${id}/image`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  if (!res.ok) throw new Error('Could not load photo')
+  return URL.createObjectURL(await res.blob())
+}
 // As-you-type job-site address suggestions, proxied through our backend (keeps
 // the Google key off the browser). Returns { suggestions: [str, ...] }.
 export function placeSuggestions(q) {
