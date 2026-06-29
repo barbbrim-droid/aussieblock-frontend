@@ -598,6 +598,17 @@ export async function getSignatureDataUrl(ref) {
   })
 }
 
+// ── Dispatch ↔ driver messaging ──
+export function getMessageThreads() { return request('/messages/threads') }
+export function getMessageThread(driver) { return request(`/messages/${encodeURIComponent(driver)}`) }
+export function sendMessage(driver, body) {
+  return request('/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ driver, body }) })
+}
+export function getDriverMessages() { return request('/driver/messages') }
+export function getDriverUnread() { return request('/driver/messages/unread') }
+export function sendDriverMessage(body) {
+  return request('/driver/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) })
+}
 // As-you-type job-site address suggestions, proxied through our backend (keeps
 // the Google key off the browser). Returns { suggestions: [str, ...] }.
 export function placeSuggestions(q) {

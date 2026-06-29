@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, logout, isLoggedIn } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -4305,6 +4305,105 @@ function POPanel({ materials }) {
   );
 }
 
+// Dispatch ↔ driver chat. Left column = driver list (roster ∪ anyone with a
+// thread) with unread badges; right column = the selected thread + compose box.
+// Polls the threads list every 8s, and the open thread every 5s, so a reply
+// shows up without a manual refresh.
+function MessagesModal({ onClose }) {
+  const roster = useContext(DriversContext);
+  const [threads, setThreads] = useState([]);
+  const [sel, setSel] = useState(null);   // selected driver name
+  const [msgs, setMsgs] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef(null);
+
+  const loadThreads = async () => {
+    try { const r = await getMessageThreads(); setThreads(r.threads || []); } catch { /* keep prior */ }
+  };
+  const loadThread = async (drv) => {
+    if (!drv) return;
+    try { const r = await getMessageThread(drv); setMsgs(r.messages || []); } catch { /* keep prior */ }
+  };
+
+  useEffect(() => { loadThreads(); const t = setInterval(loadThreads, 8000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    if (!sel) return;
+    loadThread(sel);
+    const t = setInterval(() => loadThread(sel), 5000);
+    return () => clearInterval(t);
+  }, [sel]);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs]);
+
+  // Driver list: roster names first, then anyone who has a thread but isn't on it.
+  const byDriver = {}; threads.forEach((t) => { byDriver[t.driver] = t; });
+  const names = [...new Set([...(roster || []), ...threads.map((t) => t.driver)])];
+
+  const send = async () => {
+    const body = draft.trim();
+    if (!body || !sel || busy) return;
+    setBusy(true);
+    try {
+      const m = await sendMessage(sel, body);
+      setMsgs((xs) => [...xs, m]); setDraft("");
+      loadThreads();
+    } catch (e) { alert(e.message || "Couldn't send"); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-4xl h-[85vh] rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 shrink-0" style={{ background: NAVY, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="flex items-center gap-2"><MessageSquare size={18} color={ORANGE} /><span className="text-white text-lg font-bold" style={{ fontFamily: C.cond }}>Messages</span></div>
+          <button onClick={onClose} className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        <div className="flex-1 min-h-0 flex">
+          {/* driver list */}
+          <div className="w-56 shrink-0 overflow-y-auto" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+            {names.length === 0 && <div className="text-white/40 text-sm p-4" style={{ fontFamily: C.body }}>No drivers yet.</div>}
+            {names.map((n) => {
+              const t = byDriver[n];
+              const active = sel === n;
+              return (
+                <button key={n} onClick={() => setSel(n)} className="w-full text-left px-4 py-3 active:scale-[0.99]" style={{ background: active ? "rgba(245,158,11,0.14)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.06)", borderLeft: active ? `3px solid ${ORANGE}` : "3px solid transparent" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{n}</span>
+                    {t && t.unread > 0 && <span className="shrink-0 text-[11px] font-bold rounded-full px-1.5 py-0.5" style={{ background: ORANGE, color: NAVY_DEEP }}>{t.unread}</span>}
+                  </div>
+                  {t && t.last && <div className="text-white/45 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{t.last}</div>}
+                </button>
+              );
+            })}
+          </div>
+          {/* thread + compose */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            {!sel ? (
+              <div className="flex-1 flex items-center justify-center text-white/40 text-sm" style={{ fontFamily: C.body }}>Pick a driver to start chatting.</div>
+            ) : (
+              <>
+                <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-2">
+                  {msgs.length === 0 && <div className="text-white/40 text-sm text-center my-auto" style={{ fontFamily: C.body }}>No messages yet — say hello to {sel}.</div>}
+                  {msgs.map((m) => (
+                    <div key={m.id} className={"max-w-[75%] rounded-2xl px-3 py-2 " + (m.from_dispatch ? "self-end" : "self-start")} style={{ background: m.from_dispatch ? ORANGE : NAVY, color: m.from_dispatch ? NAVY_DEEP : "#fff", border: m.from_dispatch ? "none" : "1px solid rgba(255,255,255,0.12)" }}>
+                      <div className="text-sm whitespace-pre-wrap break-words" style={{ fontFamily: C.body }}>{m.body}</div>
+                      <div className="text-[10px] opacity-60 mt-0.5" style={{ fontFamily: C.body }}>{fmtDateTime(m.at)}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="shrink-0 p-3 flex items-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+                  <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} rows={1} placeholder={`Message ${sel}…`} className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white resize-none outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body, maxHeight: "8rem" }} />
+                  <button onClick={send} disabled={busy || !draft.trim()} className="rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 flex items-center gap-1.5 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Send size={15} /> Send</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MaterialsModal({ onClose }) {
   const [tab, setTab] = useState("inventory");
   const [summary, setSummary] = useState({ materials: [], unmapped_mixes: [] });
@@ -5724,6 +5823,8 @@ function DispatchApp({ email, role, onLogout }) {
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
   const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
+  const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
+  const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
@@ -5831,6 +5932,18 @@ function DispatchApp({ email, role, onLogout }) {
     const tick = setInterval(() => { if (alive) forceTick((n) => n + 1); }, 1000);
     return () => { alive = false; clearInterval(poll); clearInterval(tick); };
   }, []);
+
+  // Poll the dispatch unread-message count for the Messages button badge. Skipped
+  // while the modal is open (it marks read on its own, and zeroes the badge there).
+  useEffect(() => {
+    let alive = true;
+    const tickUnread = async () => {
+      try { const r = await getMessageThreads(); if (alive) setMsgUnread(r.unread_total || 0); } catch { /* ignore */ }
+    };
+    if (!showMessages) { tickUnread(); const t = setInterval(tickUnread, 10000); return () => { alive = false; clearInterval(t); }; }
+    setMsgUnread(0);
+    return () => { alive = false; };
+  }, [showMessages]);
 
   // Drop a freshly-updated order (returned by the status/assign endpoints) back
   // into the list so the row reflects it immediately, without waiting for the
@@ -5956,6 +6069,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showStaff && <ManageStaffModal onClose={() => { setShowStaff(false); refresh(); }} />}
       {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
+      {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
       )}
@@ -6051,6 +6165,10 @@ function DispatchApp({ email, role, onLogout }) {
                   <Layers size={16} color={ORANGE} /> Materials
                 </button>
               )}
+              <button onClick={() => setShowMessages(true)} className="relative flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <MessageSquare size={16} color={ORANGE} /> Messages
+                {msgUnread > 0 && <span className="absolute -top-1.5 -right-1.5 text-[11px] font-bold rounded-full px-1.5 py-0.5 leading-none flex items-center justify-center min-w-[18px]" style={{ background: "#ef5350", color: "#fff" }}>{msgUnread}</span>}
+              </button>
               <button onClick={() => setShowDocs(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <BookOpen size={16} color={ORANGE} /> Knowledge
               </button>
@@ -6415,6 +6533,13 @@ function DriverApp({ driver, onLogout }) {
   const [notesDraft, setNotesDraft] = useState("");        // driver's editable on-site notes
   const [notesBusy, setNotesBusy] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
+  // Dispatch chat
+  const [showMsgs, setShowMsgs] = useState(false);
+  const [driverMsgs, setDriverMsgs] = useState([]);
+  const [msgDraft, setMsgDraft] = useState("");
+  const [msgBusy, setMsgBusy] = useState(false);
+  const [driverUnread, setDriverUnread] = useState(0);
+  const msgScrollRef = useRef(null);
   // Manual fuel fill — driver enters truck #, gallons, optional mileage.
   const [showFuel, setShowFuel] = useState(false);
   const [fuelForm, setFuelForm] = useState({ truck_no: localStorage.getItem("driver_truck_no") || "", odometer: "", gallons: "" });
@@ -6484,6 +6609,29 @@ function DriverApp({ driver, onLogout }) {
     catch (e) { setErr(e.message); }
   };
   useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, []);
+
+  // Messaging — load the thread while the chat is open (marks dispatch's messages
+  // read), and poll the unread count for the button badge while it's closed.
+  const loadMsgs = async () => {
+    try { const r = await getDriverMessages(); setDriverMsgs(r.messages || []); setDriverUnread(0); } catch { /* keep prior */ }
+  };
+  const sendMsg = async () => {
+    const body = msgDraft.trim();
+    if (!body || msgBusy) return;
+    setMsgBusy(true);
+    try { const m = await sendDriverMessage(body); setDriverMsgs((xs) => [...xs, m]); setMsgDraft(""); }
+    catch (e) { setErr(e.message || "Couldn't send"); }
+    setMsgBusy(false);
+  };
+  useEffect(() => {
+    let alive = true;
+    if (showMsgs) {
+      loadMsgs(); const t = setInterval(loadMsgs, 5000); return () => { alive = false; clearInterval(t); };
+    }
+    const tick = async () => { try { const r = await getDriverUnread(); if (alive) setDriverUnread(r.count || 0); } catch { /* ignore */ } };
+    tick(); const t = setInterval(tick, 12000); return () => { alive = false; clearInterval(t); };
+  }, [showMsgs]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (msgScrollRef.current) msgScrollRef.current.scrollTop = msgScrollRef.current.scrollHeight; }, [driverMsgs]);
 
   const orders = data?.orders || [];
   const active = orders.find((o) => o.ref === activeRef) || null;
@@ -6558,6 +6706,10 @@ function DriverApp({ driver, onLogout }) {
             {/* LEFT pane — delivery list. Full width on a phone (hidden once a job is
                 open); a fixed sidebar on a landscape tablet (always visible). */}
             <div className={`overflow-y-auto overscroll-contain p-4 lg:w-96 lg:shrink-0 lg:border-r lg:border-white/10 ${active ? "hidden lg:block" : "w-full"}`}>
+              <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                <MessageSquare size={18} color={ORANGE} /> Message dispatch
+                {driverUnread > 0 && <span className="absolute top-2 right-3 text-xs font-bold rounded-full px-2 py-0.5 leading-none flex items-center justify-center min-w-[20px]" style={{ background: "#ef5350", color: "#fff" }}>{driverUnread}</span>}
+              </button>
               <button onClick={() => { setFuelMsg(null); setShowFuel(true); }} className="w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: ORANGE, color: NAVY_DEEP }}>
                 <Droplets size={18} /> Fuel up — log a fill
               </button>
@@ -6761,6 +6913,29 @@ function DriverApp({ driver, onLogout }) {
                 {fuelBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />} Save fill
               </button>
               <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 mt-2 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showMsgs && (
+        <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowMsgs(false)}>
+          <div className="w-full sm:max-w-lg h-full sm:h-[80vh] flex flex-col sm:rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.875rem)" }}>
+              <div className="flex items-center gap-2"><MessageSquare size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Dispatch</span></div>
+              <button onClick={() => setShowMsgs(false)} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+            </div>
+            <div ref={msgScrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 flex flex-col gap-2">
+              {driverMsgs.length === 0 && <div className="text-white/40 text-sm text-center my-auto" style={{ fontFamily: C.body }}>No messages yet. Send dispatch a note below.</div>}
+              {driverMsgs.map((m) => (
+                <div key={m.id} className={"max-w-[80%] rounded-2xl px-3.5 py-2.5 " + (m.from_dispatch ? "self-start" : "self-end")} style={{ background: m.from_dispatch ? NAVY : ORANGE, color: m.from_dispatch ? "#fff" : NAVY_DEEP, border: m.from_dispatch ? "1px solid rgba(255,255,255,0.12)" : "none" }}>
+                  <div className="text-base whitespace-pre-wrap break-words" style={{ fontFamily: C.body }}>{m.body}</div>
+                  <div className="text-[10px] opacity-60 mt-0.5" style={{ fontFamily: C.body }}>{m.from_dispatch ? "Dispatch" : "You"} · {fmtDateTime(m.at)}</div>
+                </div>
+              ))}
+            </div>
+            <div className="shrink-0 p-3 flex items-end gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+              <textarea value={msgDraft} onChange={(e) => setMsgDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} rows={1} placeholder="Message dispatch…" className="flex-1 rounded-xl px-3 py-3 text-base text-white resize-none outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body, maxHeight: "9rem" }} />
+              <button onClick={sendMsg} disabled={msgBusy || !msgDraft.trim()} className="rounded-xl px-4 py-3 text-base font-bold active:scale-95 flex items-center gap-1.5 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><Send size={17} /> Send</button>
             </div>
           </div>
         </div>
