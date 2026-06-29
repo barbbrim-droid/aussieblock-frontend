@@ -4305,6 +4305,19 @@ function POPanel({ materials }) {
   );
 }
 
+// Flash the browser-tab title while `count` > 0 so a new message grabs attention
+// even from another tab. Alternates the real title with an alert line every ~1s,
+// and restores it when the count clears (message read) or the component unmounts.
+function useTitleFlash(count, text) {
+  useEffect(() => {
+    if (!count) return;
+    const orig = document.title;
+    let on = false;
+    const id = setInterval(() => { on = !on; document.title = on ? `🔴 ${text}` : orig; }, 1000);
+    return () => { clearInterval(id); document.title = orig; };
+  }, [count, text]);
+}
+
 // Dispatch ↔ driver chat. Left column = driver list (roster ∪ anyone with a
 // thread) with unread badges; right column = the selected thread + compose box.
 // Polls the threads list every 8s, and the open thread every 5s, so a reply
@@ -5944,6 +5957,7 @@ function DispatchApp({ email, role, onLogout }) {
     setMsgUnread(0);
     return () => { alive = false; };
   }, [showMessages]);
+  useTitleFlash(msgUnread, `${msgUnread} new message${msgUnread > 1 ? "s" : ""}`);
 
   // Drop a freshly-updated order (returned by the status/assign endpoints) back
   // into the list so the row reflects it immediately, without waiting for the
@@ -6631,6 +6645,7 @@ function DriverApp({ driver, onLogout }) {
     const tick = async () => { try { const r = await getDriverUnread(); if (alive) setDriverUnread(r.count || 0); } catch { /* ignore */ } };
     tick(); const t = setInterval(tick, 12000); return () => { alive = false; clearInterval(t); };
   }, [showMsgs]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useTitleFlash(driverUnread, `${driverUnread} message${driverUnread > 1 ? "s" : ""} from dispatch`);
   useEffect(() => { if (msgScrollRef.current) msgScrollRef.current.scrollTop = msgScrollRef.current.scrollHeight; }, [driverMsgs]);
 
   const orders = data?.orders || [];
