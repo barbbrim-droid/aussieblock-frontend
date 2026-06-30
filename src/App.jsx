@@ -2031,7 +2031,7 @@ function BatchTicketForm({ o, onEdited }) {
 
   const money = (v) => (v == null || v === "" ? "—" : `$${Number(v).toFixed(2)}`);
   const cp = px && px.customer, dl = px && px.delivery;
-  const HAULERS = ["PL", "RTS"];
+  const HAULERS = ["P&L", "RTS"];
 
   const groupHead = (txt) => (
     <div className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1 pb-1" style={{ color: ORANGE, borderBottom: "1px solid rgba(255,255,255,0.08)", fontFamily: C.body }}>{txt}</div>
