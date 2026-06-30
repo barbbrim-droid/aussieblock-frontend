@@ -4960,6 +4960,10 @@ function CostsModal({ orders, onClose }) {
     });
     return has ? [{ name: "P&L", owe, owed, net: owed - owe }] : [];
   })();
+  // Self-pickup buckets ("… · self-pickup") = customers who hauled their own
+  // concrete; they OWE us (no haul pay). Excluded from the hauler statement, so
+  // they get their own downloadable statement (see exportSelfPickupPdf).
+  const selfHaulers = haulerNames.filter((h) => haulerAmt[h].selfPickup);
 
   // Open a clean, printable PDF (new tab → "Print / Save as PDF"): a one-row-per-
   // customer SUMMARY page, then a page break and the per-customer DETAIL tables.
@@ -5143,6 +5147,85 @@ function CostsModal({ orders, onClose }) {
     w.document.close();
   };
 
+  // Self-pickup statement PDF — one page per self-haul customer (e.g. P&L), the
+  // loads they hauled themselves and what they OWE us (concrete + admixtures +
+  // tax — no delivery/haul). The mirror of the Hauler statement, which excludes
+  // these buckets. Amount owed per load = that order's billed total.
+  const exportSelfPickupPdf = () => {
+    const w = window.open("", "_blank");
+    if (!w) { setErr("Allow pop-ups to open the PDF."); return; }
+    setErr("");
+    const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const m0 = (v) => `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const ydCell = (v) => (v == null ? "" : (Number(v) % 1 ? Number(v).toFixed(1) : Number(v)));
+    const perYd = (r) => (r && r.unit != null && Number(r.unit) > 0) ? `${m0(r.unit)}/yd` : "—";
+    const fiberCell = (amt, lbs) => {
+      const parts = [];
+      if (lbs) parts.push(`${Number(lbs).toLocaleString("en-US", { maximumFractionDigits: 1 })} lb`);
+      if (amt) parts.push(m0(amt));
+      return parts.length ? parts.join(" · ") : "—";
+    };
+    const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    const period = (from || to) ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}` : "All dates";
+    // Drop the "· self-pickup" suffix from the bucket name for the heading.
+    const baseName = (h) => h.replace(/ · self-pickup$/, "");
+    const sections = selfHaulers.map((h) => {
+      const list = haulerGroups[h];
+      let yd = 0;
+      const rows = list.map((o) => {
+        const r = px[o.ref] || {};
+        if (r.yards != null && Number(r.yards) > 0) yd += Number(r.yards);
+        const owed = haulerAmt[h][o.ref] || 0;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${ydCell(r.yards)}</td><td class="r">${perYd(r)}</td><td class="r">${fiberCell(r.fiberAmt, r.fiberLbs)}</td><td class="r">${m0(owed)}</td></tr>`;
+      }).join("");
+      return `<section class="cust"><h2>${esc(baseName(h))} <span class="ct">· ${list.length} load${list.length === 1 ? "" : "s"} hauled</span></h2>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Base $/yd</th><th class="r">Fiber</th><th class="r">Amount owed</th></tr></thead>
+<tbody>${rows}</tbody>
+<tfoot><tr><td colspan="4" class="r">Total — ${list.length} load${list.length === 1 ? "" : "s"}</td><td class="r">${ydCell(yd)}</td><td class="r"></td><td class="r"></td><td class="r">${m0(haulerAmt[h].total)}</td></tr></tfoot></table></section>`;
+    }).join("");
+    const grandOwed = selfHaulers.reduce((a, h) => a + (haulerAmt[h].total || 0), 0);
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Self-pickup statement — ${esc(period)}</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:28px;font-size:13px;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #e7732a;padding-bottom:14px;}
+  .brand .logo{height:52px;width:auto;display:block;}.brand-words{flex:1;}
+  .brand-name{font-size:22px;font-weight:bold;letter-spacing:.06em;color:#161d27;}
+  .brand-sub{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#e7732a;font-weight:bold;margin-top:3px;}
+  .brand-meta{text-align:right;font-size:11px;color:#667;line-height:1.7;}.brand-meta .ml{text-transform:uppercase;letter-spacing:.05em;color:#9aa1ab;font-size:9.5px;}
+  .sum{display:flex;flex-wrap:wrap;gap:26px;background:#f6f7f9;border-radius:10px;padding:14px 18px;margin-top:16px;}
+  .lab{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}.big{font-size:19px;font-weight:bold;margin-top:2px;}
+  h2{font-size:16px;margin:18px 0 6px;color:#161d27;border-left:4px solid #e7732a;padding-left:8px;}h2 .ct{color:#889;font-size:12px;font-weight:normal;}
+  table{width:100%;border-collapse:collapse;margin-top:4px;}th,td{text-align:left;padding:7px 8px;}
+  thead th{color:#667;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid #c9ced4;}
+  tbody td{border-bottom:1px solid #eceef1;}tbody tr:nth-child(even){background:#f7f8fa;}
+  .r{text-align:right;white-space:nowrap;}.job{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tfoot td{border-top:2px solid #c9ced4;font-weight:bold;padding-top:8px;}
+  .cust{page-break-inside:auto;page-break-before:always;margin-bottom:6px;}.cust:first-of-type{page-break-before:avoid;}
+  thead{display:table-header-group;}.muted{color:#667;font-size:11px;margin-top:10px;}
+  .foot{margin-top:24px;border-top:1px solid #e2e6ea;padding-top:10px;color:#667;font-size:11px;display:flex;justify-content:space-between;}.foot .co{font-weight:bold;color:#161d27;}
+  button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:26px;}
+  @media print{button{display:none;}body{margin:0;}}
+</style></head>
+<body>
+  <header class="brand">
+    <svg class="logo" viewBox="54 54 517 374" xmlns="http://www.w3.org/2000/svg"><path d="${LOGO_TILE}" fill="#161d27"/><path d="${LOGO_ROO}" fill="#e7732a"/></svg>
+    <div class="brand-words"><div class="brand-name">AUSSIEBLOCK READY MIX</div><div class="brand-sub">Self-Pickup Statement</div></div>
+    <div class="brand-meta"><div><span class="ml">Generated</span> ${stamp}</div><div><span class="ml">Period</span> ${esc(period)}</div></div>
+  </header>
+  <div class="sum">
+    <div><div class="lab">Period</div><div class="big" style="font-size:15px;">${esc(period)}</div></div>
+    <div><div class="lab">Total owed to us</div><div class="big">${m0(grandOwed)}</div></div>
+    <div><div class="lab">Customers</div><div class="big">${selfHaulers.length}</div></div>
+  </div>
+  ${selfHaulers.length ? sections : `<p class="muted" style="margin-top:24px;">No self-pickup loads in this period.</p>`}
+  <div class="muted">"Amount owed" = concrete + admixtures + sales tax for the loads this customer hauled themselves — no delivery or haul fees. One page per customer — send each their page.</div>
+  <div class="foot"><span class="co">Aussieblock Ready Mix</span><span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span></div>
+  <button onclick="window.print()">Print / Save as PDF</button>
+  <button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
+</body></html>`);
+    w.document.close();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
@@ -5161,6 +5244,11 @@ function CostsModal({ orders, onClose }) {
             <button onClick={() => (view === "hauler" ? exportHaulerPdf() : exportPdf())} disabled={loading || filtered.length === 0} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform disabled:opacity-40" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
               <Printer size={15} /> {view === "hauler" ? "Hauler PDF" : "PDF"}
             </button>
+            {view === "hauler" && selfHaulers.length > 0 && (
+              <button onClick={exportSelfPickupPdf} disabled={loading} title="Statement of what self-pickup customers (e.g. P&L) owe for concrete they hauled themselves" className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+                <Package size={15} /> Self-pickup PDF
+              </button>
+            )}
           </div>
           {err && <div className="rounded-lg px-2.5 py-1.5 text-xs mb-2" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
           {/* date range filter */}
