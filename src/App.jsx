@@ -6616,11 +6616,20 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
 // Print / Save-PDF option. Shown wherever an order has_signature.
 function DeliveryTicketModal({ order, onClose }) {
   const [sig, setSig] = useState(null);
+  const [sigErr, setSigErr] = useState(false);   // fetch failed / image missing
+  const [tries, setTries] = useState(0);          // bump to retry the fetch
   useEffect(() => {
+    if (!order.has_signature) return;
     let live = true;
-    if (order.has_signature) getSignatureDataUrl(order.ref).then((d) => live && setSig(d)).catch(() => {});
+    setSigErr(false);
+    // getSignatureDataUrl resolves null on any non-OK response (missing file,
+    // cold-start 502, transient network). Without surfacing that, the modal would
+    // spin on "Loading…" forever — so mark it an error and offer a retry.
+    getSignatureDataUrl(order.ref)
+      .then((d) => { if (!live) return; if (d) setSig(d); else setSigErr(true); })
+      .catch(() => { if (live) setSigErr(true); });
     return () => { live = false; };
-  }, [order.ref, order.has_signature]);
+  }, [order.ref, order.has_signature, tries]);
 
   const signedAt = fmtDateTime(order.signed_at);
   const Row = ({ label, val }) => (val ? (
@@ -6677,7 +6686,12 @@ function DeliveryTicketModal({ order, onClose }) {
             <div className="text-white/45 text-xs uppercase tracking-wide mb-1">Customer signature</div>
             {order.has_signature ? (
               sig ? <img src={sig} alt="signature" className="w-full rounded-lg" style={{ background: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
-                  : <div className="text-white/40 text-xs py-3 flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Loading signature…</div>
+                  : sigErr ? (
+                    <div className="text-xs py-3 flex items-center justify-between gap-2" style={{ color: "#ff8a85" }}>
+                      <span>Couldn't load the signature image.</span>
+                      <button onClick={() => setTries((t) => t + 1)} className="font-semibold px-2.5 py-1 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "#fff", background: NAVY, border: "1px solid rgba(255,255,255,0.18)" }}><RefreshCw size={12} /> Retry</button>
+                    </div>
+                  ) : <div className="text-white/40 text-xs py-3 flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Loading signature…</div>
             ) : <div className="text-white/40 text-xs py-3">Not signed yet.</div>}
           </div>
           <button onClick={printTicket} className="w-full mt-4 rounded-xl py-2.5 text-sm font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
