@@ -3606,6 +3606,20 @@ function ManageStaffModal({ onClose }) {
     setPw(`crew${rand()}`);
   };
 
+  // Give a driver a real (loggable-in) account with one tap. Drivers sign in via
+  // the tap-to-login link, so the office never needs a real email — we mint a
+  // random login handle + password. Pre-fills the form (name carried over) so a
+  // name-only roster driver can be upgraded to a tablet login in place.
+  const fillDriverLogin = (name = "") => {
+    const rand = () => Math.random().toString(36).slice(2, 8);
+    setRole("driver");
+    setEditing(false);
+    setDriverName(name);
+    setEmail(`driver-${rand()}@texausrock.com`);
+    setPw(`drive${rand()}`);
+    setMsg(null); setInvite(null);
+  };
+
   const pick = (u) => {
     setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
     setCompanyId(u.customer_id || ""); setProject(u.project || "");
@@ -3791,6 +3805,9 @@ function ManageStaffModal({ onClose }) {
                           <KeyRound size={11} />{existingPin ? existingPin : "Set PIN"}
                         </button>
                       )}
+                      <button onClick={() => fillDriverLogin(n)} disabled={busy} title="Give this driver a login & password" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold active:scale-90 disabled:opacity-50" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}` }}>
+                        <KeyRound size={11} /> Add login
+                      </button>
                       <button onClick={() => removeDriver(n)} disabled={busy} title="Remove driver" className="p-1.5 rounded-lg shrink-0 ml-1 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
                         <Trash2 size={15} color="#ff8a85" />
                       </button>
@@ -3823,6 +3840,11 @@ function ManageStaffModal({ onClose }) {
             {role === "worker" && !editing && (
               <button type="button" onClick={fillWorker} className="w-full mb-2 rounded-lg py-2 flex items-center justify-center gap-1.5 text-xs font-bold active:scale-[0.98] transition-transform" style={{ background: "#6aa9ff22", color: "#6aa9ff", border: "1px solid #6aa9ff", fontFamily: C.body }}>
                 <KeyRound size={13} /> Auto-generate login (no email/password to type)
+              </button>
+            )}
+            {role === "driver" && !editing && !email.trim() && (
+              <button type="button" onClick={() => fillDriverLogin(driverName)} className="w-full mb-2 rounded-lg py-2 flex items-center justify-center gap-1.5 text-xs font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE_HOT + "22", color: ORANGE_HOT, border: `1px solid ${ORANGE_HOT}`, fontFamily: C.body }}>
+                <KeyRound size={13} /> Auto-generate login &amp; password (they sign in with the tap link)
               </button>
             )}
             <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder={role === "driver" ? "email (optional — leave blank for a name-only driver, no login)" : "email"} autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
