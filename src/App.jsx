@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power } from "lucide-react";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -6729,6 +6729,28 @@ function DriverApp({ driver, onLogout }) {
   const [fuelForm, setFuelForm] = useState({ truck_no: localStorage.getItem("driver_truck_no") || "", odometer: "", gallons: "" });
   const [fuelBusy, setFuelBusy] = useState(false);
   const [fuelMsg, setFuelMsg] = useState(null);
+  // Yard pump relay control
+  const PUMP_DEVICE = "yard_diesel_1";
+  const [showPump, setShowPump] = useState(false);
+  const [pumpOn, setPumpOn] = useState(false);
+  const [pumpPin, setPumpPin] = useState("");
+  const [pumpBusy, setPumpBusy] = useState(false);
+  const [pumpMsg, setPumpMsg] = useState(null);
+  useEffect(() => {
+    const poll = async () => { try { const r = await getPumpState(PUMP_DEVICE); setPumpOn(r.relay === "on"); } catch { /* ignore */ } };
+    poll(); const t = setInterval(poll, 5000); return () => clearInterval(t);
+  }, []);
+  const submitPump = async (relayOn) => {
+    if (pumpPin.length !== 4) { setPumpMsg({ ok: false, text: "Enter your 4-digit PIN." }); return; }
+    setPumpBusy(true); setPumpMsg(null);
+    try {
+      const r = await pumpControl(PUMP_DEVICE, pumpPin, relayOn);
+      setPumpOn(r.relay === "on");
+      setPumpMsg({ ok: true, text: `Pump turned ${r.relay === "on" ? "ON" : "OFF"} — authorised as ${r.by}.` });
+      setPumpPin("");
+    } catch (e) { setPumpMsg({ ok: false, text: e.message || "Could not reach the pump." }); }
+    finally { setPumpBusy(false); }
+  };
   const submitFuel = async () => {
     const truck = fuelForm.truck_no.trim();
     if (!truck) { setFuelMsg({ ok: false, text: "Enter your truck number." }); return; }
@@ -6920,6 +6942,9 @@ function DriverApp({ driver, onLogout }) {
               </button>
               <button onClick={() => { setFuelMsg(null); setShowFuel(true); }} className="w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: ORANGE, color: NAVY_DEEP }}>
                 <Droplets size={18} /> Fuel up — log a fill
+              </button>
+              <button onClick={() => { setPumpMsg(null); setPumpPin(""); setShowPump(true); }} className="w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: pumpOn ? "#1a3a1a" : NAVY, color: pumpOn ? "#4caf50" : "#fff", border: `1px solid ${pumpOn ? "#4caf50" : "rgba(255,255,255,0.18)"}` }}>
+                <Power size={18} color={pumpOn ? "#4caf50" : "#fff"} /> Yard pump — {pumpOn ? "ON" : "off"}
               </button>
               {orders.length === 0 ? (
               <div className="text-white/40 text-sm py-10 text-center">No deliveries assigned for today.</div>
@@ -7121,6 +7146,33 @@ function DriverApp({ driver, onLogout }) {
                 {fuelBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />} Save fill
               </button>
               <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 mt-2 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPump && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowPump(false)}>
+          <div className="w-full sm:max-w-sm rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5" style={{ background: pumpOn ? "#2d5a2d" : NAVY }}>
+              <div className="flex items-center gap-2"><Power size={20} color={pumpOn ? "#4caf50" : "#fff"} /><span style={{ color: pumpOn ? "#4caf50" : "#fff", fontFamily: C.cond }} className="text-lg font-bold">Yard Pump</span></div>
+              <button onClick={() => setShowPump(false)} className="p-1 rounded-full active:scale-90" style={{ background: "rgba(0,0,0,0.3)" }}><X size={16} color="#fff" /></button>
+            </div>
+            <div className="p-5">
+              <div className="rounded-xl py-3 px-4 mb-4 flex items-center justify-center gap-2 text-base font-bold" style={{ background: pumpOn ? "#4caf5022" : "rgba(255,255,255,0.06)", color: pumpOn ? "#4caf50" : "rgba(255,255,255,0.4)", border: `1px solid ${pumpOn ? "#4caf5055" : "rgba(255,255,255,0.12)"}` }}>
+                <Power size={16} /> Pump is currently {pumpOn ? "ON" : "OFF"}
+              </div>
+              <label className="text-white/50 text-xs uppercase tracking-wide">Your 4-digit PIN</label>
+              <input value={pumpPin} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 4); setPumpPin(v); setPumpMsg(null); }} inputMode="numeric" maxLength={4} placeholder="• • • •" className="w-full rounded-xl px-3 py-3 text-white text-2xl tracking-[0.5em] outline-none mb-4 mt-1 text-center" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+              {pumpMsg && <div className="rounded-lg px-3 py-2 text-sm mb-3" style={{ background: pumpMsg.ok ? "#4caf5022" : "rgba(239,83,80,0.14)", color: pumpMsg.ok ? "#4caf50" : "#ff8a85" }}>{pumpMsg.text}</div>}
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button onClick={() => submitPump(true)} disabled={pumpBusy || pumpPin.length !== 4} className="rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: "#4caf50", color: "#fff" }}>
+                  {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn ON
+                </button>
+                <button onClick={() => submitPump(false)} disabled={pumpBusy || pumpPin.length !== 4} className="rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: "rgba(239,83,80,0.85)", color: "#fff" }}>
+                  {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn OFF
+                </button>
+              </div>
+              <button onClick={() => setShowPump(false)} className="w-full rounded-xl py-2.5 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Close</button>
             </div>
           </div>
         </div>

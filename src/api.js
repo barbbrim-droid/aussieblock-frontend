@@ -800,6 +800,18 @@ export function createStaff(email, password, role, phone, customerId, project, c
 export function deleteStaff(email) {
   return request(`/staff/${encodeURIComponent(email)}`, { method: 'DELETE' })
 }
+
+// ── Yard pump relay ───────────────────────────────────────────────────────────
+export function getPumpState(deviceId) {
+  return request(`/pump_state?device_id=${encodeURIComponent(deviceId)}`)
+}
+export function pumpControl(deviceId, pin, relayOn) {
+  return request('/pump_control', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: deviceId, pin, relay_on: relayOn }),
+  })
+}
 export function staffTextInvite(email, message) {
   return request(`/staff/${encodeURIComponent(email)}/text-invite`, {
     method: 'POST',
