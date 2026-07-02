@@ -812,6 +812,19 @@ export function pumpControl(deviceId, pin, relayOn) {
     body: JSON.stringify({ device_id: deviceId, pin, relay_on: relayOn }),
   })
 }
+export function listPumpPins() {
+  return request('/pump_pins')
+}
+export function createPumpPin(pin, label) {
+  return request('/pump_pins', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin, label }),
+  })
+}
+export function deletePumpPin(pin) {
+  return request(`/pump_pins/${encodeURIComponent(pin)}`, { method: 'DELETE' })
+}
 export function staffTextInvite(email, message) {
   return request(`/staff/${encodeURIComponent(email)}/text-invite`, {
     method: 'POST',

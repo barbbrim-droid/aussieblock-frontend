@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl } from "./api";
+import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3554,9 +3554,38 @@ function ManageStaffModal({ onClose }) {
   const [sent, setSent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Pump PINs — keyed by lowercase driver name
+  const [pumpPinMap, setPumpPinMap] = useState({});   // { "john smith": "1234", ... }
+  const [pinEditName, setPinEditName] = useState(null);
+  const [pinEditValue, setPinEditValue] = useState("");
+  const [pinBusy, setPinBusy] = useState(false);
+
+  const loadPins = async () => {
+    try {
+      const pins = await listPumpPins();
+      const m = {};
+      (pins || []).forEach((p) => { m[p.label.toLowerCase()] = p.pin; });
+      setPumpPinMap(m);
+    } catch { /* ignore */ }
+  };
+  const savePin = async (name) => {
+    if (pinEditValue.length !== 4) return;
+    setPinBusy(true);
+    try { await createPumpPin(pinEditValue, name); await loadPins(); setPinEditName(null); setPinEditValue(""); }
+    catch (e) { setMsg({ ok: false, text: e.message || "Could not save PIN" }); }
+    finally { setPinBusy(false); }
+  };
+  const removePin = async (name) => {
+    const pin = pumpPinMap[name.toLowerCase()];
+    if (!pin) return;
+    setPinBusy(true);
+    try { await deletePumpPin(pin); await loadPins(); }
+    catch (e) { setMsg({ ok: false, text: e.message || "Could not remove PIN" }); }
+    finally { setPinBusy(false); }
+  };
 
   const load = async () => {
-    try { setStaff(await listStaff()); } catch (e) { setMsg({ ok: false, text: e.message }); }
+    try { setStaff(await listStaff()); loadPins(); } catch (e) { setMsg({ ok: false, text: e.message }); }
     try { setAllDrivers(await getDrivers()); } catch { /* drivers list is best-effort */ }
   };
   useEffect(() => {
@@ -3709,7 +3738,27 @@ function ManageStaffModal({ onClose }) {
                     )}
                     <div className="text-white/40 text-xs truncate flex items-center gap-1">{u.phone ? <><Phone size={11} /> {u.phone}</> : "No phone on file"}</div>
                   </button>
-                  <button onClick={() => remove(u.email)} disabled={busy} title="Remove login" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
+                  {u.role === "driver" && (() => {
+                    const name = (u.company || "").trim();
+                    const existingPin = pumpPinMap[name.toLowerCase()];
+                    const editing = pinEditName === name;
+                    return (
+                      <div className="shrink-0 ml-2 flex items-center gap-1">
+                        {editing ? (
+                          <>
+                            <input value={pinEditValue} onChange={(e) => setPinEditValue(e.target.value.replace(/\D/g,"").slice(0,4))} inputMode="numeric" maxLength={4} placeholder="PIN" className="w-16 rounded-lg px-2 py-1 text-sm text-center text-white outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,170,60,0.5)", fontFamily: C.body }} />
+                            <button onClick={() => savePin(name)} disabled={pinBusy || pinEditValue.length !== 4} className="p-1.5 rounded-lg active:scale-90 disabled:opacity-40" style={{ background: "#4caf5022" }}><Check size={14} color="#4caf50" /></button>
+                            <button onClick={() => { setPinEditName(null); setPinEditValue(""); }} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(255,255,255,0.06)" }}><X size={14} color="rgba(255,255,255,0.4)" /></button>
+                          </>
+                        ) : (
+                          <button onClick={() => { setPinEditName(name); setPinEditValue(existingPin || ""); }} title="Set pump PIN" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold active:scale-90" style={{ background: existingPin ? "#4caf5018" : "rgba(255,255,255,0.06)", color: existingPin ? "#4caf50" : "rgba(255,255,255,0.4)", border: `1px solid ${existingPin ? "#4caf5033" : "rgba(255,255,255,0.1)"}` }}>
+                            <KeyRound size={11} />{existingPin ? existingPin : "Set PIN"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <button onClick={() => remove(u.email)} disabled={busy} title="Remove login" className="p-1.5 rounded-lg shrink-0 ml-1 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
                     <Trash2 size={15} color="#ff8a85" />
                   </button>
                 </div>
@@ -3721,17 +3770,34 @@ function ManageStaffModal({ onClose }) {
           {rosterDrivers.length > 0 && (
             <div className="mb-4">
               <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Drivers without a login ({rosterDrivers.length})</div>
-              {rosterDrivers.map((n) => (
-                <div key={n} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <div className="min-w-0 flex items-center gap-2">
-                    <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{n}</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: ORANGE_HOT + "22", color: ORANGE_HOT }}>DRIVER · NO LOGIN</span>
+              {rosterDrivers.map((n) => {
+                const existingPin = pumpPinMap[n.toLowerCase()];
+                const editing = pinEditName === n;
+                return (
+                  <div key={n} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{n}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: ORANGE_HOT + "22", color: ORANGE_HOT }}>DRIVER · NO LOGIN</span>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-1">
+                      {editing ? (
+                        <>
+                          <input value={pinEditValue} onChange={(e) => setPinEditValue(e.target.value.replace(/\D/g,"").slice(0,4))} inputMode="numeric" maxLength={4} placeholder="PIN" className="w-16 rounded-lg px-2 py-1 text-sm text-center text-white outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,170,60,0.5)", fontFamily: C.body }} />
+                          <button onClick={() => savePin(n)} disabled={pinBusy || pinEditValue.length !== 4} className="p-1.5 rounded-lg active:scale-90 disabled:opacity-40" style={{ background: "#4caf5022" }}><Check size={14} color="#4caf50" /></button>
+                          <button onClick={() => { setPinEditName(null); setPinEditValue(""); }} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(255,255,255,0.06)" }}><X size={14} color="rgba(255,255,255,0.4)" /></button>
+                        </>
+                      ) : (
+                        <button onClick={() => { setPinEditName(n); setPinEditValue(existingPin || ""); }} title="Set pump PIN" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold active:scale-90" style={{ background: existingPin ? "#4caf5018" : "rgba(255,255,255,0.06)", color: existingPin ? "#4caf50" : "rgba(255,255,255,0.4)", border: `1px solid ${existingPin ? "#4caf5033" : "rgba(255,255,255,0.1)"}` }}>
+                          <KeyRound size={11} />{existingPin ? existingPin : "Set PIN"}
+                        </button>
+                      )}
+                      <button onClick={() => removeDriver(n)} disabled={busy} title="Remove driver" className="p-1.5 rounded-lg shrink-0 ml-1 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
+                        <Trash2 size={15} color="#ff8a85" />
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => removeDriver(n)} disabled={busy} title="Remove driver" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
-                    <Trash2 size={15} color="#ff8a85" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
