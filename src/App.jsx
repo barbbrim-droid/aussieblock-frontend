@@ -6807,14 +6807,33 @@ function DriverApp({ driver, onLogout }) {
     poll(); const t = setInterval(poll, 5000); return () => clearInterval(t);
   }, []);
   const submitPump = async (relayOn) => {
-    // Turning off never needs a PIN — only turning on does.
-    if (relayOn && pumpPin.length !== 4) { setPumpMsg({ ok: false, text: "Enter your 4-digit PIN." }); return; }
+    if (relayOn) {
+      if (!fuelForm.truck_no.trim()) { setPumpMsg({ ok: false, text: "Enter your truck number." }); return; }
+      if (!(Number(fuelForm.odometer) > 0)) { setPumpMsg({ ok: false, text: "Enter the current mileage." }); return; }
+      if (pumpPin.length !== 4) { setPumpMsg({ ok: false, text: "Enter your 4-digit PIN." }); return; }
+    }
     setPumpBusy(true); setPumpMsg(null);
     try {
-      const r = await pumpControl(PUMP_DEVICE, relayOn ? pumpPin : "0000", relayOn);
+      const r = await pumpControl(PUMP_DEVICE, relayOn ? pumpPin : "", relayOn);
       setPumpOn(r.relay === "on");
-      setPumpMsg({ ok: true, text: `Pump turned ${r.relay === "on" ? "ON" : "OFF"}${r.by ? ` — ${r.by}` : ""}.` });
-      setPumpPin("");
+      if (relayOn) {
+        localStorage.setItem("driver_truck_no", fuelForm.truck_no.trim());
+        setPumpPin("");
+        setPumpMsg({ ok: true, text: `Pump ON — go ahead and fuel up.` });
+      } else {
+        // Auto-log the fill when the pump is turned off.
+        try {
+          const fill = await attachFuelMileage({ truck_no: fuelForm.truck_no.trim(), odometer: Number(fuelForm.odometer) });
+          if (fill && fill.ok) {
+            setPumpMsg({ ok: true, text: `Pump off — logged ${Number(fill.gallons || 0).toFixed(1)} gal to ${fill.truck || fuelForm.truck_no} at ${Number(fuelForm.odometer).toLocaleString()} mi.` });
+            setFuelForm((f) => ({ ...f, odometer: "", gallons: "" }));
+          } else {
+            setPumpMsg({ ok: true, text: `Pump off. Use the Log Fill tab if the meter missed this fill.` });
+          }
+        } catch {
+          setPumpMsg({ ok: true, text: `Pump off. Use the Log Fill tab to log the gallons manually.` });
+        }
+      }
     } catch (e) { setPumpMsg({ ok: false, text: e.message || "Could not reach the pump." }); }
     finally { setPumpBusy(false); }
   };
@@ -7210,23 +7229,28 @@ function DriverApp({ driver, onLogout }) {
             {/* pump tab */}
             {fuelTab === "pump" && (
               <div className="p-5">
-                <div className="rounded-xl py-3 px-4 mb-4 flex items-center justify-center gap-2 text-base font-bold" style={{ background: pumpOn ? "#4caf5022" : "rgba(255,255,255,0.06)", color: pumpOn ? "#4caf50" : "rgba(255,255,255,0.4)", border: `1px solid ${pumpOn ? "#4caf5055" : "rgba(255,255,255,0.12)"}` }}>
-                  <Power size={16} /> Pump is {pumpOn ? "ON" : "OFF"}
-                </div>
-                {!pumpOn && (
+                {!pumpOn ? (
                   <>
-                    <label className="text-white/50 text-xs uppercase tracking-wide">Your 4-digit PIN to turn on</label>
+                    <label className="text-white/50 text-xs uppercase tracking-wide">Truck number</label>
+                    <input value={fuelForm.truck_no} onChange={(e) => { setFuelForm({ ...fuelForm, truck_no: e.target.value }); setPumpMsg(null); }} inputMode="numeric" placeholder="e.g. 4554" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+                    <label className="text-white/50 text-xs uppercase tracking-wide">Current mileage</label>
+                    <input value={fuelForm.odometer} onChange={(e) => { setFuelForm({ ...fuelForm, odometer: e.target.value }); setPumpMsg(null); }} type="number" inputMode="numeric" placeholder="e.g. 123456" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+                    <label className="text-white/50 text-xs uppercase tracking-wide">Your 4-digit PIN</label>
                     <input value={pumpPin} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 4); setPumpPin(v); setPumpMsg(null); }} inputMode="numeric" maxLength={4} placeholder="• • • •" className="w-full rounded-xl px-3 py-3 text-white text-2xl tracking-[0.5em] outline-none mb-4 mt-1 text-center" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
                   </>
+                ) : (
+                  <div className="rounded-xl py-3 px-4 mb-4 flex items-center justify-center gap-2 text-base font-bold" style={{ background: "#4caf5022", color: "#4caf50", border: "1px solid #4caf5055" }}>
+                    <Power size={16} /> Pump ON {fuelForm.truck_no ? `— Truck ${fuelForm.truck_no}` : ""}
+                  </div>
                 )}
                 {pumpMsg && <div className="rounded-lg px-3 py-2 text-sm mb-3" style={{ background: pumpMsg.ok ? "#4caf5022" : "rgba(239,83,80,0.14)", color: pumpMsg.ok ? "#4caf50" : "#ff8a85" }}>{pumpMsg.text}</div>}
                 {!pumpOn ? (
-                  <button onClick={() => submitPump(true)} disabled={pumpBusy || pumpPin.length !== 4} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2" style={{ background: "#4caf50", color: "#fff" }}>
+                  <button onClick={() => submitPump(true)} disabled={pumpBusy || !fuelForm.truck_no.trim() || !(Number(fuelForm.odometer) > 0) || pumpPin.length !== 4} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2" style={{ background: "#4caf50", color: "#fff" }}>
                     {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn ON
                   </button>
                 ) : (
                   <button onClick={() => submitPump(false)} disabled={pumpBusy} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2" style={{ background: "rgba(239,83,80,0.85)", color: "#fff" }}>
-                    {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn OFF
+                    {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn OFF — done fueling
                   </button>
                 )}
                 <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Close</button>
