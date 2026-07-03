@@ -3569,9 +3569,6 @@ const PLANT_CHECKLIST = [
     { key: "firstaid", label: "First-aid kit stocked" },
   ] },
   { title: "Plant Equipment", items: [
-    { key: "cement_scale", label: "Cement scale zeroed & swings free" },
-    { key: "agg_scale", label: "Aggregate scale zeroed & swings free" },
-    { key: "water_meter", label: "Water meter / weigh batcher operating" },
     { key: "admix_disp", label: "Admixture dispensers primed, lines clear" },
     { key: "mixer", label: "Mixer paddles / liners — wear & buildup OK" },
     { key: "conveyors", label: "Charge & discharge conveyors / belts OK" },
