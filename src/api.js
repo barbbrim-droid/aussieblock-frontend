@@ -77,6 +77,20 @@ export async function login(email, password) {
   return data // { access_token, token_type, role, customer_id }
 }
 
+// Driver tablet sign-in with just a 4–6 digit PIN — no email/password. Stores the
+// token exactly like login() so the rest of the app behaves the same afterwards.
+export async function pinLogin(pin) {
+  const res = await fetch(`${API_BASE}/auth/pin-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin }),
+  })
+  if (!res.ok) throw new Error('Incorrect PIN')
+  const data = await res.json()
+  localStorage.setItem(TOKEN_KEY, data.access_token)
+  return data
+}
+
 export function getMe() {
   return request('/auth/me')
 }
@@ -790,11 +804,12 @@ export function listStaff() {
 }
 // company is the driver's NAME for role 'driver' (matches Order.driver); ignored
 // for other roles (their company comes from customer_id).
-export function createStaff(email, password, role, phone, customerId, project, company) {
+// pin is the driver tablet sign-in PIN (role 'driver' only; blank = leave unchanged).
+export function createStaff(email, password, role, phone, customerId, project, company, pin = "") {
   return request('/staff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role, phone, customer_id: customerId, project, company }),
+    body: JSON.stringify({ email, password, role, phone, customer_id: customerId, project, company, pin }),
   })
 }
 export function deleteStaff(email) {

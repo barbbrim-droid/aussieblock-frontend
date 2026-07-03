@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power } from "lucide-react";
-import { login, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -1378,8 +1378,10 @@ ${account.pastDue > 0 ? `<div><div class="lab pastdue">Past due</div><div class=
 
 // ── Login screen (new — sits in front of everything) ─────────────────
 function LoginScreen({ onLoggedIn }) {
+  const [mode, setMode] = useState("email");   // "email" (staff/customer/worker) | "pin" (driver)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -1388,7 +1390,11 @@ function LoginScreen({ onLoggedIn }) {
     setBusy(true);
     setErr("");
     try {
-      await login(email.trim(), password);
+      if (mode === "pin") {
+        await pinLogin(pin);
+      } else {
+        await login(email.trim(), password);
+      }
       const m = await getMe();
       onLoggedIn(m);
     } catch (ex) {
@@ -1411,21 +1417,35 @@ function LoginScreen({ onLoggedIn }) {
         </div>
 
         <form onSubmit={submit} className="px-5 py-6">
-          <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold">Sign in</h1>
-          <p className="text-white/45 text-sm mb-5" style={{ fontFamily: C.body }}>Access your orders, tracking, and account.</p>
+          <h1 style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold">{mode === "pin" ? "Driver sign-in" : "Sign in"}</h1>
+          <p className="text-white/45 text-sm mb-5" style={{ fontFamily: C.body }}>{mode === "pin" ? "Enter your driver PIN to see today's deliveries." : "Access your orders, tracking, and account."}</p>
 
-          <label className="block text-white/50 text-xs uppercase tracking-wide mb-1" style={{ fontFamily: C.body }}>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required
-            className="w-full rounded-xl px-3 py-3 mb-4 text-white outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+          {mode === "email" ? (
+            <>
+              <label className="block text-white/50 text-xs uppercase tracking-wide mb-1" style={{ fontFamily: C.body }}>Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required
+                className="w-full rounded-xl px-3 py-3 mb-4 text-white outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
 
-          <label className="block text-white/50 text-xs uppercase tracking-wide mb-1" style={{ fontFamily: C.body }}>Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required
-            className="w-full rounded-xl px-3 py-3 text-white outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+              <label className="block text-white/50 text-xs uppercase tracking-wide mb-1" style={{ fontFamily: C.body }}>Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required
+                className="w-full rounded-xl px-3 py-3 text-white outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            </>
+          ) : (
+            <>
+              <label className="block text-white/50 text-xs uppercase tracking-wide mb-1" style={{ fontFamily: C.body }}>Driver PIN</label>
+              <input type="tel" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} autoComplete="off" required maxLength={6} placeholder="• • • •"
+                className="w-full rounded-xl px-3 py-3.5 text-white text-3xl text-center tracking-[0.4em] outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }} />
+            </>
+          )}
 
           {err && <div className="mt-4 rounded-xl px-3 py-2.5 text-sm" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
 
-          <button type="submit" disabled={busy} className="w-full mt-5 rounded-xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-60" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
+          <button type="submit" disabled={busy || (mode === "pin" && pin.length < 4)} className="w-full mt-5 rounded-xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-[0.98] transition-transform disabled:opacity-60" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
             {busy ? <Loader2 size={18} className="animate-spin" /> : null} {busy ? "Signing in…" : "Sign in"}
+          </button>
+
+          <button type="button" onClick={() => { setErr(""); setMode(mode === "pin" ? "email" : "pin"); }} className="w-full mt-3 text-sm font-semibold active:scale-95 transition-transform" style={{ color: ORANGE, fontFamily: C.body }}>
+            {mode === "pin" ? "Office / customer sign-in" : "Driver? Sign in with your PIN"}
           </button>
         </form>
       </div>
@@ -3545,6 +3565,7 @@ function ManageStaffModal({ onClose }) {
   const [companyId, setCompanyId] = useState("");   // the company a worker belongs to (a real customer id) — scopes what they see
   const [project, setProject] = useState("");       // their current project/job
   const [driverName, setDriverName] = useState(""); // for a driver login: their name (matches Order.driver)
+  const [loginPin, setLoginPin] = useState("");    // for a driver login: their 4–6 digit tablet sign-in PIN
   const [editing, setEditing] = useState(false);   // editing an existing login (locks the email field)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);            // { ok, text }
@@ -3594,7 +3615,7 @@ function ManageStaffModal({ onClose }) {
     getCustomers().then((cs) => setCompanies(cs.map((c) => ({ id: c.id, name: c.name })))).catch(() => {});   // the company a worker belongs to
   }, []);
 
-  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompanyId(""); setProject(""); setDriverName(""); setEditing(false); };
+  const reset = () => { setEmail(""); setPw(""); setRole("worker"); setPhone(""); setCompanyId(""); setProject(""); setDriverName(""); setLoginPin(""); setEditing(false); };
 
   // Auto-generate an email + password for a worker so the office doesn't have to
   // invent one. These are just login ids (workers never type them — they use the
@@ -3606,17 +3627,18 @@ function ManageStaffModal({ onClose }) {
     setPw(`crew${rand()}`);
   };
 
-  // Give a driver a real (loggable-in) account with one tap. Drivers sign in via
-  // the tap-to-login link, so the office never needs a real email — we mint a
-  // random login handle + password. Pre-fills the form (name carried over) so a
-  // name-only roster driver can be upgraded to a tablet login in place.
+  const randPin = () => String(Math.floor(1000 + Math.random() * 9000));   // a 4-digit PIN
+
+  // Give a name-only roster driver a real tablet login in place: switch the form
+  // to Driver mode with their name filled and a ready-to-use PIN generated. The
+  // office can keep or change the PIN, then hit "Create login" — the driver signs
+  // in by typing that PIN (no email/password needed).
   const fillDriverLogin = (name = "") => {
-    const rand = () => Math.random().toString(36).slice(2, 8);
     setRole("driver");
     setEditing(false);
     setDriverName(name);
-    setEmail(`driver-${rand()}@texausrock.com`);
-    setPw(`drive${rand()}`);
+    setEmail(""); setPw("");
+    setLoginPin(randPin());
     setMsg(null); setInvite(null);
   };
 
@@ -3624,6 +3646,7 @@ function ManageStaffModal({ onClose }) {
     setEmail(u.email); setPw(""); setRole(u.role); setPhone(u.phone || "");
     setCompanyId(u.customer_id || ""); setProject(u.project || "");
     setDriverName(u.role === "driver" ? (u.company || "") : "");
+    setLoginPin(u.role === "driver" ? (u.pin || "") : "");
     setEditing(true); setMsg(null); setInvite(null);
   };
 
@@ -3632,10 +3655,12 @@ function ManageStaffModal({ onClose }) {
       if (!companyId) { setMsg({ ok: false, text: "Pick the company this person belongs to." }); return; }
     }
     if (role === "driver" && !driverName.trim()) { setMsg({ ok: false, text: "Enter the driver's name (must match the name on their orders)." }); return; }
+    const pinDigits = role === "driver" ? loginPin.replace(/\D/g, "") : "";
+    if (pinDigits && (pinDigits.length < 4 || pinDigits.length > 6)) { setMsg({ ok: false, text: "The PIN must be 4 to 6 digits." }); return; }
     setBusy(true); setMsg(null);
     try {
-      // Driver with no email → name-only roster entry (assignable, no tablet login).
-      if (role === "driver" && !email.trim()) {
+      // Driver with no email AND no PIN → name-only roster entry (assignable, no tablet login).
+      if (role === "driver" && !email.trim() && !pinDigits) {
         await addDriver(driverName.trim());
         setInvite(null);
         setMsg({ ok: true, text: `Added driver "${driverName.trim()}" (no login). They're now assignable on orders.` });
@@ -3645,26 +3670,31 @@ function ManageStaffModal({ onClose }) {
       }
       const r = await createStaff(email.trim().toLowerCase(), pw, role, phone.trim(),
         (role === "worker" || role === "customer") ? Number(companyId) : null, project.trim(),
-        role === "driver" ? driverName.trim() : "");
-      if (pw) {
-        // A password was set (new login or a reset) — offer the invite to send.
+        role === "driver" ? driverName.trim() : "", pinDigits);
+      const driverPin = role === "driver" ? (r.pin || "") : "";
+      if (pw || driverPin) {
+        // A login was set up (new/reset password, and/or a driver PIN) — offer the invite.
         const appUrl = window.location.origin;
         const addHome = ` Add it to your phone's home screen (quick steps): ${appUrl}/add-to-home-screen.pdf`;
-        // Tap-to-open link that signs them in automatically (no typing). The
-        // credentials ride in the URL; App() consumes + scrubs them on open.
-        const quickLink = `${appUrl}/?login=${encodeURIComponent(btoa(`${r.email}:${pw}`))}`;
+        // Tap-to-open link that signs them in automatically (only when we set a
+        // password here — a PIN-only driver has no shareable password).
+        const quickLink = pw ? `${appUrl}/?login=${encodeURIComponent(btoa(`${r.email}:${pw}`))}` : "";
+        const pinLine = driverPin ? ` To sign in, open ${appUrl}, tap "Driver? Sign in with your PIN", and enter your PIN: ${driverPin}.` : "";
+        const linkLine = quickLink ? (driverPin ? ` Or just tap this link to open already signed in: ${quickLink}` : ` Tap this link and it opens already signed in — no typing: ${quickLink}`) : "";
         const text = (role === "staff"
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : role === "driver"
-          ? `Hi ${r.company || ""} — you're set up on the Aussieblock driver app for your truck tablet. Tap this link and it opens already signed in — no typing: ${quickLink} You'll see today's deliveries, the batch ticket, and can get the customer's signature on delivery. (Backup login — email: ${r.email}, password: ${pw}.) Questions? Call dispatch at ${DISPATCH_PHONE}.`
+          ? `Hi ${r.company || ""} — you're set up on the Aussieblock driver app for your truck tablet.${pinLine}${linkLine} You'll see today's deliveries, the batch ticket, and can get the customer's signature on delivery. Questions? Call dispatch at ${DISPATCH_PHONE}.`
           : role === "customer"
           ? `Hi — Aussieblock has an app for ordering and tracking concrete deliveries and managing your account. You can place orders, track the trucks live, and view invoices for ${r.company || "your company"}. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : `Hi! This is Aussieblock, your ready-mix concrete supplier. We've set you up on our app so you can see your scheduled deliveries for ${r.company || "your company"} and track the trucks live on a map. Just tap this link and the app opens already signed in — no username or password to type: ${quickLink} (Backup login if the link ever stops working — email: ${r.email}, password: ${pw}.) Questions? Call or text dispatch at ${DISPATCH_PHONE}.`) + addHome;
         setInvite({ email: r.email, phone: phone.trim(), sms: toSmsNumber(phone), text, quickLink, isWorker: role === "worker" });
         setSent(false); setCopied(false); setLinkCopied(false);
-        setMsg({ ok: true, text: `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
+        setMsg({ ok: true, text: (driverPin && !pw)
+          ? `Driver login ${r.action} for "${r.company}" — PIN ${driverPin}. Send the invite below 👇`
+          : `Login ${r.action} for ${r.email} (${r.role}). Send the invite below 👇` });
       } else {
-        // Details-only save (existing login, password left unchanged).
+        // Details-only save (existing login, password/PIN left unchanged).
         setInvite(null);
         setMsg({ ok: true, text: `Saved ${r.email} (${r.role}). Password unchanged.` });
       }
@@ -3750,6 +3780,9 @@ function ManageStaffModal({ onClose }) {
                     {(u.company || u.project) && (
                       <div className="text-white/55 text-xs truncate flex items-center gap-1" style={{ fontFamily: C.body }}><Building2 size={11} color={ORANGE} /> {[u.company, u.project].filter(Boolean).join(" · ")}</div>
                     )}
+                    {u.role === "driver" && u.pin && (
+                      <div className="text-xs truncate flex items-center gap-1" style={{ color: ORANGE_HOT, fontFamily: C.body }}><KeyRound size={11} /> Sign-in PIN {u.pin}</div>
+                    )}
                     <div className="text-white/40 text-xs truncate flex items-center gap-1">{u.phone ? <><Phone size={11} /> {u.phone}</> : "No phone on file"}</div>
                   </button>
                   {u.role === "driver" && (() => {
@@ -3766,7 +3799,7 @@ function ManageStaffModal({ onClose }) {
                           </>
                         ) : (
                           <button onClick={() => { setPinEditName(name); setPinEditValue(existingPin || ""); }} title="Set pump PIN" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold active:scale-90" style={{ background: existingPin ? "#4caf5018" : "rgba(255,255,255,0.06)", color: existingPin ? "#4caf50" : "rgba(255,255,255,0.4)", border: `1px solid ${existingPin ? "#4caf5033" : "rgba(255,255,255,0.1)"}` }}>
-                            <KeyRound size={11} />{existingPin ? existingPin : "Set PIN"}
+                            <KeyRound size={11} />Pump {existingPin || "PIN"}
                           </button>
                         )}
                       </div>
@@ -3802,7 +3835,7 @@ function ManageStaffModal({ onClose }) {
                         </>
                       ) : (
                         <button onClick={() => { setPinEditName(n); setPinEditValue(existingPin || ""); }} title="Set pump PIN" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold active:scale-90" style={{ background: existingPin ? "#4caf5018" : "rgba(255,255,255,0.06)", color: existingPin ? "#4caf50" : "rgba(255,255,255,0.4)", border: `1px solid ${existingPin ? "#4caf5033" : "rgba(255,255,255,0.1)"}` }}>
-                          <KeyRound size={11} />{existingPin ? existingPin : "Set PIN"}
+                          <KeyRound size={11} />Pump {existingPin || "PIN"}
                         </button>
                       )}
                       <button onClick={() => fillDriverLogin(n)} disabled={busy} title="Give this driver a login & password" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold active:scale-90 disabled:opacity-50" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}` }}>
@@ -3842,12 +3875,17 @@ function ManageStaffModal({ onClose }) {
                 <KeyRound size={13} /> Auto-generate login (no email/password to type)
               </button>
             )}
-            {role === "driver" && !editing && !email.trim() && (
-              <button type="button" onClick={() => fillDriverLogin(driverName)} className="w-full mb-2 rounded-lg py-2 flex items-center justify-center gap-1.5 text-xs font-bold active:scale-[0.98] transition-transform" style={{ background: ORANGE_HOT + "22", color: ORANGE_HOT, border: `1px solid ${ORANGE_HOT}`, fontFamily: C.body }}>
-                <KeyRound size={13} /> Auto-generate login &amp; password (they sign in with the tap link)
-              </button>
+            {role === "driver" && (
+              <>
+                <input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="driver's name — must match the name on their orders (e.g. Rodney)" className={inCls + " mb-2"} style={inSt} />
+                <div className="flex items-center gap-2 mb-1">
+                  <input value={loginPin} onChange={(e) => setLoginPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder={editing ? "sign-in PIN (blank = keep current)" : "4–6 digit sign-in PIN"} className={inCls + " flex-1 tracking-[0.3em]"} style={inSt} />
+                  <button type="button" onClick={() => setLoginPin(randPin())} className="rounded-lg px-3 py-2 text-xs font-bold shrink-0 active:scale-95" style={{ background: ORANGE_HOT + "22", color: ORANGE_HOT, border: `1px solid ${ORANGE_HOT}`, fontFamily: C.body }}>Generate</button>
+                </div>
+                <p className="text-white/45 text-xs mb-2">The driver types this PIN to sign in on the tablet — no email or password needed. (Leave blank to instead set an email + password login below.)</p>
+              </>
             )}
-            <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder={role === "driver" ? "email (optional — leave blank for a name-only driver, no login)" : "email"} autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={editing} placeholder={role === "driver" ? "email (optional — only for an email/tap-link login)" : "email"} autoComplete="off" className={inCls + " mb-2 disabled:opacity-60"} style={inSt} />
             {!(role === "driver" && !email.trim() && !editing) && (
               <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={editing ? "new password — leave blank to keep current" : "password (min 6 characters)"} autoComplete="new-password" className={inCls + " mb-2"} style={inSt} />
             )}
@@ -3858,20 +3896,20 @@ function ManageStaffModal({ onClose }) {
                 {companies.slice().sort((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
-            {role === "driver" && (
-              <input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="driver's name — must match the name on their orders (e.g. Rodney)" className={inCls + " mb-2"} style={inSt} />
-            )}
-            {role === "driver" && !email.trim() && !editing && (
-              <p className="text-white/45 text-xs mb-2 -mt-1">No email = a name-only driver: assignable on orders, but no truck-tablet login. Add an email to also give them the driver app.</p>
+            {role === "driver" && !email.trim() && !loginPin.trim() && !editing && (
+              <p className="text-white/45 text-xs mb-2 -mt-1">No PIN and no email = a name-only driver: assignable on orders, but no truck-tablet login. Add a PIN (above) or an email to give them the driver app.</p>
             )}
             {role !== "driver" && <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />}
             <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : role === "driver" ? "A driver uses the truck tablet — today's deliveries assigned to them, the batch ticket, and customer sign-off. No board, no billing, no other companies." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
             {(() => {
-              const driverNoLogin = role === "driver" && !email.trim() && !editing;
+              const pinDigits = role === "driver" ? loginPin.replace(/\D/g, "") : "";
+              const driverPinOnly = role === "driver" && !email.trim() && pinDigits.length >= 4;   // PIN login, no email/password needed
+              const driverNoLogin = role === "driver" && !email.trim() && !pinDigits && !editing;   // name-only roster
               const disabled = busy
                 || (role === "driver" && !driverName.trim())
-                || (!driverNoLogin && !email.trim())
-                || (!driverNoLogin && !editing && pw.length < 6)
+                || (pinDigits.length > 0 && (pinDigits.length < 4 || pinDigits.length > 6))
+                || (!driverNoLogin && !driverPinOnly && !email.trim())
+                || (!driverNoLogin && !driverPinOnly && !editing && pw.length < 6)
                 || (pw.length > 0 && pw.length < 6)
                 || ((role === "worker" || role === "customer") && !companyId);
               return (
