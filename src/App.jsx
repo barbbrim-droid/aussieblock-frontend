@@ -3578,7 +3578,7 @@ const PLANT_CHECKLIST = [
     { key: "air_comp", label: "Air compressor pressure normal; tanks drained" },
     { key: "dust", label: "Dust collector / silo baghouse operating" },
     { key: "control", label: "Control system boots & batch tickets print" },
-    { key: "generator", label: "Generator / plant fuel level OK" },
+    { key: "water_supply_filters", label: "Water supply line filters checked & clean" },
   ] },
   { title: "Materials & Inventory", note: "record level", items: [
     { key: "cement_silo", label: "Cement silo level", type: "record", unit: "ton" },
