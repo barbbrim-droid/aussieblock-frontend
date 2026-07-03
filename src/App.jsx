@@ -3591,7 +3591,6 @@ const PLANT_CHECKLIST = [
     { key: "scale_verify", label: "Scale accuracy verified with test weights" },
     { key: "sand_moisture", label: "Sand (fine agg) moisture", type: "record", unit: "%" },
     { key: "rock_moisture", label: "Rock (coarse agg) moisture", type: "record", unit: "%" },
-    { key: "moisture_comp", label: "Moisture compensation set in batcher" },
     { key: "slump", label: "First-batch slump", type: "record", unit: "in" },
     { key: "air_content", label: "First-batch air content", type: "record", unit: "%" },
     { key: "temp", label: "First-batch concrete temperature", type: "record", unit: "°F" },
