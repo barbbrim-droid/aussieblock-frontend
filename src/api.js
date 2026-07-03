@@ -816,6 +816,21 @@ export function deleteStaff(email) {
   return request(`/staff/${encodeURIComponent(email)}`, { method: 'DELETE' })
 }
 
+// ── Batch plant: daily operator checklist ─────────────────────────────────────
+export function submitPlantChecklist(payload) {
+  return request('/plant-checklist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+export function getPlantChecklists() {
+  return request('/plant-checklist')
+}
+export function getPlantChecklist(id) {
+  return request(`/plant-checklist/${id}`)
+}
+
 // ── Yard pump relay ───────────────────────────────────────────────────────────
 export function getPumpState(deviceId) {
   return request(`/pump_state?device_id=${encodeURIComponent(deviceId)}`)

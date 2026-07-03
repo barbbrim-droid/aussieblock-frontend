@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck } from "lucide-react";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -3554,6 +3554,253 @@ function MixerModal({ onClose }) {
 // engineers, no financials) and full staff — then text them their invite. Mirrors
 // the customer-login flow (ManageTrucksModal layout + CustomerLogins invite box).
 // Full-staff only; the board only renders the button for finance users.
+// The daily batch-plant checklist. Sections of items the operator works through
+// each shift: "check" items get an OK / N/A / Issue tap; "record" items get a
+// write-in reading. Edit this list to change what's on the checklist.
+const PLANT_CHECKLIST = [
+  { title: "Safety & Housekeeping", items: [
+    { key: "estops", label: "Emergency stops (E-stops) tested & functional" },
+    { key: "guards", label: "Guards & covers secured on moving parts" },
+    { key: "walkways", label: "Ladders, platforms & walkways clear" },
+    { key: "washout", label: "Wash-out area & site drainage clear" },
+    { key: "leaks", label: "No fuel / oil / hydraulic leaks" },
+    { key: "extinguisher", label: "Fire extinguisher charged & accessible" },
+    { key: "ppe", label: "PPE on hand (eye, hearing, gloves, hard hat)" },
+    { key: "firstaid", label: "First-aid kit stocked" },
+  ] },
+  { title: "Plant Equipment", items: [
+    { key: "cement_scale", label: "Cement scale zeroed & swings free" },
+    { key: "agg_scale", label: "Aggregate scale zeroed & swings free" },
+    { key: "water_meter", label: "Water meter / weigh batcher operating" },
+    { key: "admix_disp", label: "Admixture dispensers primed, lines clear" },
+    { key: "mixer", label: "Mixer paddles / liners — wear & buildup OK" },
+    { key: "conveyors", label: "Charge & discharge conveyors / belts OK" },
+    { key: "air_comp", label: "Air compressor pressure normal; tanks drained" },
+    { key: "dust", label: "Dust collector / silo baghouse operating" },
+    { key: "control", label: "Control system boots & batch tickets print" },
+    { key: "generator", label: "Generator / plant fuel level OK" },
+  ] },
+  { title: "Materials & Inventory", note: "record level", items: [
+    { key: "cement_silo", label: "Cement silo level", type: "record", unit: "ton" },
+    { key: "slag_silo", label: "Slag / fly ash silo level", type: "record", unit: "ton" },
+    { key: "rock_bin", label: "Coarse aggregate (rock) bin", type: "record", unit: "%" },
+    { key: "sand_bin", label: "Fine aggregate (sand) bin", type: "record", unit: "%" },
+    { key: "admix_tanks", label: "Admixture tank levels", type: "record", unit: "gal" },
+    { key: "water_supply", label: "Water supply pressure / available", type: "record", unit: "psi" },
+    { key: "contamination", label: "Materials free of contamination / frozen lumps" },
+    { key: "silo_filters", label: "Silo filters & pressure relief checked" },
+  ] },
+  { title: "Quality Control / TxDOT", note: "first batch", items: [
+    { key: "scale_verify", label: "Scale accuracy verified with test weights" },
+    { key: "sand_moisture", label: "Sand (fine agg) moisture", type: "record", unit: "%" },
+    { key: "rock_moisture", label: "Rock (coarse agg) moisture", type: "record", unit: "%" },
+    { key: "moisture_comp", label: "Moisture compensation set in batcher" },
+    { key: "slump", label: "First-batch slump", type: "record", unit: "in" },
+    { key: "air_content", label: "First-batch air content", type: "record", unit: "%" },
+    { key: "temp", label: "First-batch concrete temperature", type: "record", unit: "°F" },
+    { key: "calibration", label: "Calibration records current (scales, meters, admix)" },
+  ] },
+];
+const PLANT_CHECK_LABELS = Object.fromEntries(PLANT_CHECKLIST.flatMap((s) => s.items.map((i) => [i.key, i])));
+const PC_STATUS = { ok: { label: "OK", bg: GREEN, fg: NAVY_DEEP }, na: { label: "N/A", bg: "#6b7683", fg: "#fff" }, issue: { label: "Issue", bg: "#ef5350", fg: "#fff" } };
+
+function PlantChecklistModal({ onClose }) {
+  const [view, setView] = useState("form");     // "form" | "history"
+  const [operator, setOperator] = useState(localStorage.getItem("plant_operator") || "");
+  const [ambient, setAmbient] = useState("");
+  const [weather, setWeather] = useState("");
+  const [items, setItems] = useState({});       // { key: "ok" | "na" | "issue" }
+  const [readings, setReadings] = useState({}); // { key: "value" }
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [history, setHistory] = useState(null);
+  const [detail, setDetail] = useState(null);   // a loaded past submission (read-only)
+
+  const inSt = { background: NAVY, border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontFamily: C.body };
+  const allChecks = PLANT_CHECKLIST.flatMap((s) => s.items.filter((i) => i.type !== "record"));
+  const markedCount = allChecks.filter((i) => items[i.key]).length;
+  const issueCount = allChecks.filter((i) => items[i.key] === "issue").length;
+
+  const loadHistory = async () => { try { setHistory(await getPlantChecklists()); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  useEffect(() => { if (view === "history" && history === null) loadHistory(); }, [view]);   // eslint-disable-line
+
+  const setItem = (key, status) => setItems((m) => ({ ...m, [key]: m[key] === status ? undefined : status }));
+  const setReading = (key, val) => setReadings((m) => ({ ...m, [key]: val }));
+
+  const submit = async () => {
+    if (!operator.trim()) { setMsg({ ok: false, text: "Enter the operator's name." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const cleanItems = {}; Object.entries(items).forEach(([k, v]) => { if (v) cleanItems[k] = v; });
+      const cleanReadings = {}; Object.entries(readings).forEach(([k, v]) => { if ((v || "").trim()) cleanReadings[k] = v.trim(); });
+      const r = await submitPlantChecklist({ date: localToday(), operator: operator.trim(), ambient_temp: ambient.trim(), weather: weather.trim(), items: cleanItems, readings: cleanReadings, notes: notes.trim() });
+      localStorage.setItem("plant_operator", operator.trim());
+      setMsg({ ok: true, text: `Submitted for ${r.date}${r.issues ? ` — ${r.issues} issue${r.issues > 1 ? "s" : ""} flagged` : ""}. Saved to records.` });
+      setItems({}); setReadings({}); setNotes(""); setAmbient(""); setWeather("");
+      setHistory(null);   // force a refresh next time History is opened
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const openDetail = async (id) => { setMsg(null); try { setDetail(await getPlantChecklist(id)); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  const fmtWhen = (iso) => { try { return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch { return iso; } };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        {/* branded header */}
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2.5">
+            <span style={{ color: NAVY_DEEP, display: "flex" }}><Roo size={22} variant="mark" /></span>
+            <div className="leading-none">
+              <div style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Daily Plant Checklist</div>
+              <div style={{ color: NAVY_DEEP, fontFamily: C.body }} className="text-[11px] font-semibold opacity-70 -mt-0.5">Batch Plant · Moby 1500</div>
+            </div>
+          </div>
+          <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+
+        {/* tabs */}
+        <div className="flex shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          {[["form", "Today's checklist"], ["history", "History"]].map(([id, label]) => (
+            <button key={id} onClick={() => { setView(id); setDetail(null); }} className="flex-1 py-2.5 text-sm font-bold transition-colors" style={{ color: view === id ? ORANGE : "rgba(255,255,255,0.45)", borderBottom: view === id ? `2px solid ${ORANGE}` : "2px solid transparent", background: "transparent", fontFamily: C.body }}>{label}</button>
+          ))}
+        </div>
+
+        <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {msg && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+
+          {view === "form" && (
+            <>
+              {/* who / conditions */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="col-span-2">
+                  <label className="text-white/50 text-[11px] uppercase tracking-wide">Operator</label>
+                  <input value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="your name" className="w-full rounded-lg px-3 py-2 text-sm outline-none mt-1" style={inSt} />
+                </div>
+                <div>
+                  <label className="text-white/50 text-[11px] uppercase tracking-wide">Ambient temp</label>
+                  <input value={ambient} onChange={(e) => setAmbient(e.target.value)} inputMode="numeric" placeholder="°F" className="w-full rounded-lg px-3 py-2 text-sm outline-none mt-1" style={inSt} />
+                </div>
+                <div>
+                  <label className="text-white/50 text-[11px] uppercase tracking-wide">Weather</label>
+                  <input value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="clear / rain…" className="w-full rounded-lg px-3 py-2 text-sm outline-none mt-1" style={inSt} />
+                </div>
+              </div>
+              <div className="text-white/40 text-[11px] mb-4">Date {localToday()} · saved to records when you submit.</div>
+
+              {PLANT_CHECKLIST.map((sec) => (
+                <div key={sec.title} className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span style={{ width: 16, height: 3, background: ORANGE, borderRadius: 2, display: "inline-block" }} />
+                    <h3 className="text-white text-[13px] font-bold uppercase tracking-wide" style={{ fontFamily: C.cond }}>{sec.title}</h3>
+                    {sec.note && <span className="text-white/35 text-[10px] uppercase tracking-wide ml-auto">{sec.note}</span>}
+                  </div>
+                  <div className="rounded-xl p-2.5" style={{ background: NAVY }}>
+                    {sec.items.map((it, idx) => (
+                      <div key={it.key} className={idx > 0 ? "mt-2.5 pt-2.5" : ""} style={idx > 0 ? { borderTop: "1px solid rgba(255,255,255,0.06)" } : undefined}>
+                        {it.type === "record" ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-white/85 text-sm flex-1 leading-tight">{it.label}</span>
+                            <input value={readings[it.key] || ""} onChange={(e) => setReading(it.key, e.target.value)} inputMode="decimal" placeholder="—" className="w-20 rounded-lg px-2 py-1.5 text-sm text-right outline-none" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontFamily: C.body }} />
+                            <span className="text-white/40 text-xs" style={{ width: 30 }}>{it.unit}</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-white/85 text-sm mb-1.5 leading-tight">{it.label}</div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {["ok", "na", "issue"].map((st) => {
+                                const on = items[it.key] === st;
+                                const m = PC_STATUS[st];
+                                return (
+                                  <button key={st} onClick={() => setItem(it.key, st)} className="rounded-lg py-1.5 text-xs font-bold active:scale-95 transition-transform" style={on ? { background: m.bg, color: m.fg } : { background: NAVY_DEEP, color: "rgba(255,255,255,0.5)", border: `1px solid ${st === "issue" ? "rgba(239,83,80,0.4)" : "rgba(255,255,255,0.12)"}` }}>{m.label}</button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <label className="text-white/50 text-[11px] uppercase tracking-wide">Deficiencies & corrective action</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Note anything flagged as an Issue, and what was done about it…" className="w-full rounded-lg px-3 py-2 text-sm outline-none mt-1 mb-3 resize-none" style={inSt} />
+
+              <div className="flex items-center justify-between mb-2 text-xs">
+                <span style={{ color: markedCount === allChecks.length ? GREEN : "rgba(255,255,255,0.5)" }}>{markedCount}/{allChecks.length} items marked</span>
+                {issueCount > 0 && <span style={{ color: "#ff8a85", fontWeight: 700 }}>{issueCount} issue{issueCount > 1 ? "s" : ""} flagged</span>}
+              </div>
+              <button onClick={submit} disabled={busy || !operator.trim()} className="w-full rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+                {busy ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />} Submit today's checklist
+              </button>
+            </>
+          )}
+
+          {view === "history" && !detail && (
+            <>
+              {history === null ? (
+                <div className="text-white/50 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+              ) : history.length === 0 ? (
+                <div className="text-white/40 text-sm py-8 text-center">No checklists submitted yet.</div>
+              ) : history.map((h) => (
+                <button key={h.id} onClick={() => openDetail(h.id)} className="w-full text-left rounded-xl px-3 py-2.5 mb-1.5 flex items-center justify-between gap-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="min-w-0">
+                    <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{orderDateUS(h.date) || h.date}</div>
+                    <div className="text-white/45 text-xs truncate">{h.operator || "—"} · {fmtWhen(h.submitted_at)}</div>
+                  </div>
+                  {h.issues > 0
+                    ? <span className="shrink-0 text-[11px] font-bold rounded-full px-2 py-0.5" style={{ background: "rgba(239,83,80,0.16)", color: "#ff8a85" }}>{h.issues} issue{h.issues > 1 ? "s" : ""}</span>
+                    : <span className="shrink-0 text-[11px] font-bold rounded-full px-2 py-0.5 flex items-center gap-1" style={{ background: GREEN + "1a", color: GREEN }}><Check size={11} /> Clear</span>}
+                </button>
+              ))}
+            </>
+          )}
+
+          {view === "history" && detail && (
+            <>
+              <button onClick={() => setDetail(null)} className="text-xs font-semibold mb-3 flex items-center gap-1" style={{ color: ORANGE }}><ChevronLeft size={14} /> All checklists</button>
+              <div className="rounded-xl p-3 mb-3" style={{ background: NAVY }}>
+                <div className="text-white font-bold" style={{ fontFamily: C.cond }}>{orderDateUS(detail.date) || detail.date}</div>
+                <div className="text-white/50 text-xs mt-0.5">Operator: {detail.operator || "—"} · {fmtWhen(detail.submitted_at)}</div>
+                <div className="text-white/50 text-xs">{[detail.ambient_temp && `${detail.ambient_temp}°F`, detail.weather].filter(Boolean).join(" · ") || "—"}</div>
+              </div>
+              {PLANT_CHECKLIST.map((sec) => (
+                <div key={sec.title} className="mb-3">
+                  <div className="text-white/50 text-[11px] uppercase tracking-wide mb-1.5">{sec.title}</div>
+                  {sec.items.map((it) => {
+                    const isRec = it.type === "record";
+                    const val = isRec ? (detail.readings || {})[it.key] : (detail.items || {})[it.key];
+                    const m = !isRec && val ? PC_STATUS[val] : null;
+                    return (
+                      <div key={it.key} className="flex items-center justify-between gap-2 py-1" style={{ borderBottom: "1px dotted rgba(255,255,255,0.07)" }}>
+                        <span className="text-white/75 text-xs leading-tight">{it.label}</span>
+                        {isRec
+                          ? <span className="shrink-0 text-xs font-semibold" style={{ color: val ? "#fff" : "rgba(255,255,255,0.3)" }}>{val ? `${val} ${it.unit}` : "—"}</span>
+                          : m
+                            ? <span className="shrink-0 text-[11px] font-bold rounded-full px-2 py-0.5" style={{ background: m.bg, color: m.fg }}>{m.label}</span>
+                            : <span className="shrink-0 text-[11px] text-white/30">—</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              {detail.notes && (
+                <div className="rounded-xl p-3" style={{ background: NAVY }}>
+                  <div className="text-white/50 text-[11px] uppercase tracking-wide mb-1">Deficiencies & corrective action</div>
+                  <div className="text-white/85 text-sm whitespace-pre-wrap">{detail.notes}</div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManageStaffModal({ onClose }) {
   const [staff, setStaff] = useState([]);
   const [allDrivers, setAllDrivers] = useState([]);   // merged driver names (logins + name-only roster)
@@ -6117,6 +6364,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
   const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
+  const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
   const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
@@ -6365,6 +6613,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showStaff && <ManageStaffModal onClose={() => { setShowStaff(false); refresh(); }} />}
       {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
+      {showPlant && <PlantChecklistModal onClose={() => setShowPlant(false)} />}
       {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
       {showTrucks && (
         <ManageTrucksModal onClose={() => setShowTrucks(false)} onChanged={refresh} />
@@ -6461,6 +6710,9 @@ function DispatchApp({ email, role, onLogout }) {
                   <Layers size={16} color={ORANGE} /> Materials
                 </button>
               )}
+              <button onClick={() => setShowPlant(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                <ClipboardCheck size={16} color={ORANGE} /> Plant check
+              </button>
               <button onClick={() => setShowMessages(true)} className="relative flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <MessageSquare size={16} color={ORANGE} /> Messages
                 {msgUnread > 0 && <span className="absolute -top-1.5 -right-1.5 text-[11px] font-bold rounded-full px-1.5 py-0.5 leading-none flex items-center justify-center min-w-[18px]" style={{ background: "#ef5350", color: "#fff" }}>{msgUnread}</span>}
