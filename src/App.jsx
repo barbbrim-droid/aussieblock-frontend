@@ -3562,7 +3562,7 @@ const PLANT_CHECKLIST = [
     { key: "estops", label: "Emergency stops (E-stops) tested & functional" },
     { key: "guards", label: "Guards & covers secured on moving parts" },
     { key: "walkways", label: "Ladders, platforms & walkways clear" },
-    { key: "washout", label: "Wash-out area & site drainage clear" },
+    { key: "water_filters", label: "Fresh water filters checked & clean" },
     { key: "leaks", label: "No fuel / oil / hydraulic leaks" },
     { key: "extinguisher", label: "Fire extinguisher charged & accessible" },
     { key: "ppe", label: "PPE on hand (eye, hearing, gloves, hard hat)" },
