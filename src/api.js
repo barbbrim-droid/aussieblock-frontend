@@ -906,12 +906,12 @@ export function deactivateEmployee(id) {
 // carries bilingual message/message_es + distance — survives to the kiosk UI.
 // Returns the JSON on success; on failure throws an Error with `.info` = the
 // detail object ({ code, message, message_es, ... }).
-export async function timeclockPunch({ pin, lat, lng, lunch_minutes }) {
+export async function timeclockPunch({ pin, lat, lng, lunch_minutes, end_of_day }) {
   const token = getToken()
   const res = await fetch(`${API_BASE}/timeclock/punch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ pin, lat, lng, lunch_minutes }),
+    body: JSON.stringify({ pin, lat, lng, lunch_minutes, end_of_day }),
   })
   const text = await res.text()
   const data = text ? JSON.parse(text) : null

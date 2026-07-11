@@ -5171,7 +5171,8 @@ function TimeClockKiosk({ onClose, standalone }) {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState(null);       // confirmation / error
-  const [lunchFor, setLunchFor] = useState(null); // { pin, employee } awaiting lunch answer
+  const [outFor, setOutFor] = useState(null);     // clock-out flow: { pin, employee, step: "leaving"|"lunch"|"custom" }
+  const [customMin, setCustomMin] = useState(90); // custom lunch minutes (the "additional lunch" stepper)
   const timer = useRef(null);
 
   const getPos = () => new Promise((resolve, reject) => {
@@ -5182,21 +5183,24 @@ function TimeClockKiosk({ onClose, standalone }) {
   });
   const flashFor = (obj, ms = 6000) => { setFlash(obj); clearTimeout(timer.current); timer.current = setTimeout(() => setFlash(null), ms); };
 
-  const punch = async (lunch_minutes) => {
-    const usePin = lunchFor ? lunchFor.pin : pin;
+  // punch: clock-in with no opts; clock-out is two-step — first call (no opts) →
+  // out_pending → the kiosk asks "leaving for the day?" then lunch, and re-calls
+  // with { lunch_minutes, end_of_day }.
+  const punch = async ({ lunch_minutes, end_of_day } = {}) => {
+    const usePin = outFor ? outFor.pin : pin;
     if (!usePin || usePin.length < 3) { flashFor({ err: true, message: "Enter your PIN", message_es: "Ingrese su PIN" }, 2500); return; }
     setBusy(true);
     let pos;
     try { pos = await getPos(); }
     catch { setBusy(false); flashFor({ err: true, message: "Turn on Location / GPS to punch.", message_es: "Active la ubicación / GPS para marcar." }); return; }
     try {
-      const data = await timeclockPunch({ pin: usePin, lat: pos.lat, lng: pos.lng, lunch_minutes });
-      if (data.action === "out_pending") { setLunchFor({ pin: usePin, employee: data.employee }); setBusy(false); return; }
-      setLunchFor(null); setPin("");
+      const data = await timeclockPunch({ pin: usePin, lat: pos.lat, lng: pos.lng, lunch_minutes, end_of_day });
+      if (data.action === "out_pending") { setOutFor({ pin: usePin, employee: data.employee, step: "leaving" }); setBusy(false); return; }
+      setOutFor(null); setPin("");
       flashFor({ ok: true, ...data });
     } catch (e) {
       const info = e.info || {};
-      setLunchFor(null); setPin("");
+      setOutFor(null); setPin("");
       flashFor({ err: true, message: info.message || e.message, message_es: info.message_es });
     } finally { setBusy(false); }
   };
@@ -5235,16 +5239,48 @@ function TimeClockKiosk({ onClose, standalone }) {
               </>
             )}
           </div>
-        ) : lunchFor ? (
+        ) : outFor ? (
           <div className="text-center max-w-md w-full px-4">
-            <div style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold">{lunchFor.employee}</div>
-            <div className="text-white text-xl font-bold mt-4">Did you take a lunch today?</div>
-            <div className="text-white/60 text-lg">¿Tomó almuerzo hoy?</div>
-            <div className="grid gap-3 mt-6">
-              <button disabled={busy} onClick={() => punch(30)} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>30 min</button>
-              <button disabled={busy} onClick={() => punch(60)} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>60 min · 1 hr</button>
-              <button disabled={busy} onClick={() => punch(0)} className="py-4 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: WARN + "22", color: WARN, border: `1px solid ${WARN}66` }}>Worked through · Sin almuerzo</button>
-            </div>
+            <div style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold">{outFor.employee}</div>
+            {outFor.step === "leaving" ? (
+              <>
+                <div className="text-white text-xl font-bold mt-4">Are you leaving for the day?</div>
+                <div className="text-white/60 text-lg">¿Se va por el día?</div>
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  <button disabled={busy} onClick={() => setOutFor((o) => ({ ...o, step: "lunch" }))} className="py-6 rounded-2xl text-2xl font-bold active:scale-95 disabled:opacity-50" style={{ background: GREEN + "22", color: GREEN, border: `1px solid ${GREEN}66` }}>Yes · Sí</button>
+                  <button disabled={busy} onClick={() => punch({ lunch_minutes: 0, end_of_day: false })} className="py-6 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>No</button>
+                </div>
+                <div className="text-white/40 text-xs mt-4 leading-relaxed">“No” clocks you out without lunch (stepping out / leaving early).<br />“No” marca salida sin almuerzo (salió un momento / temprano).</div>
+              </>
+            ) : outFor.step === "lunch" ? (
+              <>
+                <div className="text-white text-xl font-bold mt-4">Did you take a lunch today?</div>
+                <div className="text-white/60 text-lg">¿Tomó almuerzo hoy?</div>
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  <button disabled={busy} onClick={() => punch({ lunch_minutes: 30, end_of_day: true })} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>30 min</button>
+                  <button disabled={busy} onClick={() => punch({ lunch_minutes: 60, end_of_day: true })} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>60 min · 1 hr</button>
+                  <button disabled={busy} onClick={() => punch({ lunch_minutes: 90, end_of_day: true })} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>90 min</button>
+                  <button disabled={busy} onClick={() => punch({ lunch_minutes: 120, end_of_day: true })} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>2 hr</button>
+                </div>
+                <button disabled={busy} onClick={() => { setCustomMin(90); setOutFor((o) => ({ ...o, step: "custom" })); }} className="w-full mt-3 py-3.5 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}66` }}>Other amount · Otra cantidad</button>
+                <button disabled={busy} onClick={() => punch({ lunch_minutes: 0, end_of_day: true })} className="w-full mt-3 py-3.5 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: WARN + "22", color: WARN, border: `1px solid ${WARN}66` }}>Worked through · Sin almuerzo</button>
+              </>
+            ) : (
+              <>
+                <div className="text-white text-xl font-bold mt-4">How long was lunch?</div>
+                <div className="text-white/60 text-lg">¿Cuánto duró el almuerzo?</div>
+                <div className="flex items-center justify-center gap-4 mt-6">
+                  <button disabled={busy} onClick={() => setCustomMin((m) => Math.max(0, m - 15))} className="w-16 h-16 rounded-2xl text-3xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>−</button>
+                  <div className="text-center min-w-[7rem]">
+                    <div style={{ fontFamily: C.cond }} className="text-white text-4xl font-bold">{customMin >= 60 ? `${Math.floor(customMin / 60)}h ${customMin % 60 ? (customMin % 60) + "m" : ""}`.trim() : `${customMin}m`}</div>
+                    <div className="text-white/40 text-xs">{customMin} min</div>
+                  </div>
+                  <button disabled={busy} onClick={() => setCustomMin((m) => Math.min(600, m + 15))} className="w-16 h-16 rounded-2xl text-3xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>+</button>
+                </div>
+                <button disabled={busy} onClick={() => punch({ lunch_minutes: customMin, end_of_day: true })} className="w-full mt-6 py-4 rounded-2xl text-xl font-bold active:scale-95 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>Confirm · Confirmar</button>
+                <button disabled={busy} onClick={() => setOutFor((o) => ({ ...o, step: "lunch" }))} className="w-full mt-2 py-2.5 text-sm text-white/50 active:scale-95">Back · Atrás</button>
+              </>
+            )}
             {busy && <div className="text-white/50 mt-4 flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> …</div>}
           </div>
         ) : (
@@ -5260,7 +5296,7 @@ function TimeClockKiosk({ onClose, standalone }) {
               ))}
               <button disabled={busy} onClick={() => setPin((p) => p.slice(0, -1))} className="py-4 rounded-2xl text-lg font-bold text-white/70 active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>⌫</button>
               <button disabled={busy} onClick={() => key("0")} className="py-4 rounded-2xl text-2xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>0</button>
-              <button disabled={busy || pin.length < 3} onClick={() => punch(undefined)} className="py-4 rounded-2xl font-bold active:scale-90 disabled:opacity-40 flex items-center justify-center" style={{ background: GREEN, color: NAVY_DEEP }} title="Clock in / out">{busy ? <Loader2 size={22} className="animate-spin" /> : <Check size={24} />}</button>
+              <button disabled={busy || pin.length < 3} onClick={() => punch()} className="py-4 rounded-2xl font-bold active:scale-90 disabled:opacity-40 flex items-center justify-center" style={{ background: GREEN, color: NAVY_DEEP }} title="Clock in / out">{busy ? <Loader2 size={22} className="animate-spin" /> : <Check size={24} />}</button>
             </div>
             <div className="text-white/40 text-xs mt-4 leading-relaxed">Tap your PIN, then the green check to clock in or out.<br />Marque su PIN y toque el círculo verde.</div>
           </div>
@@ -5392,7 +5428,7 @@ function TimeClockModal({ onClose }) {
   const saveShift = async () => {
     if (!editShift.clock_in) { setErr("Clock-in time is required."); return; }
     setSavingShift(true); setErr("");
-    const body = { employee_id: editShift.employee_id, clock_in: tcFromInput(editShift.clock_in), clock_out: tcFromInput(editShift.clock_out), lunch_minutes: editShift.lunch_minutes, note: editShift.note || "" };
+    const body = { employee_id: editShift.employee_id, clock_in: tcFromInput(editShift.clock_in), clock_out: tcFromInput(editShift.clock_out), lunch_minutes: editShift.lunch_minutes, end_of_day: editShift.end_of_day !== false, note: editShift.note || "" };
     try {
       if (editShift.id) await editTimeEntry(editShift.id, body); else await addTimeEntry(body);
       setEditShift(null); setReload((k) => k + 1);
@@ -5469,14 +5505,14 @@ function TimeClockModal({ onClose }) {
                                 <div key={en.id} className="flex items-center justify-between gap-2 py-0.5">
                                   <span className="text-white/80 text-xs">
                                     {tcTime(en.clock_in)} → {en.clock_out ? tcTime(en.clock_out) : <span style={{ color: WARN }}>open</span>}
-                                    <span className="text-white/40"> · {en.open ? "—" : `${en.hours?.toFixed(2)} h`}{en.clock_out ? ` · lunch ${en.worked_through_lunch ? "0 (worked through)" : en.lunch_minutes + "m"}` : ""}</span>
+                                    <span className="text-white/40"> · {en.open ? "—" : `${en.hours?.toFixed(2)} h`}{en.clock_out ? ` · ${en.worked_through_lunch ? "worked through lunch" : en.end_of_day === false ? "left early (no lunch)" : "lunch " + (en.lunch_minutes || 0) + "m"}` : ""}</span>
                                   </span>
-                                  <button onClick={() => setEditShift({ id: en.id, employee_id: r.id, clock_in: tcToInput(en.clock_in), clock_out: tcToInput(en.clock_out), lunch_minutes: en.lunch_minutes ?? 30, note: en.note || "" })} className="text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95 shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "#cfe0ff" }}><Pencil size={11} /></button>
+                                  <button onClick={() => setEditShift({ id: en.id, employee_id: r.id, clock_in: tcToInput(en.clock_in), clock_out: tcToInput(en.clock_out), lunch_minutes: en.lunch_minutes ?? 30, end_of_day: en.end_of_day !== false, note: en.note || "" })} className="text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95 shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "#cfe0ff" }}><Pencil size={11} /></button>
                                 </div>
                               ))}
                             </div>
                           ))}
-                          <button onClick={() => setEditShift({ employee_id: r.id, clock_in: tcToInput(new Date(days[0].getTime() + 7 * 3600e3).toISOString()), clock_out: "", lunch_minutes: 30, note: "" })} className="mt-1 flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md active:scale-95" style={{ background: ORANGE + "22", color: ORANGE }}><Plus size={12} /> Add a shift (missed punch)</button>
+                          <button onClick={() => setEditShift({ employee_id: r.id, clock_in: tcToInput(new Date(days[0].getTime() + 7 * 3600e3).toISOString()), clock_out: "", lunch_minutes: 30, end_of_day: true, note: "" })} className="mt-1 flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md active:scale-95" style={{ background: ORANGE + "22", color: ORANGE }}><Plus size={12} /> Add a shift (missed punch)</button>
                         </div>
                       )}
                     </div>
@@ -5549,10 +5585,16 @@ function TimeClockModal({ onClose }) {
             <input type="datetime-local" value={editShift.clock_in} onChange={(e) => setEditShift((s) => ({ ...s, clock_in: e.target.value }))} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none mb-2 mt-0.5" style={inSt} />
             <label className="text-white/50 text-[11px]">Clock out <span className="text-white/30">(blank = still open)</span></label>
             <input type="datetime-local" value={editShift.clock_out} onChange={(e) => setEditShift((s) => ({ ...s, clock_out: e.target.value }))} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none mb-2 mt-0.5" style={inSt} />
-            <label className="text-white/50 text-[11px]">Lunch</label>
-            <select value={editShift.lunch_minutes ?? 30} onChange={(e) => setEditShift((s) => ({ ...s, lunch_minutes: Number(e.target.value) }))} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none mb-3 mt-0.5" style={inSt}>
-              <option value={30}>30 min</option><option value={60}>60 min</option><option value={0}>0 — worked through</option>
-            </select>
+            <label className="text-white/50 text-[11px]">Lunch (minutes deducted)</label>
+            <div className="flex items-center gap-1.5 mb-2 mt-0.5">
+              <input type="number" min="0" max="600" step="15" value={editShift.lunch_minutes ?? 30} onChange={(e) => setEditShift((s) => ({ ...s, lunch_minutes: Number(e.target.value) }))} className="w-24 rounded-lg px-2.5 py-1.5 text-sm outline-none" style={inSt} />
+              {[0, 30, 60, 90, 120].map((m) => (
+                <button key={m} onClick={() => setEditShift((s) => ({ ...s, lunch_minutes: m }))} className="text-[11px] font-semibold px-1.5 py-1 rounded-md active:scale-95" style={{ background: (editShift.lunch_minutes ?? 30) === m ? ORANGE + "22" : "rgba(255,255,255,0.06)", color: (editShift.lunch_minutes ?? 30) === m ? ORANGE : "rgba(255,255,255,0.6)" }}>{m}</button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-white/65 text-xs mb-3">
+              <input type="checkbox" checked={editShift.end_of_day !== false} onChange={(e) => setEditShift((s) => ({ ...s, end_of_day: e.target.checked }))} /> Left for the day <span className="text-white/35">(0 lunch + this = “worked through”)</span>
+            </label>
             <div className="flex items-center gap-2">
               <button onClick={saveShift} disabled={savingShift} className="flex-1 rounded-lg px-3 py-2 text-sm font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1" style={{ background: ORANGE, color: NAVY_DEEP }}>{savingShift ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save</button>
               {editShift.id && <button onClick={() => removeShift(editShift.id)} className="rounded-lg px-3 py-2 text-sm font-bold active:scale-95" style={{ background: "rgba(239,83,80,0.14)", color: "#ff8a85" }}><Trash2 size={14} /></button>}
