@@ -5366,12 +5366,14 @@ function TimeClockModal({ onClose }) {
   const grand = empRows.reduce((s, r) => s + r.total, 0);
 
   const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
-  const cellVal = (r, d) => { const c = r.days[tcIso(d)]; if (!c) return ""; if (c.hours) return c.hours.toFixed(2); return c.open ? "open" : ""; };
+  // A day cell exists only when there are punches that day — so a completed shift
+  // that nets 0 h still shows "0.00" (never blank), and an open shift shows "open".
+  const cellVal = (r, d) => { const c = r.days[tcIso(d)]; if (!c) return ""; if (c.hours) return c.hours.toFixed(2); return c.open ? "open" : "0.00"; };
 
   const downloadCsv = () => {
     const hdr = ["Employee", ...days.map((d, i) => `${dow[i]} ${d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}`), "Total hrs", "Notes"];
     const rows = empRows.map((r) => {
-      const cells = days.map((d) => { const c = r.days[tcIso(d)]; return c && c.hours ? c.hours.toFixed(2) : (c && c.open ? "OPEN" : ""); });
+      const cells = days.map((d) => { const c = r.days[tcIso(d)]; return c && c.hours ? c.hours.toFixed(2) : (c && c.open ? "OPEN" : (c ? "0.00" : "")); });
       const notes = [];
       if (r.hasOpen) notes.push("has open shift — not clocked out");
       if (r.hasWT) notes.push("worked through lunch");
@@ -5393,7 +5395,7 @@ function TimeClockModal({ onClose }) {
     const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const head = `<tr><th>Employee</th>${days.map((d, i) => `<th class="r">${dow[i]}<br>${d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}</th>`).join("")}<th class="r">Total</th></tr>`;
     const body = empRows.map((r) => {
-      const cells = days.map((d) => { const c = r.days[tcIso(d)]; return `<td class="r">${c && c.hours ? c.hours.toFixed(2) : (c && c.open ? '<span class="open">open</span>' : "")}</td>`; }).join("");
+      const cells = days.map((d) => { const c = r.days[tcIso(d)]; return `<td class="r">${c && c.hours ? c.hours.toFixed(2) : (c && c.open ? '<span class="open">open</span>' : (c ? "0.00" : ""))}</td>`; }).join("");
       const note = r.hasWT ? ' <span class="wt">*worked through lunch</span>' : "";
       return `<tr><td>${esc(r.name)}${note}</td>${cells}<td class="r b">${r.total.toFixed(2)}</td></tr>`;
     }).join("");
@@ -5495,7 +5497,7 @@ function TimeClockModal({ onClose }) {
                           const c = r.days[tcIso(d)];
                           return <div key={i} className="text-center text-xs" style={{ color: c && c.open ? WARN : c && c.wt ? "#ffd28a" : "rgba(255,255,255,0.8)" }}>{cellVal(r, d) || <span className="text-white/15">·</span>}</div>;
                         })}
-                        <div className="text-right text-sm font-bold" style={{ color: ORANGE }}>{r.total ? r.total.toFixed(2) : "—"}</div>
+                        <div className="text-right text-sm font-bold" style={{ color: ORANGE }}>{Object.keys(r.days).length ? r.total.toFixed(2) : "—"}</div>
                       </button>
                       {expanded === r.id && (
                         <div className="mt-1 mb-2 rounded-lg px-2.5 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
