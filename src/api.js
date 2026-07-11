@@ -901,6 +901,11 @@ export function saveEmployee(emp) {
 export function deactivateEmployee(id) {
   return request(`/employees/${id}`, { method: 'DELETE' })
 }
+// Permanently remove an employee — only succeeds if they have no recorded hours
+// (backend 409s otherwise; deactivate those instead to keep timesheet history).
+export function removeEmployee(id) {
+  return request(`/employees/${id}?hard=1`, { method: 'DELETE' })
+}
 
 // Kiosk punch. Own fetch (not `request`) so the structured error detail — which
 // carries bilingual message/message_es + distance — survives to the kiosk UI.
