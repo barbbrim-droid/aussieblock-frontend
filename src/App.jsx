@@ -5217,11 +5217,16 @@ function CostsModal({ orders, onClose }) {
         // delivering truck (RTS 4554/7329/7336 → RTS; other → P&L Concrete) with
         // self-haul customers grouped under their own name.
         const hauler = (dl && dl.hauler_group) || (dl && dl.hauler) || o.hauler || "";
+        const selfHaul = !!(dl && dl.self_haul);
         const billed = cp && cp.total != null ? Number(cp.total) : null;
         // To the hauler = delivery/mileage cost + short-load fee + back-haul fee.
+        // Self-pickup customers haul their own concrete → there is NO hauler payout,
+        // so their mileage cost must NOT count as a "to hauler" charge (it was
+        // inflating the To-hauler totals). Bill components (short/backhaul) are
+        // already zeroed server-side for self-haul.
         const haulMi = dl && dl.total != null ? Number(dl.total) : null;
         const fees = cp ? (Number(cp.short_load) || 0) + (Number(cp.backhaul) || 0) : 0;
-        const toHauler = (haulMi != null || fees) ? (haulMi || 0) + fees : null;
+        const toHauler = selfHaul ? null : ((haulMi != null || fees) ? (haulMi || 0) + fees : null);
         const yards = p.billed_qty != null ? p.billed_qty : o.qty;
         // base (pre-tax) price per yard: the sheet/override unit price, plus the
         // concrete-only extended (unit × yards) so subtotals blend correctly.
@@ -5234,7 +5239,19 @@ function CostsModal({ orders, onClose }) {
         const fiberAmt = fiber ? Number(fiber.amount) || 0 : 0;
         const lbM = fiber && /([\d.]+)\s*lb/i.exec(fiber.label || "");
         const fiberLbs = lbM ? Number(lbM[1]) : 0;
-        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul: !!(dl && dl.self_haul), haulerSplit: p.hauler_split || {}, miles: (dl && dl.mileage) != null ? dl.mileage : null };
+        // Full cost breakdown so the cost sheet can itemize each figure. These add
+        // up to `billed`:  concrete + fiber + other admixtures + short-load +
+        // back-haul + standby + tax = billed. (Every piece comes straight from the
+        // backend's own pricing block, so the parts always reconcile to the total.)
+        const admixTotal = ((cp && cp.admixtures) || []).reduce((a, x) => a + (Number(x && x.amount) || 0), 0);
+        const otherAdmix = Number((admixTotal - fiberAmt).toFixed(2));   // non-fiber admixtures
+        const billDelivery = cp ? Number(cp.delivery) || 0 : 0;   // distance haul billed to the customer
+        const deliveryRate = cp ? Number(cp.delivery_rate) || 0 : 0;
+        const shortLoad = cp ? Number(cp.short_load) || 0 : 0;
+        const backhaul = cp ? Number(cp.backhaul) || 0 : 0;
+        const standby = p.onsite ? Number(p.onsite.standby) || 0 : 0;
+        const tax = cp ? Number(cp.tax) || 0 : 0;
+        return { billed, toHauler, yards, hauler, unit, ext, fiberAmt, fiberLbs, admixTotal, otherAdmix, billDelivery, deliveryRate, shortLoad, backhaul, standby, tax, invoiceAmt: (p.invoice && p.invoice.amount != null) ? Number(p.invoice.amount) : null, invoice: p.invoice || null, onsite: p.onsite || null, selfHaul, haulerSplit: p.hauler_split || {}, miles: (dl && dl.mileage) != null ? dl.mileage : null };
       };
       // ONE request prices every order server-side — firing one request per order
       // used to flood the backend and lock the database, which broke the dispatch
@@ -5253,6 +5270,11 @@ function CostsModal({ orders, onClose }) {
   const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
   const Drow = ({ label, val }) => (
     <div className="flex justify-between gap-2"><span className="text-white/40">{label}</span><span className="text-white/85 text-right truncate ml-2">{val == null || val === "" ? "—" : val}</span></div>
+  );
+  // One line in the itemized cost breakdown (label · $amount). `muted` dims it
+  // (for cost-side lines like delivery that aren't part of the customer's bill).
+  const Brow = ({ label, val, muted }) => (
+    <div className="flex justify-between gap-2"><span className={muted ? "text-white/35" : "text-white/55"}>{label}</span><span className={`text-right ml-2 ${muted ? "text-white/50" : "text-white/85"}`}>{val == null || val === "" ? "—" : val}</span></div>
   );
   const fmtMins = (m) => { const h = Math.floor(m / 60); const mm = Math.round(m % 60); return h ? `${h}h ${mm}m` : `${mm}m`; };
 
@@ -5285,10 +5307,17 @@ function CostsModal({ orders, onClose }) {
     if (r.ext != null) acc.ext += r.ext;   // concrete-only $ (pre-tax/fees) → blended base $/yd
     if (r.fiberAmt) acc.fiber += r.fiberAmt;
     if (r.fiberLbs) acc.fiberLbs += r.fiberLbs;
+    if (r.otherAdmix) acc.otherAdmix += r.otherAdmix;   // non-fiber admixtures $
+    if (r.billDelivery) acc.billDelivery += r.billDelivery;   // distance haul billed to customer
+    if (r.shortLoad) acc.shortLoad += r.shortLoad;
+    if (r.backhaul) acc.backhaul += r.backhaul;
+    if (r.standby) acc.standby += r.standby;
+    if (r.tax) acc.tax += r.tax;
+    if (r.invoiceAmt != null) acc.invoiceAmt += r.invoiceAmt;
     if (r.billed != null && r.yards != null && Number(r.yards) > 0) acc.yards += Number(r.yards);   // yards that have a billed total → blended $/yd
     if (r.unit != null && Number(r.unit) > 0) acc.units.add(Number(r.unit).toFixed(2));   // distinct sheet rates in the group
     return acc;
-  }, { billed: 0, toHauler: 0, yards: 0, ext: 0, fiber: 0, fiberLbs: 0, units: new Set() });
+  }, { billed: 0, toHauler: 0, yards: 0, ext: 0, fiber: 0, fiberLbs: 0, otherAdmix: 0, billDelivery: 0, shortLoad: 0, backhaul: 0, standby: 0, tax: 0, invoiceAmt: 0, units: new Set() });
   const grand = sumFor(filtered);
 
   // "By hauler" splits each order across the haulers that ran its loads (per-load
@@ -5357,34 +5386,45 @@ function CostsModal({ orders, onClose }) {
       if (amt) parts.push(m(amt));
       return parts.length ? parts.join(" · ") : "—";
     };
+    const mz = (v) => (!Number(v) ? "—" : m(v));                              // dash for $0 (keeps the sheet uncluttered)
+    const ydc = (v) => (Number(v) > 0 ? Number(v).toLocaleString("en-US", { maximumFractionDigits: 1 }) : "");
+    // The nine breakdown columns shared by the summary + every detail table. Each
+    // line's parts (concrete + fiber + other admixtures + short-load + back-haul +
+    // standby + tax) add up to Billed; To hauler is the cost side (not billed).
+    const bdHead = `<th class="r">Concrete</th><th class="r">Hauler&nbsp;fee</th><th class="r">Fiber</th><th class="r">Admix</th><th class="r">Short&#8209;load</th><th class="r">Back&#8209;haul</th><th class="r">Standby</th><th class="r">Tax</th><th class="r bcol">Billed</th>`;
+    const bdCells = (c) => `<td class="r">${mz(c.concrete)}</td><td class="r">${mz(c.delivery)}</td><td class="r">${fiberCell(c.fiberAmt, c.fiberLbs)}</td><td class="r">${mz(c.otherAdmix)}</td><td class="r">${mz(c.shortLoad)}</td><td class="r">${mz(c.backhaul)}</td><td class="r">${mz(c.standby)}</td><td class="r">${mz(c.tax)}</td><td class="r bcol">${c.billed == null ? "—" : m(c.billed)}</td>`;
+    const rowBd = (r) => bdCells({ concrete: r.ext, delivery: r.billDelivery, fiberAmt: r.fiberAmt, fiberLbs: r.fiberLbs, otherAdmix: r.otherAdmix, shortLoad: r.shortLoad, backhaul: r.backhaul, standby: r.standby, tax: r.tax, billed: r.error ? null : r.billed });
+    const totBd = (t) => bdCells({ concrete: t.ext, delivery: t.billDelivery, fiberAmt: t.fiber, fiberLbs: t.fiberLbs, otherAdmix: t.otherAdmix, shortLoad: t.shortLoad, backhaul: t.backhaul, standby: t.standby, tax: t.tax, billed: t.billed });
     const stamp = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     const period = (from || to)
       ? `${from ? (orderDateUS(from) || from) : "start"} – ${to ? (orderDateUS(to) || to) : "today"}`
       : "All dates";
 
-    // Page 1 — summary: one row per customer.
+    // Page 1 — summary: one row per customer, fully itemized.
     const summaryRows = custNames.map((name) => {
       const t = sumFor(groups[name]);
-      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${m(t.billed)}</td><td class="r">${fiberCell(t.fiber, t.fiberLbs)}</td><td class="r">${groupBase(t)}</td><td class="r">${m(t.toHauler)}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${ydc(t.yards)}</td>${totBd(t)}</tr>`;
     }).join("");
 
-    // Detail — per-customer tables (kept whole, won't split across a page).
+    // Detail — per-customer tables (kept whole, won't split across a page), each
+    // order broken down into its cost components so a wrong figure is traceable.
     const sections = custNames.map((name) => {
       const list = groups[name];
       const t = sumFor(list);
       const rows = list.map((o) => {
         const r = px[o.ref] || {};
-        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : fiberCell(r.fiberAmt, r.fiberLbs)}</td><td class="r">${r.error ? "—" : m(r.billed)}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td><td class="r">${r.error ? "—" : m(r.toHauler)}</td></tr>`;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td>${rowBd(r)}</tr>`;
       }).join("");
       return `<section class="cust"><h2>${esc(name)} <span class="ct">· ${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
-<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Fiber</th><th class="r">Billed</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Base&nbsp;$/yd</th>${bdHead}</tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="5" class="r">Subtotal</td><td class="r">${fiberCell(t.fiber, t.fiberLbs)}</td><td class="r">${m(t.billed)}</td><td class="r">${groupBase(t)}</td><td class="r">${m(t.toHauler)}</td></tr></tfoot></table></section>`;
+<tfoot><tr><td colspan="4" class="r">Subtotal</td><td class="r">${ydc(t.yards)}</td><td class="r">${groupBase(t)}</td>${totBd(t)}</tr></tfoot></table></section>`;
     }).join("");
 
     const empty = custNames.length === 0;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aussieblock costs — ${esc(period)}</title>
 <style>
+  @page{size:landscape;margin:12mm;}
   body{font-family:Arial,Helvetica,sans-serif;color:#161d27;margin:28px;font-size:13px;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #e7732a;padding-bottom:14px;}
   .brand .logo{height:52px;width:auto;display:block;}
@@ -5403,14 +5443,16 @@ function CostsModal({ orders, onClose }) {
   .lab{color:#667;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
   .big{font-size:19px;font-weight:bold;margin-top:2px;}
   .sec-title{font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#889;margin:22px 0 6px;}
-  table{width:100%;border-collapse:collapse;margin-top:4px;}
-  th,td{text-align:left;padding:7px 8px;}
-  thead th{color:#667;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid #c9ced4;}
+  table{width:100%;border-collapse:collapse;margin-top:4px;font-size:9.5px;}
+  th,td{text-align:left;padding:4px 6px;}
+  thead th{color:#667;font-size:9px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1.5px solid #c9ced4;}
   tbody td{border-bottom:1px solid #eceef1;}
   tbody tr:nth-child(even){background:#f7f8fa;}
   .r{text-align:right;white-space:nowrap;}
-  .job{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  tfoot td{border-top:2px solid #c9ced4;font-weight:bold;padding-top:8px;}
+  .bcol{background:#fff4ec;font-weight:bold;}
+  thead th.bcol{background:#fde6d6;}
+  .job{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tfoot td{border-top:2px solid #c9ced4;font-weight:bold;padding-top:7px;}
   .cust{page-break-inside:avoid;page-break-before:always;margin-bottom:6px;}
   thead{display:table-header-group;}
   button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:26px;}
@@ -5436,14 +5478,14 @@ function CostsModal({ orders, onClose }) {
     <div><div class="lab">Orders</div><div class="big">${filtered.length}</div></div>
   </div>
   ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
-  <div class="sec-title">Summary by ${view === "hauler" ? "hauler" : "customer"}</div>
+  <div class="sec-title">Summary by ${view === "hauler" ? "hauler" : "customer"} — itemized</div>
   <table>
-    <thead><tr><th>${view === "hauler" ? "Hauler" : "Customer"}</th><th class="r">Orders</th><th class="r">Billed</th><th class="r">Fiber</th><th class="r">Base $/yd</th><th class="r">To hauler</th></tr></thead>
+    <thead><tr><th>${view === "hauler" ? "Hauler" : "Customer"}</th><th class="r">Orders</th><th class="r">Yards</th>${bdHead}</tr></thead>
     <tbody>${summaryRows}</tbody>
-    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${m(grand.billed)}</td><td class="r">${fiberCell(grand.fiber, grand.fiberLbs)}</td><td class="r">${groupBase(grand)}</td><td class="r">${m(grand.toHauler)}</td></tr></tfoot>
+    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${ydc(grand.yards)}</td>${totBd(grand)}</tr></tfoot>
   </table>
   ${sections}`}
-  <div class="muted" style="margin-top:10px;font-size:11px;">“Base $/yd” = your price-sheet rate per yard — concrete only, before sales tax, fees &amp; admixtures (the flat sheet rate; only blended when a customer’s orders span different rates). “Fiber” = Mac Matrix fiber used (lbs · $ charged), already included in “Billed”. “Billed” is the full amount the customer paid, including tax, fiber &amp; any fees. “To hauler” = delivery (mileage) cost + short-load + back-haul fees. Completed orders only.</div>
+  <div class="muted" style="margin-top:10px;font-size:11px;">Each order's <b>Billed</b> is broken into: <b>Concrete</b> (price-sheet rate × yards) + <b>Hauler fee</b> (mileage-bracket delivery × yards) + <b>Fiber</b> (lbs · $) + <b>Admix</b> (other admixtures) + <b>Short-load</b> + <b>Back-haul</b> + <b>Standby</b> + <b>Tax</b> — these add up to Billed. “Base $/yd” = the flat concrete price-sheet rate per yard (before haul/tax/fees). <b>Hauler fee</b> is the distance delivery charge, shown “—” for self-pickup customers and all-in negotiated prices (e.g. Landers). The <b>Total to hauler</b> figure at the top is what you pay the hauler (cost side). Completed orders only.</div>
   <div class="foot">
     <span class="co">Aussieblock Ready Mix</span>
     <span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span>
@@ -5782,13 +5824,39 @@ function CostsModal({ orders, onClose }) {
                                   <Drow label="Mix" val={o.mix} />
                                   <Drow label="Yards" val={r.yards != null ? `${r.yards} yd` : o.qty} />
                                   <Drow label="Base $/yd" val={r.unit != null ? `${money(r.unit)}/yd` : "—"} />
-                                  <Drow label="Fiber" val={r.fiberAmt ? `${r.fiberLbs ? r.fiberLbs + " lb · " : ""}${money(r.fiberAmt)}` : "—"} />
                                   <Drow label="On site" val={r.onsite && r.onsite.minutes ? `${fmtMins(r.onsite.minutes)}${r.onsite.trucks > 1 ? ` total · ${r.onsite.trucks} trucks` : ""}` : "—"} />
-                                  <Drow label={r.onsite && r.onsite.trucks > 1 ? "Standby (per truck)" : "Standby"} val={r.onsite && r.onsite.standby ? money(r.onsite.standby) : (r.onsite && r.onsite.minutes ? "$0 (under 1 hr)" : "—")} />
-                                  <Drow label="Billed" val={r.error ? "—" : money(r.billed)} />
-                                  <Drow label="To hauler (order)" val={money(r.toHauler)} />
-                                  {view === "hauler" && !selfPickup && <Drow label={`This hauler (${name})`} val={money(share)} />}
                                 </div>
+                                {/* Itemized cost breakdown — each line adds up to Billed, so a
+                                    figure that looks off can be traced to its component. */}
+                                {!r.error && (
+                                  <div className="rounded-lg px-2.5 py-2 mb-2" style={{ background: NAVY }}>
+                                    <div className="text-white/40 text-[10px] uppercase tracking-wide mb-1.5" style={{ fontFamily: C.body }}>Cost breakdown</div>
+                                    <div className="text-[11px]" style={{ fontFamily: C.body }}>
+                                      <Brow label={`Concrete${r.unit != null && Number(r.yards) > 0 ? ` (${money(r.unit)}/yd × ${r.yards} yd)` : ""}`} val={money(r.ext)} />
+                                      {r.billDelivery ? <Brow label={`Hauler fee${r.deliveryRate ? ` (${money(r.deliveryRate)}/yd${r.miles != null ? ` · ${r.miles} mi` : ""})` : ""}`} val={money(r.billDelivery)} /> : null}
+                                      {r.fiberAmt ? <Brow label={`Fiber${r.fiberLbs ? ` (${r.fiberLbs} lb)` : ""}`} val={money(r.fiberAmt)} /> : null}
+                                      {r.otherAdmix ? <Brow label="Other admixtures" val={money(r.otherAdmix)} /> : null}
+                                      {r.shortLoad ? <Brow label="Short-load fee" val={money(r.shortLoad)} /> : null}
+                                      {r.backhaul ? <Brow label="Back-haul fee" val={money(r.backhaul)} /> : null}
+                                      {r.standby ? <Brow label={r.onsite && r.onsite.trucks > 1 ? "Standby (per truck)" : "Standby"} val={money(r.standby)} /> : null}
+                                      <Brow label="Sales tax" val={money(r.tax)} />
+                                      <div className="flex justify-between gap-2 pt-1 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.12)" }}>
+                                        <span className="text-white font-bold">Billed total</span>
+                                        <span className="font-bold" style={{ color: ORANGE }}>{money(r.billed)}</span>
+                                      </div>
+                                      {r.invoiceAmt != null && Math.abs((r.invoiceAmt || 0) - (r.billed || 0)) >= 0.02 && (
+                                        <div className="flex justify-between gap-2 text-[10px] mt-0.5" style={{ color: WARN }}>
+                                          <span>QuickBooks invoice</span>
+                                          <span>{money(r.invoiceAmt)} (Δ {money((r.invoiceAmt || 0) - (r.billed || 0))})</span>
+                                        </div>
+                                      )}
+                                      <div className="mt-1 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                                        <Brow label="To hauler (delivery cost)" val={r.selfHaul ? "— self-pickup" : money(r.toHauler)} muted />
+                                        {view === "hauler" && !selfPickup && <Brow label={`This hauler (${name})`} val={money(share)} muted />}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                                 {inv ? (
                                   <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5" style={{ background: NAVY }}>
                                     <span className="text-[11px] min-w-0 truncate" style={{ fontFamily: C.body }}>
