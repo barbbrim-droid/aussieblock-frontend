@@ -884,3 +884,68 @@ export function assignTruck(ref, truck) {
 export function assignDriver(ref, driver) {
   return request(`/orders/${ref}/driver?driver=${encodeURIComponent(driver)}`, { method: 'POST' })
 }
+
+// ── Employee time clock ──
+// Office (finance) manages employees; the plant kiosk punches in/out.
+export function getEmployees() {
+  return request('/employees')
+}
+export function saveEmployee(emp) {
+  // emp = { name, pin, kind: 'plant'|'yard', active }
+  return request('/employees', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(emp),
+  })
+}
+export function deactivateEmployee(id) {
+  return request(`/employees/${id}`, { method: 'DELETE' })
+}
+
+// Kiosk punch. Own fetch (not `request`) so the structured error detail — which
+// carries bilingual message/message_es + distance — survives to the kiosk UI.
+// Returns the JSON on success; on failure throws an Error with `.info` = the
+// detail object ({ code, message, message_es, ... }).
+export async function timeclockPunch({ pin, lat, lng, lunch_minutes }) {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/timeclock/punch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ pin, lat, lng, lunch_minutes }),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : null
+  if (!res.ok) {
+    const info = (data && data.detail) || {}
+    const err = new Error((info && info.message) || 'Punch failed')
+    err.info = typeof info === 'object' ? info : { message: String(info) }
+    throw err
+  }
+  return data
+}
+
+export function getTimeEntries({ frm, to, employee_id } = {}) {
+  const p = new URLSearchParams()
+  if (frm) p.set('frm', frm)
+  if (to) p.set('to', to)
+  if (employee_id) p.set('employee_id', employee_id)
+  const qs = p.toString()
+  return request(`/timeclock/entries${qs ? `?${qs}` : ''}`)
+}
+export function addTimeEntry(body) {
+  return request('/timeclock/entries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+export function editTimeEntry(id, body) {
+  return request(`/timeclock/entries/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+export function deleteTimeEntry(id) {
+  return request(`/timeclock/entries/${id}`, { method: 'DELETE' })
+}

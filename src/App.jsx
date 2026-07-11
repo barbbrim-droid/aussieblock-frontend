@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -5151,6 +5151,401 @@ function PastOrdersModal({ orders, archived, trucks, onStatus, onAssign, onCance
 // and back-haul fees (those are billed to the customer but passed through to the
 // hauler, not kept by us). Groups it by customer with per-customer + grand totals,
 // filterable by a From/To date range, and "Export PDF" opens a clean printable sheet.
+// ── Employee time clock ──────────────────────────────────────────────────────
+// Bilingual (EN/ES) GPS-gated kiosk for the plant tablet, plus an office Time
+// Clock tab: weekly per-employee hours with CSV/print for payroll, employee
+// management, and missed-punch fixes.
+
+// tc* date helpers (Monday-start weeks, local dates)
+const tcAddDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const tcMonday = (d) => { const x = new Date(d); const wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); x.setHours(0, 0, 0, 0); return x; };
+const tcIso = (d) => { const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+const tcTime = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch { return "—"; } };
+const tcToInput = (iso) => { if (!iso) return ""; const d = new Date(iso); const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const tcFromInput = (v) => (v ? new Date(v).toISOString() : null);
+
+// Full-screen kiosk (plant tablet). Enter PIN → clock in / out. Captures GPS on
+// every punch; the backend refuses punches outside the yard geofence. On clock-out
+// it asks (EN/ES) about lunch: 30 / 60 min or worked through.
+function TimeClockKiosk({ onClose }) {
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState(null);       // confirmation / error
+  const [lunchFor, setLunchFor] = useState(null); // { pin, employee } awaiting lunch answer
+  const timer = useRef(null);
+
+  const getPos = () => new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("no-geo"));
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+  });
+  const flashFor = (obj, ms = 6000) => { setFlash(obj); clearTimeout(timer.current); timer.current = setTimeout(() => setFlash(null), ms); };
+
+  const punch = async (lunch_minutes) => {
+    const usePin = lunchFor ? lunchFor.pin : pin;
+    if (!usePin || usePin.length < 3) { flashFor({ err: true, message: "Enter your PIN", message_es: "Ingrese su PIN" }, 2500); return; }
+    setBusy(true);
+    let pos;
+    try { pos = await getPos(); }
+    catch { setBusy(false); flashFor({ err: true, message: "Turn on Location / GPS to punch.", message_es: "Active la ubicación / GPS para marcar." }); return; }
+    try {
+      const data = await timeclockPunch({ pin: usePin, lat: pos.lat, lng: pos.lng, lunch_minutes });
+      if (data.action === "out_pending") { setLunchFor({ pin: usePin, employee: data.employee }); setBusy(false); return; }
+      setLunchFor(null); setPin("");
+      flashFor({ ok: true, ...data });
+    } catch (e) {
+      const info = e.info || {};
+      setLunchFor(null); setPin("");
+      flashFor({ err: true, message: info.message || e.message, message_es: info.message_es });
+    } finally { setBusy(false); }
+  };
+
+  const key = (d) => setPin((p) => (p + d).slice(0, 8));
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col" style={{ background: NAVY_DEEP }}>
+      <div className="flex items-center justify-between px-5 py-3" style={{ background: ORANGE }}>
+        <div className="flex items-center gap-2"><Clock size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-xl font-bold">Time Clock · Reloj</span></div>
+        <button onClick={onClose} className="text-sm font-bold px-3 py-1.5 rounded-lg active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}>Exit · Salir</button>
+      </div>
+      <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+        {flash ? (
+          <div className="text-center max-w-md">
+            {flash.ok ? (
+              <>
+                <div className="mx-auto mb-3 rounded-full flex items-center justify-center" style={{ width: 76, height: 76, background: (flash.action === "in" ? GREEN : ORANGE) + "22" }}>
+                  <Clock size={38} color={flash.action === "in" ? GREEN : ORANGE} />
+                </div>
+                <div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold">{flash.employee}</div>
+                <div className="text-2xl font-bold mt-1" style={{ color: flash.action === "in" ? GREEN : ORANGE }}>
+                  {flash.action === "in" ? "Clocked IN · Entrada" : "Clocked OUT · Salida"}
+                </div>
+                <div className="text-white/60 mt-1">{tcTime(flash.at)}{flash.action === "out" && flash.hours != null ? ` · ${flash.hours} hrs` : ""}</div>
+                {flash.action === "out" && flash.worked_through_lunch && <div className="mt-2 text-sm font-semibold" style={{ color: WARN }}>Worked through lunch · Trabajó sin almuerzo</div>}
+                {flash.action === "out" && flash.lunch_minutes > 0 && <div className="mt-2 text-sm text-white/50">Lunch · Almuerzo: {flash.lunch_minutes} min</div>}
+                <button onClick={() => setFlash(null)} className="mt-5 px-8 py-2.5 rounded-xl font-bold active:scale-95" style={{ background: ORANGE, color: NAVY_DEEP }}>OK</button>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto mb-3 rounded-full flex items-center justify-center" style={{ width: 76, height: 76, background: "#ef535022" }}><X size={40} color="#ff6b66" /></div>
+                <div className="text-white text-xl font-bold">{flash.message}</div>
+                {flash.message_es && <div className="text-white/60 text-lg mt-1">{flash.message_es}</div>}
+                <button onClick={() => setFlash(null)} className="mt-5 px-8 py-2.5 rounded-xl font-bold active:scale-95" style={{ background: ORANGE, color: NAVY_DEEP }}>OK</button>
+              </>
+            )}
+          </div>
+        ) : lunchFor ? (
+          <div className="text-center max-w-md w-full px-4">
+            <div style={{ fontFamily: C.cond }} className="text-white text-2xl font-bold">{lunchFor.employee}</div>
+            <div className="text-white text-xl font-bold mt-4">Did you take a lunch today?</div>
+            <div className="text-white/60 text-lg">¿Tomó almuerzo hoy?</div>
+            <div className="grid gap-3 mt-6">
+              <button disabled={busy} onClick={() => punch(30)} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>30 min</button>
+              <button disabled={busy} onClick={() => punch(60)} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>60 min · 1 hr</button>
+              <button disabled={busy} onClick={() => punch(0)} className="py-4 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: WARN + "22", color: WARN, border: `1px solid ${WARN}66` }}>Worked through · Sin almuerzo</button>
+            </div>
+            {busy && <div className="text-white/50 mt-4 flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> …</div>}
+          </div>
+        ) : (
+          <div className="w-full max-w-xs text-center">
+            <div className="text-white/70 text-lg font-semibold">Enter your PIN</div>
+            <div className="text-white/40 mb-1">Ingrese su PIN</div>
+            <div className="my-3 h-14 rounded-2xl flex items-center justify-center text-3xl tracking-[0.3em] font-bold text-white" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>
+              {pin ? "•".repeat(pin.length) : <span className="text-white/25 text-lg tracking-normal">— — — —</span>}
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                <button key={n} disabled={busy} onClick={() => key(String(n))} className="py-4 rounded-2xl text-2xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>{n}</button>
+              ))}
+              <button disabled={busy} onClick={() => setPin((p) => p.slice(0, -1))} className="py-4 rounded-2xl text-lg font-bold text-white/70 active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>⌫</button>
+              <button disabled={busy} onClick={() => key("0")} className="py-4 rounded-2xl text-2xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>0</button>
+              <button disabled={busy || pin.length < 3} onClick={() => punch(undefined)} className="py-4 rounded-2xl font-bold active:scale-90 disabled:opacity-40 flex items-center justify-center" style={{ background: GREEN, color: NAVY_DEEP }} title="Clock in / out">{busy ? <Loader2 size={22} className="animate-spin" /> : <Check size={24} />}</button>
+            </div>
+            <div className="text-white/40 text-xs mt-4 leading-relaxed">Tap your PIN, then the green check to clock in or out.<br />Marque su PIN y toque el círculo verde.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Office Time Clock tab: weekly per-employee hours (CSV + print for payroll),
+// employee roster management, and missed-punch fixes. Launches the kiosk too.
+function TimeClockModal({ onClose }) {
+  const [tab, setTab] = useState("sheet");     // "sheet" | "employees"
+  const [kiosk, setKiosk] = useState(false);
+  const [weekStart, setWeekStart] = useState(() => tcMonday(new Date()));
+  const [entries, setEntries] = useState([]);
+  const [emps, setEmps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [expanded, setExpanded] = useState(null);   // employee id expanded
+  const [editShift, setEditShift] = useState(null); // { id?, employee_id, clock_in, clock_out, lunch_minutes, note }
+  const [savingShift, setSavingShift] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [empForm, setEmpForm] = useState({ name: "", pin: "", kind: "yard", active: true });
+  const [savingEmp, setSavingEmp] = useState(false);
+
+  const days = Array.from({ length: 7 }, (_, i) => tcAddDays(weekStart, i));
+  const weekEnd = days[6];
+  const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  useEffect(() => {
+    let live = true; setLoading(true);
+    const frm = tcIso(tcAddDays(weekStart, -1)), to = tcIso(tcAddDays(weekEnd, 1));   // pad for tz roll
+    Promise.all([getTimeEntries({ frm, to }), getEmployees()])
+      .then(([es, em]) => { if (live) { setEntries(es || []); setEmps(em || []); setErr(""); } })
+      .catch((e) => { if (live) setErr(e.message); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [weekStart, reload]);
+
+  const inWeek = (iso) => { const k = tcIso(new Date(iso)); return k >= tcIso(weekStart) && k <= tcIso(weekEnd); };
+
+  const byEmp = {};
+  entries.forEach((en) => {
+    if (!en.clock_in || !inWeek(en.clock_in)) return;
+    const g = byEmp[en.employee_id] || (byEmp[en.employee_id] = { name: en.employee, kind: en.kind, days: {}, total: 0, hasOpen: false, hasWT: false });
+    const dk = tcIso(new Date(en.clock_in));
+    const d = g.days[dk] || (g.days[dk] = { hours: 0, open: false, wt: false, entries: [] });
+    d.entries.push(en);
+    if (en.hours != null) { d.hours += en.hours; g.total += en.hours; }
+    if (en.open) { d.open = true; g.hasOpen = true; }
+    if (en.worked_through_lunch) { d.wt = true; g.hasWT = true; }
+  });
+  emps.filter((e) => e.active).forEach((e) => { if (!byEmp[e.id]) byEmp[e.id] = { name: e.name, kind: e.kind, days: {}, total: 0, hasOpen: false, hasWT: false }; });
+  const empRows = Object.entries(byEmp).map(([id, g]) => ({ id: Number(id), ...g })).sort((a, b) => a.name.localeCompare(b.name));
+  const grand = empRows.reduce((s, r) => s + r.total, 0);
+
+  const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+  const cellVal = (r, d) => { const c = r.days[tcIso(d)]; if (!c) return ""; if (c.hours) return c.hours.toFixed(2); return c.open ? "open" : ""; };
+
+  const downloadCsv = () => {
+    const hdr = ["Employee", ...days.map((d, i) => `${dow[i]} ${d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}`), "Total hrs", "Notes"];
+    const rows = empRows.map((r) => {
+      const cells = days.map((d) => { const c = r.days[tcIso(d)]; return c && c.hours ? c.hours.toFixed(2) : (c && c.open ? "OPEN" : ""); });
+      const notes = [];
+      if (r.hasOpen) notes.push("has open shift — not clocked out");
+      if (r.hasWT) notes.push("worked through lunch");
+      return [r.name, ...cells, r.total.toFixed(2), notes.join("; ")];
+    });
+    rows.push(["TOTAL", ...days.map(() => ""), grand.toFixed(2), ""]);
+    const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [hdr, ...rows].map((row) => row.map(esc).join(",")).join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `timesheet_${tcIso(weekStart)}_to_${tcIso(weekEnd)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+
+  const printSheet = () => {
+    const w = window.open("", "_blank");
+    if (!w) { setErr("Allow pop-ups to print."); return; }
+    const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const head = `<tr><th>Employee</th>${days.map((d, i) => `<th class="r">${dow[i]}<br>${d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}</th>`).join("")}<th class="r">Total</th></tr>`;
+    const body = empRows.map((r) => {
+      const cells = days.map((d) => { const c = r.days[tcIso(d)]; return `<td class="r">${c && c.hours ? c.hours.toFixed(2) : (c && c.open ? '<span class="open">open</span>' : "")}</td>`; }).join("");
+      const note = r.hasWT ? ' <span class="wt">*worked through lunch</span>' : "";
+      return `<tr><td>${esc(r.name)}${note}</td>${cells}<td class="r b">${r.total.toFixed(2)}</td></tr>`;
+    }).join("");
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Timesheet ${esc(weekLabel)}</title><style>
+      body{font-family:Arial,sans-serif;color:#161d27;margin:26px;font-size:13px;}
+      .brand{display:flex;align-items:center;gap:14px;border-bottom:3px solid #e7732a;padding-bottom:12px;margin-bottom:6px;}
+      .brand-name{font-size:20px;font-weight:bold;letter-spacing:.05em;} .brand-sub{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#e7732a;font-weight:bold;}
+      h2{font-size:15px;margin:14px 0 8px;} table{width:100%;border-collapse:collapse;margin-top:6px;} th,td{padding:7px 9px;text-align:left;border-bottom:1px solid #e6e8eb;}
+      thead th{background:#f6f7f9;font-size:11px;text-transform:uppercase;color:#667;} .r{text-align:right;} .b{font-weight:bold;} tfoot td{border-top:2px solid #c9ced4;font-weight:bold;}
+      .open{color:#c47f17;font-weight:bold;} .wt{color:#c0392b;font-size:10px;} .muted{color:#667;font-size:11px;margin-top:10px;}
+      button{background:#e7732a;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:20px;} @media print{button{display:none;}body{margin:0;}}
+    </style></head><body>
+      <div class="brand"><div><div class="brand-name">AUSSIEBLOCK READY MIX</div><div class="brand-sub">Weekly Timesheet</div></div><div style="margin-left:auto;text-align:right;font-size:12px;color:#667;">${esc(weekLabel)}</div></div>
+      <table><thead>${head}</thead><tbody>${body || `<tr><td colspan="9" class="muted">No hours this week.</td></tr>`}</tbody>
+      <tfoot><tr><td>TOTAL</td>${days.map(() => "<td></td>").join("")}<td class="r">${grand.toFixed(2)}</td></tr></tfoot></table>
+      <div class="muted">Hours = clock-out − clock-in − lunch. “open” = still clocked in (fix before sending). * worked through lunch (no deduction).</div>
+      <button onclick="window.print()">Print / Save PDF</button><button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
+    </body></html>`);
+    w.document.close();
+  };
+
+  const submitEmp = async () => {
+    if (!empForm.name.trim() || !empForm.pin.trim()) { setErr("Name and PIN are required."); return; }
+    setSavingEmp(true); setErr("");
+    try { await saveEmployee(empForm); setEmpForm({ name: "", pin: "", kind: "yard", active: true }); setReload((k) => k + 1); }
+    catch (e) { setErr(e.message); } finally { setSavingEmp(false); }
+  };
+  const removeEmp = async (e) => {
+    if (!window.confirm(`Deactivate ${e.name}? Their past hours stay on record; they'll be hidden from the kiosk.`)) return;
+    try { await deactivateEmployee(e.id); setReload((k) => k + 1); } catch (er) { setErr(er.message); }
+  };
+  const saveShift = async () => {
+    if (!editShift.clock_in) { setErr("Clock-in time is required."); return; }
+    setSavingShift(true); setErr("");
+    const body = { employee_id: editShift.employee_id, clock_in: tcFromInput(editShift.clock_in), clock_out: tcFromInput(editShift.clock_out), lunch_minutes: editShift.lunch_minutes, note: editShift.note || "" };
+    try {
+      if (editShift.id) await editTimeEntry(editShift.id, body); else await addTimeEntry(body);
+      setEditShift(null); setReload((k) => k + 1);
+    } catch (e) { setErr(e.message); } finally { setSavingShift(false); }
+  };
+  const removeShift = async (id) => { if (!window.confirm("Delete this shift?")) return; try { await deleteTimeEntry(id); setEditShift(null); setReload((k) => k + 1); } catch (e) { setErr(e.message); } };
+
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full max-w-3xl rounded-2xl overflow-hidden max-h-[94vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Clock size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Time Clock</span></div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setKiosk(true)} className="text-sm font-bold px-3 py-1.5 rounded-lg active:scale-95 flex items-center gap-1.5" style={{ background: NAVY_DEEP, color: ORANGE }}><Clock size={14} /> Open kiosk</button>
+            <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+          </div>
+        </div>
+
+        <div className="px-4 pt-3 shrink-0">
+          <div className="flex items-center gap-1.5 mb-2">
+            <button onClick={() => setTab("sheet")} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full active:scale-95" style={{ background: tab === "sheet" ? ORANGE + "22" : NAVY, color: tab === "sheet" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${tab === "sheet" ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}><CalendarDays size={12} /> Timesheets</button>
+            <button onClick={() => setTab("employees")} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full active:scale-95" style={{ background: tab === "employees" ? ORANGE + "22" : NAVY, color: tab === "employees" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${tab === "employees" ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}><User size={12} /> Employees</button>
+          </div>
+          {err && <div className="rounded-lg px-2.5 py-1.5 text-xs mb-2" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)", color: "#ff8a85", fontFamily: C.body }}>{err}</div>}
+        </div>
+
+        <div className="p-4 pt-1 overflow-y-auto" style={{ fontFamily: C.body }}>
+          {tab === "sheet" ? (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => setWeekStart((w) => tcAddDays(w, -7))} className="p-1.5 rounded-lg active:scale-90" style={{ background: NAVY }}><ChevronLeft size={16} color="#fff" /></button>
+                <div className="text-center flex-1"><div style={{ fontFamily: C.cond }} className="text-white text-lg font-bold">{weekLabel}</div><div className="text-white/40 text-[11px]">Week of Monday</div></div>
+                <button onClick={() => setWeekStart((w) => tcAddDays(w, 7))} className="p-1.5 rounded-lg active:scale-90" style={{ background: NAVY }}><ChevronRight size={16} color="#fff" /></button>
+                <button onClick={() => setWeekStart(tcMonday(new Date()))} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg active:scale-95" style={{ background: NAVY, color: ORANGE }}>This week</button>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={downloadCsv} disabled={loading} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 disabled:opacity-40" style={{ background: GREEN, color: NAVY_DEEP }}><Download size={15} /> Download week (CSV)</button>
+                <button onClick={printSheet} disabled={loading} className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP }}><FileText size={15} /> Print</button>
+              </div>
+              {loading ? (
+                <div className="text-white/45 text-sm py-8 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Loading hours…</div>
+              ) : empRows.length === 0 ? (
+                <div className="text-white/40 text-sm py-8 text-center">No employees yet — add them in the Employees tab.</div>
+              ) : (
+                <>
+                  {/* grid header */}
+                  <div className="grid gap-1 text-[10px] text-white/40 uppercase tracking-wide mb-1" style={{ gridTemplateColumns: "1.4fr repeat(7, 1fr) 0.9fr" }}>
+                    <div>Employee</div>{dow.map((d, i) => <div key={d} className="text-center">{d}<br /><span className="text-white/25">{days[i].getDate()}</span></div>)}<div className="text-right">Total</div>
+                  </div>
+                  {empRows.map((r) => (
+                    <div key={r.id} className="mb-1">
+                      <button onClick={() => setExpanded(expanded === r.id ? null : r.id)} className="w-full grid gap-1 items-center rounded-lg px-2 py-2 active:scale-[0.99]" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.07)", gridTemplateColumns: "1.4fr repeat(7, 1fr) 0.9fr" }}>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{r.name}</span>
+                          {r.hasOpen && <span title="Open shift" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: WARN }} />}
+                        </div>
+                        {days.map((d, i) => {
+                          const c = r.days[tcIso(d)];
+                          return <div key={i} className="text-center text-xs" style={{ color: c && c.open ? WARN : c && c.wt ? "#ffd28a" : "rgba(255,255,255,0.8)" }}>{cellVal(r, d) || <span className="text-white/15">·</span>}</div>;
+                        })}
+                        <div className="text-right text-sm font-bold" style={{ color: ORANGE }}>{r.total ? r.total.toFixed(2) : "—"}</div>
+                      </button>
+                      {expanded === r.id && (
+                        <div className="mt-1 mb-2 rounded-lg px-2.5 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          {(r.hasWT || r.hasOpen) && (
+                            <div className="text-[11px] mb-1.5" style={{ color: WARN }}>{r.hasOpen ? "Has an open shift — clock them out or fix it below. " : ""}{r.hasWT ? "Worked through lunch on a day (no lunch deducted)." : ""}</div>
+                          )}
+                          {Object.keys(r.days).sort().map((dk) => (
+                            <div key={dk} className="mb-1.5">
+                              <div className="text-white/45 text-[10px] uppercase tracking-wide">{new Date(dk + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                              {r.days[dk].entries.map((en) => (
+                                <div key={en.id} className="flex items-center justify-between gap-2 py-0.5">
+                                  <span className="text-white/80 text-xs">
+                                    {tcTime(en.clock_in)} → {en.clock_out ? tcTime(en.clock_out) : <span style={{ color: WARN }}>open</span>}
+                                    <span className="text-white/40"> · {en.open ? "—" : `${en.hours?.toFixed(2)} h`}{en.clock_out ? ` · lunch ${en.worked_through_lunch ? "0 (worked through)" : en.lunch_minutes + "m"}` : ""}</span>
+                                  </span>
+                                  <button onClick={() => setEditShift({ id: en.id, employee_id: r.id, clock_in: tcToInput(en.clock_in), clock_out: tcToInput(en.clock_out), lunch_minutes: en.lunch_minutes ?? 30, note: en.note || "" })} className="text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95 shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "#cfe0ff" }}><Pencil size={11} /></button>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                          <button onClick={() => setEditShift({ employee_id: r.id, clock_in: tcToInput(new Date(days[0].getTime() + 7 * 3600e3).toISOString()), clock_out: "", lunch_minutes: 30, note: "" })} className="mt-1 flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md active:scale-95" style={{ background: ORANGE + "22", color: ORANGE }}><Plus size={12} /> Add a shift (missed punch)</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between mt-3 pt-2 px-2" style={{ borderTop: "2px solid rgba(255,255,255,0.12)" }}>
+                    <span className="text-white/50 text-xs uppercase tracking-wide">Week total</span>
+                    <span className="text-lg font-bold" style={{ color: ORANGE, fontFamily: C.cond }}>{grand.toFixed(2)} hrs</span>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Employees tab */}
+              <div className="rounded-xl px-3 py-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="text-white/50 text-[11px] uppercase tracking-wide mb-2">Add / edit employee</div>
+                <div className="flex flex-wrap gap-2">
+                  <input value={empForm.name} onChange={(e) => setEmpForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" className="flex-1 min-w-[120px] rounded-lg px-2.5 py-1.5 text-sm outline-none" style={inSt} />
+                  <input value={empForm.pin} onChange={(e) => setEmpForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, "").slice(0, 8) }))} inputMode="numeric" placeholder="PIN (3–8 digits)" className="w-32 rounded-lg px-2.5 py-1.5 text-sm outline-none" style={inSt} />
+                  <select value={empForm.kind} onChange={(e) => setEmpForm((f) => ({ ...f, kind: e.target.value }))} className="rounded-lg px-2.5 py-1.5 text-sm outline-none" style={inSt}>
+                    <option value="yard">Yard</option><option value="plant">Plant operator</option>
+                  </select>
+                  <button onClick={submitEmp} disabled={savingEmp} className="rounded-lg px-3 py-1.5 text-sm font-bold active:scale-95 disabled:opacity-50 flex items-center gap-1" style={{ background: ORANGE, color: NAVY_DEEP }}>{savingEmp ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save</button>
+                </div>
+                <div className="text-white/35 text-[11px] mt-1.5">Enter the same name to edit an existing employee (change PIN or type). PINs must be unique.</div>
+              </div>
+              {loading ? (
+                <div className="text-white/45 text-sm py-8 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+              ) : emps.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center">No employees yet.</div>
+              ) : emps.map((e) => (
+                <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 mb-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.06)", opacity: e.active ? 1 : 0.5 }}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{e.name}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase" style={{ background: e.kind === "plant" ? "#6aa9ff22" : ORANGE + "22", color: e.kind === "plant" ? "#8fc0ff" : ORANGE }}>{e.kind}</span>
+                      {e.clocked_in && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>● IN</span>}
+                      {!e.active && <span className="text-[10px] text-white/40">inactive</span>}
+                    </div>
+                    <div className="text-white/40 text-[11px]">PIN {e.pin}{e.since ? ` · since ${tcTime(e.since)}` : ""}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => { setEmpForm({ name: e.name, pin: e.pin, kind: e.kind, active: true }); }} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(255,255,255,0.06)" }} title="Load to edit"><Pencil size={13} color="#cfe0ff" /></button>
+                    {e.active && <button onClick={() => removeEmp(e)} className="p-1.5 rounded-lg active:scale-90" style={{ background: "rgba(239,83,80,0.12)" }} title="Deactivate"><Trash2 size={13} color="#ff8a85" /></button>}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Shift editor */}
+      {editShift && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setEditShift(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-4" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="text-white font-bold mb-3" style={{ fontFamily: C.cond }}>{editShift.id ? "Edit shift" : "Add shift (missed punch)"}</div>
+            <label className="text-white/50 text-[11px]">Clock in</label>
+            <input type="datetime-local" value={editShift.clock_in} onChange={(e) => setEditShift((s) => ({ ...s, clock_in: e.target.value }))} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none mb-2 mt-0.5" style={inSt} />
+            <label className="text-white/50 text-[11px]">Clock out <span className="text-white/30">(blank = still open)</span></label>
+            <input type="datetime-local" value={editShift.clock_out} onChange={(e) => setEditShift((s) => ({ ...s, clock_out: e.target.value }))} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none mb-2 mt-0.5" style={inSt} />
+            <label className="text-white/50 text-[11px]">Lunch</label>
+            <select value={editShift.lunch_minutes ?? 30} onChange={(e) => setEditShift((s) => ({ ...s, lunch_minutes: Number(e.target.value) }))} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none mb-3 mt-0.5" style={inSt}>
+              <option value={30}>30 min</option><option value={60}>60 min</option><option value={0}>0 — worked through</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <button onClick={saveShift} disabled={savingShift} className="flex-1 rounded-lg px-3 py-2 text-sm font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1" style={{ background: ORANGE, color: NAVY_DEEP }}>{savingShift ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save</button>
+              {editShift.id && <button onClick={() => removeShift(editShift.id)} className="rounded-lg px-3 py-2 text-sm font-bold active:scale-95" style={{ background: "rgba(239,83,80,0.14)", color: "#ff8a85" }}><Trash2 size={14} /></button>}
+              <button onClick={() => setEditShift(null)} className="rounded-lg px-3 py-2 text-sm text-white/60 active:scale-95" style={{ background: "rgba(255,255,255,0.06)" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {kiosk && <TimeClockKiosk onClose={() => { setKiosk(false); setReload((k) => k + 1); }} />}
+    </div>
+  );
+}
+
+
 function CostsModal({ orders, onClose }) {
   const [px, setPx] = useState({});        // ref -> { billed, toHauler, yards, error }
   const [loading, setLoading] = useState(true);
@@ -6427,6 +6822,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showPrices, setShowPrices] = useState(false);   // "Price sheet" modal
   const [showStaff, setShowStaff] = useState(false);   // "Workers & staff" modal
   const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
+  const [showTimeclock, setShowTimeclock] = useState(false);   // employee time clock modal
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
@@ -6676,6 +7072,7 @@ function DispatchApp({ email, role, onLogout }) {
       )}
       {showStaff && <ManageStaffModal onClose={() => { setShowStaff(false); refresh(); }} />}
       {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
+      {showTimeclock && <TimeClockModal onClose={() => setShowTimeclock(false)} />}
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
       {showPlant && <PlantChecklistModal onClose={() => setShowPlant(false)} />}
       {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
@@ -6762,6 +7159,11 @@ function DispatchApp({ email, role, onLogout }) {
               {canFinance && (
                 <button onClick={() => setShowCosts(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                   <ClipboardList size={16} color={ORANGE} /> Costs
+                </button>
+              )}
+              {canFinance && (
+                <button onClick={() => setShowTimeclock(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                  <Clock size={16} color={ORANGE} /> Time clock
                 </button>
               )}
               {canFinance && (
