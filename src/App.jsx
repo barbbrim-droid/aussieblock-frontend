@@ -5167,7 +5167,7 @@ const tcFromInput = (v) => (v ? new Date(v).toISOString() : null);
 // Full-screen kiosk (plant tablet). Enter PIN → clock in / out. Captures GPS on
 // every punch; the backend refuses punches outside the yard geofence. On clock-out
 // it asks (EN/ES) about lunch: 30 / 60 min or worked through.
-function TimeClockKiosk({ onClose }) {
+function TimeClockKiosk({ onClose, standalone }) {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState(null);       // confirmation / error
@@ -5207,7 +5207,7 @@ function TimeClockKiosk({ onClose }) {
     <div className="fixed inset-0 z-[70] flex flex-col" style={{ background: NAVY_DEEP }}>
       <div className="flex items-center justify-between px-5 py-3" style={{ background: ORANGE }}>
         <div className="flex items-center gap-2"><Clock size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-xl font-bold">Time Clock · Reloj</span></div>
-        <button onClick={onClose} className="text-sm font-bold px-3 py-1.5 rounded-lg active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}>Exit · Salir</button>
+        <button onClick={() => { if (!standalone || window.confirm("Sign this tablet out of the time clock?\n¿Cerrar sesión del reloj en esta tableta?")) onClose(); }} className="text-sm font-bold px-3 py-1.5 rounded-lg active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}>{standalone ? "Sign out" : "Exit · Salir"}</button>
       </div>
       <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
         {flash ? (
@@ -5286,6 +5286,17 @@ function TimeClockModal({ onClose }) {
   const [reload, setReload] = useState(0);
   const [empForm, setEmpForm] = useState({ name: "", pin: "", kind: "yard", active: true });
   const [savingEmp, setSavingEmp] = useState(false);
+  const KIOSK_EMAIL = "kiosk@aussieblock.com";
+  const [kioskPw, setKioskPw] = useState("");
+  const [kioskMsg, setKioskMsg] = useState("");
+  const [savingKiosk, setSavingKiosk] = useState(false);
+
+  const setupKiosk = async () => {
+    if ((kioskPw || "").length < 6) { setKioskMsg("Password must be at least 6 characters."); return; }
+    setSavingKiosk(true); setKioskMsg("");
+    try { await createStaff(KIOSK_EMAIL, kioskPw, "kiosk"); setKioskMsg(`Saved. Sign the tablet in with ${KIOSK_EMAIL} and this password — it opens straight to the clock.`); setKioskPw(""); }
+    catch (e) { setKioskMsg(e.message); } finally { setSavingKiosk(false); }
+  };
 
   const days = Array.from({ length: 7 }, (_, i) => tcAddDays(weekStart, i));
   const weekEnd = days[6];
@@ -5479,6 +5490,17 @@ function TimeClockModal({ onClose }) {
             </>
           ) : (
             <>
+              {/* Kiosk device login — a locked-down login for the plant tablet that
+                  opens straight to the punch pad (no board access). */}
+              <div className="rounded-xl px-3 py-3 mb-3" style={{ background: "#6aa9ff10", border: "1px solid #6aa9ff44" }}>
+                <div className="flex items-center gap-1.5 mb-1.5"><Clock size={13} style={{ color: "#8fc0ff" }} /><span className="text-[11px] uppercase tracking-wide" style={{ color: "#8fc0ff" }}>Kiosk device login (plant tablet)</span></div>
+                <div className="text-white/45 text-[11px] mb-2">Sign the plant tablet in with this login and it opens straight to the time clock — it can't reach the dashboard or billing. Set a password here, then log in on the tablet as <span className="text-white/70 font-semibold">{KIOSK_EMAIL}</span>.</div>
+                <div className="flex flex-wrap gap-2">
+                  <input value={kioskPw} onChange={(e) => setKioskPw(e.target.value)} type="text" placeholder="Set kiosk password (6+ chars)" className="flex-1 min-w-[160px] rounded-lg px-2.5 py-1.5 text-sm outline-none" style={inSt} />
+                  <button onClick={setupKiosk} disabled={savingKiosk} className="rounded-lg px-3 py-1.5 text-sm font-bold active:scale-95 disabled:opacity-50 flex items-center gap-1" style={{ background: "#6aa9ff", color: NAVY_DEEP }}>{savingKiosk ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Set login</button>
+                </div>
+                {kioskMsg && <div className="text-[11px] mt-1.5" style={{ color: kioskMsg.startsWith("Saved") ? GREEN : "#ff8a85" }}>{kioskMsg}</div>}
+              </div>
               {/* Employees tab */}
               <div className="rounded-xl px-3 py-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <div className="text-white/50 text-[11px] uppercase tracking-wide mb-2">Add / edit employee</div>
@@ -8200,6 +8222,7 @@ export default function App() {
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
   if (me.role === "staff") return <DispatchApp email={me.email} role={me.role} onLogout={handleLogout} />;   // the dispatch board is the operator's only
+  if (me.role === "kiosk") return <TimeClockKiosk standalone onClose={handleLogout} />;   // dedicated plant time-clock tablet — punch pad only, never the board
   if (me.role === "driver") return <DriverApp driver={me.company || me.email} onLogout={handleLogout} />;   // truck tablet
   if (loading) return <Splash label="Loading your orders…" />;
 
