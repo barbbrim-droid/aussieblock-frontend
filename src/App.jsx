@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu } from "lucide-react";
 import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
@@ -6901,6 +6901,8 @@ function DispatchApp({ email, role, onLogout }) {
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
   const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
+  const [mobileTab, setMobileTab] = useState("today");   // phone widths: which board panel fills the screen
+  const [showMore, setShowMore] = useState(false);   // phone widths: overflow menu for admin-only actions
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
@@ -7121,6 +7123,32 @@ function DispatchApp({ email, role, onLogout }) {
     .filter((o) => o.site)
     .map((o) => ({ ref: o.ref, site: o.site, label: o.customer || o.ref }));
 
+  // Admin-ish actions: a row of buttons on desktop, collapsed into a "More" menu
+  // on phone widths so the header doesn't wrap into a wall of buttons.
+  const secondaryActions = [
+    canFinance && { key: "customers", label: "Customers", icon: KeyRound, onClick: () => setShowLogins(true) },
+    canFinance && { key: "prices", label: "Price sheet", icon: Calculator, onClick: () => setShowPrices(true) },
+    canFinance && { key: "costs", label: "Costs", icon: ClipboardList, onClick: () => setShowCosts(true) },
+    canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
+    canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
+    canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
+    { key: "plant", label: "Plant check", icon: ClipboardCheck, onClick: () => setShowPlant(true) },
+    { key: "docs", label: "Knowledge", icon: BookOpen, onClick: () => setShowDocs(true) },
+    { key: "cal", label: "Calendar", icon: CalendarDays, onClick: () => setShowCal(true) },
+    { key: "past", label: "Past orders", icon: Inbox, onClick: () => setShowPast(true) },
+    { key: "trucks", label: "Trucks", icon: Truck, onClick: () => setShowTrucks(true) },
+    { key: "fuel", label: "Fuel", icon: Droplets, onClick: () => setShowFuel(true) },
+    { key: "mixer", label: "Mixer", icon: Activity, onClick: () => setShowMixer(true) },
+    { key: "testsound", label: "Test alert sound", icon: Bell, onClick: () => { unlockAudio(); orderChime(); } },
+  ].filter(Boolean);
+
+  const mobileTabs = [
+    { key: "map", label: "Map & trucks", icon: Truck, count: trucks.length },
+    { key: "pours", label: "Pours", icon: Droplets, count: currentPours.length },
+    { key: "today", label: "Today", icon: Package, count: todayOrders.length },
+    { key: "upcoming", label: "Upcoming", icon: CalendarPlus, count: upcomingOrders.length },
+  ];
+
   if (loading) return <Splash label="Loading dispatch…" />;
 
   return (
@@ -7206,7 +7234,7 @@ function DispatchApp({ email, role, onLogout }) {
             </div>
           )}
           {/* title + actions (weather centered between them) */}
-          <div className="flex items-center justify-between shrink-0 gap-2">
+          <div className="flex items-center justify-between shrink-0 gap-2 flex-wrap">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
               <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight">Dispatch board</h1>
               <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><Package size={17} color={ORANGE} /><span className="text-white/55">Today</span><span className="text-white font-bold">{todayOrders.length}</span></span>
@@ -7220,70 +7248,42 @@ function DispatchApp({ email, role, onLogout }) {
                   <Download size={16} /> Install app
                 </button>
               )}
-              {canFinance && (
-                <button onClick={() => setShowLogins(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                  <KeyRound size={16} color={ORANGE} /> Customers
-                </button>
-              )}
-              {canFinance && (
-                <button onClick={() => setShowPrices(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                  <Calculator size={16} color={ORANGE} /> Price sheet
-                </button>
-              )}
-              {canFinance && (
-                <button onClick={() => setShowCosts(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                  <ClipboardList size={16} color={ORANGE} /> Costs
-                </button>
-              )}
-              {canFinance && (
-                <button onClick={() => setShowTimeclock(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                  <Clock size={16} color={ORANGE} /> Time clock
-                </button>
-              )}
-              {canFinance && (
-                <button onClick={() => setShowStaff(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                  <User size={16} color={ORANGE} /> Workers
-                </button>
-              )}
-              {canFinance && (
-                <button onClick={() => setShowMaterials(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                  <Layers size={16} color={ORANGE} /> Materials
-                </button>
-              )}
-              <button onClick={() => setShowPlant(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <ClipboardCheck size={16} color={ORANGE} /> Plant check
-              </button>
+              {/* admin-ish actions: a row on desktop, folded into "More" on phone widths */}
+              <div className="hidden lg:flex items-center gap-2 flex-wrap">
+                {secondaryActions.map(({ key, label, icon: Icon, onClick }) => (
+                  <button key={key} onClick={onClick} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
+                    <Icon size={16} color={ORANGE} /> {label}
+                  </button>
+                ))}
+              </div>
               <button onClick={() => setShowMessages(true)} className="relative flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <MessageSquare size={16} color={ORANGE} /> Messages
                 {msgUnread > 0 && <span className="absolute -top-1.5 -right-1.5 text-[11px] font-bold rounded-full px-1.5 py-0.5 leading-none flex items-center justify-center min-w-[18px]" style={{ background: "#ef5350", color: "#fff" }}>{msgUnread}</span>}
               </button>
-              <button onClick={() => setShowDocs(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <BookOpen size={16} color={ORANGE} /> Knowledge
-              </button>
-              <button onClick={() => setShowCal(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <CalendarDays size={16} color={ORANGE} /> Calendar
-              </button>
-              <button onClick={() => setShowPast(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <Inbox size={16} color={ORANGE} /> Past orders
-              </button>
-              <button onClick={() => setShowTrucks(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <Truck size={16} color={ORANGE} /> Trucks
-              </button>
-              <button onClick={() => setShowFuel(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <Droplets size={16} color={ORANGE} /> Fuel
-              </button>
-              <button onClick={() => setShowMixer(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <Activity size={16} color={ORANGE} /> Mixer
-              </button>
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
                 <CalendarPlus size={16} /> New order
-              </button>
-              <button onClick={() => { unlockAudio(); orderChime(); }} title="Test new-order sound" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
-                <Bell size={16} color={ORANGE} />
               </button>
               <button onClick={refresh} title="Refresh now" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
                 <RefreshCw size={16} color={ORANGE} />
               </button>
+              {/* phone widths: "More" opens the same admin actions as a dropdown */}
+              <div className="lg:hidden relative">
+                <button onClick={() => setShowMore((v) => !v)} title="More actions" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <Menu size={16} color={ORANGE} />
+                </button>
+                {showMore && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowMore(false)} />
+                    <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl p-2 flex flex-col gap-1 shadow-xl max-h-[70vh] overflow-y-auto" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
+                      {secondaryActions.map(({ key, label, icon: Icon, onClick }) => (
+                        <button key={key} onClick={() => { onClick(); setShowMore(false); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-left active:scale-95" style={{ color: "#fff", fontFamily: C.body }}>
+                          <Icon size={15} color={ORANGE} /> {label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -7310,12 +7310,31 @@ function DispatchApp({ email, role, onLogout }) {
             </div>
           )}
 
+          {/* Phone widths: one panel fills the screen at a time instead of four
+              squeezed columns. Desktop ignores this — see `lg:contents` below,
+              which always shows all four regardless of the selected tab. */}
+          <div className="lg:hidden shrink-0 flex items-center gap-1.5 overflow-x-auto -mx-1 px-1">
+            {mobileTabs.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setMobileTab(t.key)}
+                className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold active:scale-95 transition-transform"
+                style={mobileTab === t.key
+                  ? { background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }
+                  : { background: NAVY, color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
+              >
+                <t.icon size={13} /> {t.label} <span className="opacity-70">({t.count})</span>
+              </button>
+            ))}
+          </div>
+
           {/* main columns — fill the screen; each scrolls inside so the page doesn't.
               All pours gets the most room (the big continuous pours staff watch
               load-by-load); Today's is next; the map and Upcoming are reference
               columns. Completed orders aren't a column — they drop straight into the
               "Past orders" tab above. */}
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.9fr)_minmax(0,1.9fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
+            <div className={(mobileTab === "map" ? "contents" : "hidden") + " lg:contents"}>
             <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} sites={mapSites} /></div>
@@ -7358,6 +7377,8 @@ function DispatchApp({ email, role, onLogout }) {
                 </div>
               </div>
             </Panel>
+            </div>
+            <div className={(mobileTab === "pours" ? "contents" : "hidden") + " lg:contents"}>
             <Panel title="All pours" icon={Droplets} count={currentPours.length} fill>
               {currentPours.length === 0 ? (
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No pours right now. A continuous pour (&gt;10 yd) appears here once it goes live.</div>
@@ -7372,6 +7393,8 @@ function DispatchApp({ email, role, onLogout }) {
                 </>
               )}
             </Panel>
+            </div>
+            <div className={(mobileTab === "today" ? "contents" : "hidden") + " lg:contents"}>
             <Panel title="Today's orders" icon={List} count={todayOrders.length} fill>
               {todayOrders.length === 0 ? (
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>No orders scheduled for today.</div>
@@ -7386,6 +7409,8 @@ function DispatchApp({ email, role, onLogout }) {
                 </>
               )}
             </Panel>
+            </div>
+            <div className={(mobileTab === "upcoming" ? "contents" : "hidden") + " lg:contents"}>
             <Panel title="Upcoming orders" icon={CalendarPlus} count={upcomingOrders.length} fill>
               {upcomingOrders.length === 0 ? (
                 <div className="text-white/40 text-sm py-6 text-center" style={{ fontFamily: C.body }}>Nothing scheduled ahead.</div>
@@ -7411,6 +7436,7 @@ function DispatchApp({ email, role, onLogout }) {
                 })
               )}
             </Panel>
+            </div>
           </div>
         </div>
       </div>
