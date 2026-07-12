@@ -7123,9 +7123,11 @@ function DispatchApp({ email, role, onLogout }) {
     .filter((o) => o.site)
     .map((o) => ({ ref: o.ref, site: o.site, label: o.customer || o.ref }));
 
-  // Admin-ish actions: a row of buttons on desktop, collapsed into a "More" menu
-  // on phone widths so the header doesn't wrap into a wall of buttons.
+  // Everything except New order / Messages lives in one "More" dropdown so the
+  // header stays clean (two buttons + one menu) at every screen width.
   const secondaryActions = [
+    installPrompt && { key: "install", label: "Install app", icon: Download, onClick: promptInstall },
+    { key: "refresh", label: "Refresh now", icon: RefreshCw, onClick: refresh },
     canFinance && { key: "customers", label: "Customers", icon: KeyRound, onClick: () => setShowLogins(true) },
     canFinance && { key: "prices", label: "Price sheet", icon: Calculator, onClick: () => setShowPrices(true) },
     canFinance && { key: "costs", label: "Costs", icon: ClipboardList, onClick: () => setShowCosts(true) },
@@ -7141,10 +7143,6 @@ function DispatchApp({ email, role, onLogout }) {
     { key: "mixer", label: "Mixer", icon: Activity, onClick: () => setShowMixer(true) },
     { key: "testsound", label: "Test alert sound", icon: Bell, onClick: () => { unlockAudio(); orderChime(); } },
   ].filter(Boolean);
-  // Of the above, these get their own always-visible buttons on phone widths
-  // (instead of being tucked behind "More") since staff reach for them a lot on-site.
-  const quickMobileKeys = ["timeclock", "costs", "docs", "past"];
-  const quickMobileActions = secondaryActions.filter((a) => quickMobileKeys.includes(a.key));
 
   const mobileTabs = [
     { key: "map", label: "Map & trucks", icon: Truck, count: trucks.length },
@@ -7247,19 +7245,6 @@ function DispatchApp({ email, role, onLogout }) {
             </div>
             <div className="shrink-0 hidden md:flex"><WeatherBar /></div>
             <div className="flex items-center gap-2 flex-wrap justify-end flex-1">
-              {installPrompt && (
-                <button onClick={promptInstall} title="Install the dispatch board as an app so order alerts sound without a click" className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: GREEN, color: NAVY_DEEP, fontFamily: C.body }}>
-                  <Download size={16} /> Install app
-                </button>
-              )}
-              {/* admin-ish actions: a row on desktop, folded into "More" on phone widths */}
-              <div className="hidden lg:flex items-center gap-2 flex-wrap">
-                {secondaryActions.map(({ key, label, icon: Icon, onClick }) => (
-                  <button key={key} onClick={onClick} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                    <Icon size={16} color={ORANGE} /> {label}
-                  </button>
-                ))}
-              </div>
               <button onClick={() => setShowMessages(true)} className="relative flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
                 <MessageSquare size={16} color={ORANGE} /> Messages
                 {msgUnread > 0 && <span className="absolute -top-1.5 -right-1.5 text-[11px] font-bold rounded-full px-1.5 py-0.5 leading-none flex items-center justify-center min-w-[18px]" style={{ background: "#ef5350", color: "#fff" }}>{msgUnread}</span>}
@@ -7267,19 +7252,8 @@ function DispatchApp({ email, role, onLogout }) {
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
                 <CalendarPlus size={16} /> New order
               </button>
-              <button onClick={refresh} title="Refresh now" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
-                <RefreshCw size={16} color={ORANGE} />
-              </button>
-              {/* phone widths: quick-access buttons for the actions staff reach for most on-site */}
-              <div className="lg:hidden flex items-center gap-2">
-                {quickMobileActions.map(({ key, label, icon: Icon, onClick }) => (
-                  <button key={key} onClick={onClick} title={label} className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
-                    <Icon size={16} color={ORANGE} />
-                  </button>
-                ))}
-              </div>
-              {/* phone widths: "More" opens the same admin actions as a dropdown */}
-              <div className="lg:hidden relative">
+              {/* everything else — Refresh, Install app, Customers, Price sheet, etc. — lives in here */}
+              <div className="relative">
                 <button onClick={() => setShowMore((v) => !v)} title="More actions" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
                   <Menu size={16} color={ORANGE} />
                 </button>
