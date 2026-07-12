@@ -7141,6 +7141,10 @@ function DispatchApp({ email, role, onLogout }) {
     { key: "mixer", label: "Mixer", icon: Activity, onClick: () => setShowMixer(true) },
     { key: "testsound", label: "Test alert sound", icon: Bell, onClick: () => { unlockAudio(); orderChime(); } },
   ].filter(Boolean);
+  // Of the above, these get their own always-visible buttons on phone widths
+  // (instead of being tucked behind "More") since staff reach for them a lot on-site.
+  const quickMobileKeys = ["timeclock", "costs", "docs", "past"];
+  const quickMobileActions = secondaryActions.filter((a) => quickMobileKeys.includes(a.key));
 
   const mobileTabs = [
     { key: "map", label: "Map & trucks", icon: Truck, count: trucks.length },
@@ -7266,6 +7270,14 @@ function DispatchApp({ email, role, onLogout }) {
               <button onClick={refresh} title="Refresh now" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
                 <RefreshCw size={16} color={ORANGE} />
               </button>
+              {/* phone widths: quick-access buttons for the actions staff reach for most on-site */}
+              <div className="lg:hidden flex items-center gap-2">
+                {quickMobileActions.map(({ key, label, icon: Icon, onClick }) => (
+                  <button key={key} onClick={onClick} title={label} className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <Icon size={16} color={ORANGE} />
+                  </button>
+                ))}
+              </div>
               {/* phone widths: "More" opens the same admin actions as a dropdown */}
               <div className="lg:hidden relative">
                 <button onClick={() => setShowMore((v) => !v)} title="More actions" className="p-2 rounded-xl active:scale-90 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
