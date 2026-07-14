@@ -860,7 +860,10 @@ function OrderConcreteModal({ onClose, onPlaced, initial, companyName }) {
 
 // Modify an existing order (customer or staff), reusing the shared spec fields
 // pre-filled from the order. Saves via PATCH.
-function EditOrderModal({ order, onClose, onSaved }) {
+// allowBackdate lets staff set the delivery date to a past day — for correcting
+// an order/ticket whose date was recorded wrong. Customers can't (the backend
+// enforces this too), so it defaults off and only the dispatch board turns it on.
+function EditOrderModal({ order, onClose, onSaved, allowBackdate = false }) {
   const spec = useConcreteSpec(order, order.customer);
   const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(order.when || "") ? order.when : "");
   const [time, setTime] = useState(/^\d{2}:\d{2}/.test(order.time || "") ? order.time : "");
@@ -873,7 +876,7 @@ function EditOrderModal({ order, onClose, onSaved }) {
   const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
   const lbl = "text-white/50 text-xs uppercase tracking-wide mb-1 block";
 
-  const canSubmit = spec.valid && date >= localToday() && site.trim() && !busy;
+  const canSubmit = spec.valid && (allowBackdate || date >= localToday()) && site.trim() && !busy;
   const submit = async () => {
     setErr(""); setBusy(true);
     try {
@@ -896,9 +899,12 @@ function EditOrderModal({ order, onClose, onSaved }) {
           <label className={lbl}>Job site</label>
           <AddressInput value={site} onChange={setSite} placeholder="Type address or business name" inCls={inCls} inSt={inSt} wrapClass="mb-3" />
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
+            <div className="min-w-0"><label className={lbl}>Date</label><input type="date" min={allowBackdate ? undefined : localToday()} value={date} onChange={(e) => { setDate(e.target.value); setErr(""); }} className={inCls} style={inSt} /></div>
             <div className="min-w-0"><label className={lbl}>Time (optional)</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
+          {allowBackdate && date && date < localToday() && (
+            <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(231,115,42,0.12)", color: ORANGE }}>Back-dating to {date} — this changes the delivery date shown on the ticket and in reports.</div>
+          )}
           <label className={lbl}>Notes (optional)</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
           {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
@@ -2669,6 +2675,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
       {showEdit && (
         <EditOrderModal
           order={{ ...o, id: o.ref }}
+          allowBackdate   // staff (dispatch board) may correct a wrong date to a past day
           onClose={() => setShowEdit(false)}
           onSaved={(u) => { setShowEdit(false); onEdited && onEdited(u); }}
         />

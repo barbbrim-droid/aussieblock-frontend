@@ -98,8 +98,15 @@ export function getMe() {
 // ── Data ──
 // Each returns exactly what the backend sends. The shapes match what the
 // prototype's screens already expect (orders, truck positions, billing).
+// The dispatch board and customer view are gated on this call and re-poll it
+// every few seconds. Without a timeout a request the backend accepts but never
+// answers leaves fetch pending forever, so the board hangs on "Loading…" instead
+// of recovering on the next poll. 15s is generous for a slow-but-alive backend
+// while still guaranteeing the spinner can never get stuck. Same reasoning for
+// getTrucks/getDrivers below, which share the board's initial Promise.all.
+const BOARD_TIMEOUT_MS = 15000
 export function getOrders() {
-  return request('/orders')
+  return request('/orders', { timeoutMs: BOARD_TIMEOUT_MS })
 }
 // Schedule a new order (staff only). Pass { customer_id, site, mix, qty,
 // scheduled_for, time, truck }. Returns the new order in the same shape as
@@ -410,7 +417,7 @@ export function getOrder(ref) {
   return request(`/orders/${ref}`)
 }
 export function getTrucks() {
-  return request('/trucks')
+  return request('/trucks', { timeoutMs: BOARD_TIMEOUT_MS })
 }
 // Add a truck (or update it if the name already exists) — staff only.
 // gps_device_id (One Step GPS) and fluidsecure_vehicle_id (FluidSecure fuel) are
@@ -453,7 +460,7 @@ export function saveFuelPrices({ fuel_price_default, fuel_prices }) {
 // Assignable driver names (driver logins + name-only roster) for the dispatch
 // dropdowns. Staff-accessible.
 export function getDrivers() {
-  return request('/drivers')
+  return request('/drivers', { timeoutMs: BOARD_TIMEOUT_MS })
 }
 // Add a name-only driver (no login/email) to the roster. Returns the merged list.
 export function addDriver(name) {
