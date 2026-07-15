@@ -5852,9 +5852,14 @@ function CostsModal({ orders, onClose }) {
     // basePerYd shows a single order's exact sheet/override unit price.
     const perYd = (val, yards) => (val == null || !(Number(yards) > 0)) ? "—" : `${m(val / Number(yards))}/yd`;
     const basePerYd = (r) => (r && r.unit != null && Number(r.unit) > 0) ? `${m(r.unit)}/yd` : perYd(r && r.ext, r && r.yards);
+    // Full charge $/yd = base rate + hauler fee, per yard = (concrete $ + haul $) ÷
+    // yards. Equals the base rate for self-pickup / all-in prices (no separate haul).
+    const fullPerYd = (r) => (!r || r.error || !(Number(r.yards) > 0)) ? "—" : perYd((Number(r.ext) || 0) + (Number(r.billDelivery) || 0), r.yards);
     // Summary/subtotal base $/yd: the flat sheet rate when every order in the
     // group is at one rate; only blend (concrete $ ÷ yards) when rates differ.
     const groupBase = (t) => (t.units && t.units.size === 1) ? `${m(Number([...t.units][0]))}/yd` : perYd(t.ext, t.yards);
+    // Group full charge $/yd: (concrete $ + haul $) ÷ yards, blended across the group.
+    const groupFull = (t) => (t && Number(t.yards) > 0) ? perYd((Number(t.ext) || 0) + (Number(t.billDelivery) || 0), t.yards) : "—";
     // Fiber used: lbs · $ charged (blank when no fiber on the order/group).
     const fiberCell = (amt, lbs) => {
       const parts = [];
@@ -5879,7 +5884,7 @@ function CostsModal({ orders, onClose }) {
     // Page 1 — summary: one row per customer, fully itemized.
     const summaryRows = custNames.map((name) => {
       const t = sumFor(groups[name]);
-      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${ydc(t.yards)}</td>${totBd(t)}</tr>`;
+      return `<tr><td>${esc(name)}</td><td class="r">${groups[name].length}</td><td class="r">${ydc(t.yards)}</td><td class="r">${groupFull(t)}</td>${totBd(t)}</tr>`;
     }).join("");
 
     // Detail — per-customer tables (kept whole, won't split across a page), each
@@ -5889,12 +5894,12 @@ function CostsModal({ orders, onClose }) {
       const t = sumFor(list);
       const rows = list.map((o) => {
         const r = px[o.ref] || {};
-        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td>${rowBd(r)}</tr>`;
+        return `<tr><td>${orderDateUS(o.when) || esc(o.when) || ""}</td><td>${esc(o.ref)}</td><td>${esc(o.mix || "")}</td><td class="job">${esc(o.site || "")}</td><td class="r">${r.yards != null ? esc(r.yards) : ""}</td><td class="r">${r.error ? "—" : basePerYd(r)}</td><td class="r">${r.error ? "—" : fullPerYd(r)}</td>${rowBd(r)}</tr>`;
       }).join("");
       return `<section class="cust"><h2>${esc(name)} <span class="ct">· ${list.length} order${list.length === 1 ? "" : "s"}</span></h2>
-<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Base&nbsp;$/yd</th>${bdHead}</tr></thead>
+<table><thead><tr><th>Date</th><th>Ticket #</th><th>Mix</th><th class="job">Job</th><th class="r">Yards</th><th class="r">Base&nbsp;$/yd</th><th class="r">Full&nbsp;$/yd</th>${bdHead}</tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="4" class="r">Subtotal</td><td class="r">${ydc(t.yards)}</td><td class="r">${groupBase(t)}</td>${totBd(t)}</tr></tfoot></table></section>`;
+<tfoot><tr><td colspan="4" class="r">Subtotal</td><td class="r">${ydc(t.yards)}</td><td class="r">${groupBase(t)}</td><td class="r">${groupFull(t)}</td>${totBd(t)}</tr></tfoot></table></section>`;
     }).join("");
 
     const empty = custNames.length === 0;
@@ -5956,12 +5961,12 @@ function CostsModal({ orders, onClose }) {
   ${empty ? `<p class="muted" style="margin-top:24px;">No completed orders in this period.</p>` : `
   <div class="sec-title">Summary by ${view === "hauler" ? "hauler" : "customer"} — itemized</div>
   <table>
-    <thead><tr><th>${view === "hauler" ? "Hauler" : "Customer"}</th><th class="r">Orders</th><th class="r">Yards</th>${bdHead}</tr></thead>
+    <thead><tr><th>${view === "hauler" ? "Hauler" : "Customer"}</th><th class="r">Orders</th><th class="r">Yards</th><th class="r">Full&nbsp;$/yd</th>${bdHead}</tr></thead>
     <tbody>${summaryRows}</tbody>
-    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${ydc(grand.yards)}</td>${totBd(grand)}</tr></tfoot>
+    <tfoot><tr><td>TOTAL</td><td class="r">${filtered.length}</td><td class="r">${ydc(grand.yards)}</td><td class="r">${groupFull(grand)}</td>${totBd(grand)}</tr></tfoot>
   </table>
   ${sections}`}
-  <div class="muted" style="margin-top:10px;font-size:11px;">Each order's <b>Billed</b> is broken into: <b>Concrete</b> (price-sheet rate × yards) + <b>Hauler fee</b> (mileage-bracket delivery × yards) + <b>Fiber</b> (lbs · $) + <b>Admix</b> (other admixtures) + <b>Short-load</b> + <b>Back-haul</b> + <b>Standby</b> + <b>Tax</b> — these add up to Billed. “Base $/yd” = the flat concrete price-sheet rate per yard (before haul/tax/fees). <b>Hauler fee</b> is the distance delivery charge, shown “—” for self-pickup customers and all-in negotiated prices (e.g. Landers). The <b>Total to hauler</b> figure at the top is what you pay the hauler (cost side). Completed orders only.</div>
+  <div class="muted" style="margin-top:10px;font-size:11px;">Each order's <b>Billed</b> is broken into: <b>Concrete</b> (price-sheet rate × yards) + <b>Hauler fee</b> (mileage-bracket delivery × yards) + <b>Fiber</b> (lbs · $) + <b>Admix</b> (other admixtures) + <b>Short-load</b> + <b>Back-haul</b> + <b>Standby</b> + <b>Tax</b> — these add up to Billed. “Base $/yd” = the flat concrete price-sheet rate per yard (before haul/tax/fees); “Full $/yd” = base rate + hauler fee per yard (what the customer pays per yard before tax) — it equals the base rate for self-pickup and all-in negotiated prices that carry no separate haul. <b>Hauler fee</b> is the distance delivery charge, shown “—” for self-pickup customers and all-in negotiated prices (e.g. Landers). The <b>Total to hauler</b> figure at the top is what you pay the hauler (cost side). Completed orders only.</div>
   <div class="foot">
     <span class="co">Aussieblock Ready Mix</span>
     <span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span>
