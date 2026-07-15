@@ -135,7 +135,7 @@ function forcedMixFor(name) {
   return "";
 }
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
-const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
+const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color", "MasterAir AE90"];
 // Selectable fiber products + their standard dose (lbs/yd). MAC 330 is the TxDOT
 // standard; Mac Matrix 360 is the legacy macrofiber.
 const FIBER_PRODUCTS = [
@@ -628,9 +628,15 @@ function parseSpec(o = {}) {
   const uf = o.use_for || "";
   const useFor = !uf ? "" : (USES.includes(uf) ? uf : "Other");
   const useOther = useFor === "Other" ? uf : "";
-  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "", fiberType = FIBER_PRODUCTS[0].name;
+  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "", fiberType = FIBER_PRODUCTS[0].name, airOz = "";
   String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
     if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
+    else if (/masterair|ae\s*90|air\s*entrain/i.test(p)) {
+      // MasterAir AE90 air-entrainer — dose read in oz/yd (digit-safe: only the oz number).
+      admix.push("MasterAir AE90");
+      const m = p.match(/([\d.]+)\s*oz/i);
+      if (m) airOz = m[1];
+    }
     else if (/fiber|matrix|mac\s*3\d0/i.test(p)) {
       admix.push("Fiber");
       // Which product was chosen, and its dose (digit-safe: the lbs number, not 330/360).
@@ -641,7 +647,7 @@ function parseSpec(o = {}) {
     else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
     else if (p === "Accelerant") admix.push("Accelerant");
   });
-  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, project: o.project || "" };
+  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, airOz, project: o.project || "" };
 }
 
 function useConcreteSpec(initial, customerName) {
@@ -659,6 +665,7 @@ function useConcreteSpec(initial, customerName) {
   const [extraSet, setExtraSet] = useState(p.extraSet);
   const [fiberLbs, setFiberLbs] = useState(p.fiberLbs);
   const [fiberType, setFiberType] = useState(p.fiberType);
+  const [airOz, setAirOz] = useState(p.airOz);
   const [colorDetail, setColorDetail] = useState(p.colorDetail);
   const [project, setProject] = useState(p.project);
   const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
@@ -677,6 +684,7 @@ function useConcreteSpec(initial, customerName) {
       if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
       if (a === "Fiber") { const x = parseFloat(fiberLbs); const dose = x > 0 ? x : fiberDose(fiberType); return `${fiberType}: ${dose} lbs/yd`; }
+      if (a === "MasterAir AE90") { const x = parseFloat(airOz); return x > 0 ? `MasterAir AE90: ${x} oz/yd` : "MasterAir AE90"; }
       return a;
     }),
     project: project.trim(),
@@ -774,6 +782,15 @@ function useConcreteSpec(initial, customerName) {
       )}
       {admix.includes("Color") && (
         <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
+      )}
+      {admix.includes("MasterAir AE90") && (
+        <div className="mb-3">
+          <label className={lbl}>MasterAir AE90 dose — oz/yd (optional)</label>
+          <div className="flex items-center rounded-lg" style={inSt}>
+            <input type="number" min="0" step="0.1" value={airOz} onChange={(e) => setAirOz(e.target.value)} placeholder="e.g. 3" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <span className="px-3 text-white/55 text-sm">oz/yd</span>
+          </div>
+        </div>
       )}
     </>
   );
