@@ -6918,6 +6918,8 @@ function DispatchApp({ email, role, onLogout }) {
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
   const seenReq = useRef(null);   // refs of "requested" orders already seen
+  const failStreak = useRef(0);   // consecutive failed polls (don't flash the banner on a single blip)
+  const loadedOnce = useRef(false);   // have we ever loaded the board? (first-load errors DO show)
   const [soundOn, setSoundOn] = useState(false);   // audio actually resumed THIS page-load (needs a gesture)
   // Whether the user has opted into alert sound at all (remembered across refreshes).
   const [wantSound, setWantSound] = useState(() => {
@@ -6999,16 +7001,25 @@ function DispatchApp({ email, role, onLogout }) {
     return () => clearInterval(id);
   }, [alerts.length]);
 
-  // Pull orders + fleet at once, reusing the existing endpoints.
+  // Pull orders + fleet at once, reusing the existing endpoints. A single slow or
+  // dropped poll (Render waking from idle, a blip on the plant Wi-Fi) must NOT flash
+  // the big red banner while good data is already on screen — the next 5s poll almost
+  // always recovers, and flashing it every few polls is what made the error look like
+  // it "comes up constantly, even when it loads." So we only surface the error on the
+  // very first load (nothing on screen yet) or after 3 failures in a row (~a real
+  // outage). Any success clears it and resets the streak.
   const refresh = async () => {
     try {
       const [os, ts, ds] = await Promise.all([getOrders(), getTrucks(), getDrivers().catch(() => [])]);
       setOrders(os);
       setTrucks(ts);
       setDrivers(ds || []);
+      failStreak.current = 0;
+      loadedOnce.current = true;
       setErr("");
     } catch (e) {
-      setErr(e.message);
+      failStreak.current += 1;
+      if (!loadedOnce.current || failStreak.current >= 3) setErr(e.message);
     } finally {
       setLoading(false);
     }
@@ -7016,11 +7027,18 @@ function DispatchApp({ email, role, onLogout }) {
 
   useEffect(() => {
     let alive = true;
-    const run = async () => { if (alive) await refresh(); };
-    run();
-    const poll = setInterval(run, 5000);   // orders, fleet, and requests all refresh within ~5s
+    let timer;
+    // Self-scheduling loop: the NEXT poll is queued only after the current one
+    // finishes, so slow responses can't stack up into a pile of overlapping requests
+    // that overloads a waking backend (which was itself a cause of the timeouts).
+    const loop = async () => {
+      if (!alive) return;
+      await refresh();
+      if (alive) timer = setTimeout(loop, 5000);   // orders, fleet, and requests all refresh within ~5s
+    };
+    loop();
     const tick = setInterval(() => { if (alive) forceTick((n) => n + 1); }, 1000);
-    return () => { alive = false; clearInterval(poll); clearInterval(tick); };
+    return () => { alive = false; clearTimeout(timer); clearInterval(tick); };
   }, []);
 
   // Poll the dispatch unread-message count for the Messages button badge. Skipped
