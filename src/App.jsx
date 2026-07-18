@@ -5704,10 +5704,22 @@ function CostsModal({ orders, onClose }) {
     finally { setSavingPrice(false); }
   };
 
+  const inRange = (o) => {
+    const d = (o.when || "").trim();   // ISO yyyy-mm-dd → string compare is chronological
+    if (from && (!d || d < from)) return false;
+    if (to && (!d || d > to)) return false;
+    return true;
+  };
+
   useEffect(() => {
     let live = true;
     (async () => {
-      const list = orders || [];
+      // Only price orders in the visible date range — pricing every completed
+      // order ever (regardless of the range shown) is what made this screen get
+      // slower and slower as order history grew; the backend does several
+      // unbatched DB queries per order, so scoping this to what's on screen keeps
+      // it fast no matter how much history there is.
+      const list = (orders || []).filter(inRange);
       // Map one order's backend pricing payload into the row shape this modal uses.
       const shape = (o, p) => {
         if (!p || p.error) return { billed: null, toHauler: null, yards: o.qty, hauler: o.hauler || "", invoice: (p && p.invoice) || null, onsite: (p && p.onsite) || null, haulerSplit: (p && p.hauler_split) || {}, error: true };
@@ -5764,7 +5776,7 @@ function CostsModal({ orders, onClose }) {
       if (live) setLoading(false);
     })();
     return () => { live = false; };
-  }, [orders, reloadKey]);
+  }, [orders, reloadKey, from, to]);
 
   const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
   const Drow = ({ label, val }) => (
@@ -5781,12 +5793,6 @@ function CostsModal({ orders, onClose }) {
   const inText = (o) => !needle ||
     [o.customer, o.ref, o.site, o.project, o.mix, orderDateUS(o.when), o.when]
       .some((v) => String(v || "").toLowerCase().includes(needle));
-  const inRange = (o) => {
-    const d = (o.when || "").trim();   // ISO yyyy-mm-dd → string compare is chronological
-    if (from && (!d || d < from)) return false;
-    if (to && (!d || d > to)) return false;
-    return true;
-  };
   const filtered = (orders || []).filter((o) => inText(o) && inRange(o));
 
   // group by customer OR hauler (alphabetical), each list earliest order first
