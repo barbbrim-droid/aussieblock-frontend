@@ -135,7 +135,7 @@ function forcedMixFor(name) {
   return "";
 }
 const SLUMPS = ["0\"", "1\"", "2\"", "3\"", "4\"", "5\"", "6\"", "7\""];
-const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color", "MasterAir AE90"];
+const ADMIXTURES = ["Set Control", "Accelerant", "Fiber", "Color"];
 // Selectable fiber products + their standard dose (lbs/yd). MAC 330 is the TxDOT
 // standard; Mac Matrix 360 is the legacy macrofiber.
 const FIBER_PRODUCTS = [
@@ -631,12 +631,6 @@ function parseSpec(o = {}) {
   const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "", fiberType = FIBER_PRODUCTS[0].name, airOz = "";
   String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
     if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
-    else if (/masterair|ae\s*90|air\s*entrain/i.test(p)) {
-      // MasterAir AE90 air-entrainer — dose read in oz/yd (digit-safe: only the oz number).
-      admix.push("MasterAir AE90");
-      const m = p.match(/([\d.]+)\s*oz/i);
-      if (m) airOz = m[1];
-    }
     else if (/fiber|matrix|mac\s*3\d0/i.test(p)) {
       admix.push("Fiber");
       // Which product was chosen, and its dose (digit-safe: the lbs number, not 330/360).
@@ -646,11 +640,19 @@ function parseSpec(o = {}) {
     }
     else if (p.startsWith("Color")) { admix.push("Color"); const m = p.match(/Color:\s*(.+)/); if (m) colorDetail = m[1].trim(); }
     else if (p === "Accelerant") admix.push("Accelerant");
+    // MasterAir AE90 — added at the truck, not batched at the plant, so this is
+    // the only record of it (the read_protocol reader hand-adds it to the
+    // certified ticket from this same text). Blank field = the standard 3 oz/yd.
+    else if (/masterair|air\s*entrain|\bae\s*90\b/i.test(p)) {
+      admix.push("Air Entrainer");
+      const m = p.match(/([\d.]+)\s*oz/i);
+      if (m) { const t = parseFloat(m[1]); if (t && t !== 3) airOz = m[1]; }
+    }
   });
   return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, airOz, project: o.project || "" };
 }
 
-function useConcreteSpec(initial, customerName) {
+function useConcreteSpec(initial, customerName, isStaff = false) {
   const p = parseSpec(initial);
   const forcedMix = forcedMixFor(customerName);   // e.g. Landers → always "Precast"
   const [mix, setMix] = useState(forcedMix || p.mix);
@@ -665,13 +667,16 @@ function useConcreteSpec(initial, customerName) {
   const [extraSet, setExtraSet] = useState(p.extraSet);
   const [fiberLbs, setFiberLbs] = useState(p.fiberLbs);
   const [fiberType, setFiberType] = useState(p.fiberType);
-  const [airOz, setAirOz] = useState(p.airOz);
   const [colorDetail, setColorDetail] = useState(p.colorDetail);
+  const [airOz, setAirOz] = useState(p.airOz);
   const [project, setProject] = useState(p.project);
   const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
 
   const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
   const toggleAdmix = (a) => setAdmix((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur.filter((x) => x !== OPPOSITE[a]), a]));
+  // Air Entrainer (MasterAir AE90) is a staff-only add-on — dosed at the truck,
+  // not something a customer selects when placing an order.
+  const admixOptions = isStaff ? [...ADMIXTURES, "Air Entrainer"] : ADMIXTURES;
   const shortLoad = parseFloat(qty) > 0 && parseFloat(qty) < 5;
   const valid = !!(mix && qty.trim() && (!shortLoad || acceptShort));
   const shortNote = shortLoad ? "Short load fee $200 (accepted)" : "";
@@ -684,7 +689,7 @@ function useConcreteSpec(initial, customerName) {
       if (a === "Color" && colorDetail.trim()) return `Color: ${colorDetail.trim()}`;
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
       if (a === "Fiber") { const x = parseFloat(fiberLbs); const dose = x > 0 ? x : fiberDose(fiberType); return `${fiberType}: ${dose} lbs/yd`; }
-      if (a === "MasterAir AE90") { const x = parseFloat(airOz); return x > 0 ? `MasterAir AE90: ${x} oz/yd` : "MasterAir AE90"; }
+      if (a === "Air Entrainer") { const x = parseFloat(airOz); const dose = x > 0 ? x : 3; return `MasterAir AE90: ${dose} oz/yd`; }
       return a;
     }),
     project: project.trim(),
@@ -749,7 +754,7 @@ function useConcreteSpec(initial, customerName) {
 
       <label className={lbl}>Admixtures (optional)</label>
       <div className="grid grid-cols-2 gap-2 mb-3">
-        {ADMIXTURES.map((a) => {
+        {admixOptions.map((a) => {
           const on = admix.includes(a);
           return (
             <button key={a} type="button" onClick={() => toggleAdmix(a)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm active:scale-[0.98] transition-transform"
@@ -780,17 +785,17 @@ function useConcreteSpec(initial, customerName) {
           </div>
         </div>
       )}
-      {admix.includes("Color") && (
-        <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
-      )}
-      {admix.includes("MasterAir AE90") && (
+      {admix.includes("Air Entrainer") && (
         <div className="mb-3">
-          <label className={lbl}>MasterAir AE90 dose — oz/yd (optional)</label>
+          <label className={lbl}>Dose — oz/yd (3 is standard)</label>
           <div className="flex items-center rounded-lg" style={inSt}>
-            <input type="number" min="0" step="0.1" value={airOz} onChange={(e) => setAirOz(e.target.value)} placeholder="e.g. 3" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <input type="number" min="0" step="0.5" value={airOz} onChange={(e) => setAirOz(e.target.value)} placeholder="3 (standard)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
             <span className="px-3 text-white/55 text-sm">oz/yd</span>
           </div>
         </div>
+      )}
+      {admix.includes("Color") && (
+        <input value={colorDetail} onChange={(e) => setColorDetail(e.target.value)} placeholder="Which color? (e.g. Davis Tan #677)" className={inCls + " mb-3"} style={inSt} />
       )}
     </>
   );
@@ -880,8 +885,8 @@ function OrderConcreteModal({ onClose, onPlaced, initial, companyName }) {
 // allowBackdate lets staff set the delivery date to a past day — for correcting
 // an order/ticket whose date was recorded wrong. Customers can't (the backend
 // enforces this too), so it defaults off and only the dispatch board turns it on.
-function EditOrderModal({ order, onClose, onSaved, allowBackdate = false }) {
-  const spec = useConcreteSpec(order, order.customer);
+function EditOrderModal({ order, onClose, onSaved, allowBackdate = false, isStaff = false }) {
+  const spec = useConcreteSpec(order, order.customer, isStaff);
   const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(order.when || "") ? order.when : "");
   const [time, setTime] = useState(/^\d{2}:\d{2}/.test(order.time || "") ? order.time : "");
   const [site, setSite] = useState(order.site || "");
@@ -2693,6 +2698,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
         <EditOrderModal
           order={{ ...o, id: o.ref }}
           allowBackdate   // staff (dispatch board) may correct a wrong date to a past day
+          isStaff
           onClose={() => setShowEdit(false)}
           onSaved={(u) => { setShowEdit(false); onEdited && onEdited(u); }}
         />
@@ -6510,7 +6516,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
   }, []);
 
   const selCust = customers.find((c) => c.id === customerId);
-  const spec = useConcreteSpec(initial, selCust?.name);   // single-mix customers (Landers) lock the mix
+  const spec = useConcreteSpec(initial, selCust?.name, true);   // single-mix customers (Landers) lock the mix
   const f = custFilter.trim().toLowerCase();
   const shown = f ? customers.filter((c) => c.name.toLowerCase().includes(f)).slice(0, 25) : [];
   const canSubmit = customerId && site.trim() && spec.valid && date >= localToday() && !busy;
