@@ -7931,7 +7931,7 @@ function DriverApp({ driver, onLogout }) {
             <>
             {/* LEFT pane — delivery list. Full width on a phone (hidden once a job is
                 open); a fixed sidebar on a landscape tablet (always visible). */}
-            <div className={`overflow-y-auto overscroll-contain p-4 lg:w-96 lg:shrink-0 lg:border-r lg:border-white/10 ${active ? "hidden lg:block" : "w-full"}`}>
+            <div className={`overflow-y-auto overscroll-contain p-4 lg:p-3 lg:w-64 lg:shrink-0 lg:border-r lg:border-white/10 ${active ? "hidden lg:block" : "w-full"}`}>
               <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                 <MessageSquare size={18} color={ORANGE} /> Message dispatch
                 {driverUnread > 0 && <span className="absolute top-2 right-3 text-xs font-bold rounded-full px-2 py-0.5 leading-none flex items-center justify-center min-w-[20px]" style={{ background: "#ef5350", color: "#fff" }}>{driverUnread}</span>}
