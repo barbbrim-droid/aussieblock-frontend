@@ -8184,8 +8184,8 @@ function DriverApp({ driver, onLogout }) {
         </div>
       )}
       {showMsgs && (
-        <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowMsgs(false)}>
-          <div className="w-full sm:max-w-lg h-full sm:h-[80vh] flex flex-col sm:rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowMsgs(false)}>
+          <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.875rem)" }}>
               <div className="flex items-center gap-2"><MessageSquare size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Dispatch</span></div>
               <button onClick={() => setShowMsgs(false)} className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
