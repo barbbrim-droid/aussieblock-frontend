@@ -7919,9 +7919,9 @@ function DriverApp({ driver, onLogout }) {
   );
 
   return (
-    <div className="w-full flex justify-center sm:items-center sm:p-4 overflow-hidden" style={{ height: "100dvh", background: "#0c1117" }}>
+    <div className="w-full flex overflow-hidden" style={{ height: "100dvh", background: "#0c1117" }}>
       <style>{FONT}</style>
-      <div className="w-full sm:max-w-xl lg:max-w-none h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
+      <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
         {Header}
         {err && <div className="px-4 py-2 text-xs shrink-0" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
         <div className="flex-1 min-h-0 flex overflow-hidden">
