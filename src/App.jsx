@@ -8135,28 +8135,37 @@ function DriverApp({ driver, onLogout }) {
             {/* pump tab */}
             {fuelTab === "pump" && (
               <div className="p-5">
-                {!pumpOn ? (
-                  <>
-                    <label className="text-white/50 text-xs uppercase tracking-wide">Your 4-digit PIN</label>
-                    <input value={pumpPin} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 4); setPumpPin(v); setPumpMsg(null); }} inputMode="numeric" maxLength={4} placeholder="• • • •" className="w-full rounded-xl px-3 py-3 text-white text-2xl tracking-[0.5em] outline-none mb-2 mt-1 text-center" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
-                    <p className="text-white/45 text-xs mb-4">Turn the pump on to fuel up, then record your truck number and mileage on the <span style={{ color: ORANGE }}>Log Fill</span> tab.</p>
-                  </>
-                ) : (
-                  <div className="rounded-xl py-3 px-4 mb-4 flex items-center justify-center gap-2 text-base font-bold" style={{ background: "#4caf5022", color: "#4caf50", border: "1px solid #4caf5055" }}>
-                    <Power size={16} /> Pump ON
+                {/* status row — pump state at a glance, always visible; dot pulses when ON */}
+                <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 mb-5" style={{ background: pumpOn ? "#4caf5014" : "rgba(255,255,255,0.04)", border: `1px solid ${pumpOn ? "#4caf5055" : "rgba(255,255,255,0.10)"}` }}>
+                  <span className="relative flex h-3 w-3">
+                    {pumpOn && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ background: "#4caf50" }} />}
+                    <span className="relative inline-flex rounded-full h-3 w-3" style={{ background: pumpOn ? "#4caf50" : "rgba(255,255,255,0.3)" }} />
+                  </span>
+                  <span className="text-base font-bold tracking-wide" style={{ color: pumpOn ? "#4caf50" : "rgba(255,255,255,0.6)", fontFamily: C.cond }}>
+                    {pumpOn ? "PUMP IS ON" : "PUMP IS OFF"}
+                  </span>
+                </div>
+
+                {!pumpOn && (
+                  <div className="mb-5">
+                    <label className="text-white/50 text-xs uppercase tracking-wide mb-1.5 block">Your 4-digit PIN</label>
+                    <input value={pumpPin} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 4); setPumpPin(v); setPumpMsg(null); }} inputMode="numeric" maxLength={4} placeholder="• • • •" className="w-full rounded-xl px-3 py-4 text-white text-2xl tracking-[0.5em] outline-none text-center" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+                    <p className="text-white/45 text-xs mt-2.5 leading-relaxed">Turn the pump on to fuel up, then record your truck number and mileage on the <span style={{ color: ORANGE, fontWeight: 600 }}>Log Fill</span> tab.</p>
                   </div>
                 )}
-                {pumpMsg && <div className="rounded-lg px-3 py-2 text-sm mb-3" style={{ background: pumpMsg.ok ? "#4caf5022" : "rgba(239,83,80,0.14)", color: pumpMsg.ok ? "#4caf50" : "#ff8a85" }}>{pumpMsg.text}</div>}
+
+                {pumpMsg && <div className="rounded-lg px-3 py-2 text-sm mb-4" style={{ background: pumpMsg.ok ? "#4caf5022" : "rgba(239,83,80,0.14)", color: pumpMsg.ok ? "#4caf50" : "#ff8a85" }}>{pumpMsg.text}</div>}
+
                 {!pumpOn ? (
-                  <button onClick={() => submitPump(true)} disabled={pumpBusy || pumpPin.length !== 4} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2" style={{ background: "#4caf50", color: "#fff" }}>
-                    {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn ON
+                  <button onClick={() => submitPump(true)} disabled={pumpBusy || pumpPin.length !== 4} className="w-full rounded-xl py-4 text-lg font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2.5" style={{ background: "#4caf50", color: "#fff" }}>
+                    {pumpBusy ? <Loader2 size={19} className="animate-spin" /> : <Power size={19} />} Turn pump ON
                   </button>
                 ) : (
-                  <button onClick={() => submitPump(false)} disabled={pumpBusy} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2" style={{ background: "rgba(239,83,80,0.85)", color: "#fff" }}>
-                    {pumpBusy ? <Loader2 size={17} className="animate-spin" /> : <Power size={17} />} Turn OFF — done fueling
+                  <button onClick={() => submitPump(false)} disabled={pumpBusy} className="w-full rounded-xl py-4 text-lg font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40 mb-2.5" style={{ background: "rgba(239,83,80,0.9)", color: "#fff" }}>
+                    {pumpBusy ? <Loader2 size={19} className="animate-spin" /> : <Power size={19} />} Turn OFF — done fueling
                   </button>
                 )}
-                <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Close</button>
+                <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-3 text-sm font-semibold active:scale-95 text-white/60" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Close</button>
               </div>
             )}
             {/* log fill tab */}
