@@ -8089,11 +8089,7 @@ function DriverApp({ driver, onLogout }) {
                   )}
                 </>
               )}
-
-              {/* always-available help line */}
-              <a href={`tel:${DISPATCH_TEL}`} className="w-full rounded-xl py-3 lg:py-5 mt-2.5 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
-                <Phone size={17} color={ORANGE} /> Call dispatch · {DISPATCH_PHONE}
-              </a>
+              {/* Drivers reach dispatch via the in-app chat (Message dispatch), not a phone call. */}
               </div>{/* end right column */}
               </div>{/* end two-column grid */}
             </div>
