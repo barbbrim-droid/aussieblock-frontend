@@ -652,7 +652,7 @@ function parseSpec(o = {}) {
     else if (/masterlife|300\s*d\b/i.test(p)) {
       admix.push("MasterLife 300D");
       const m = p.match(/([\d.]+)\s*lb/i);
-      if (m) lifeLbs = m[1];
+      if (m) { const t = parseFloat(m[1]); if (t && t !== 9.5) lifeLbs = m[1]; }   // blank field = the standard 9.5 lbs/yd
     }
   });
   return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, airOz, lifeLbs, project: o.project || "" };
@@ -697,7 +697,7 @@ function useConcreteSpec(initial, customerName, isStaff = false) {
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
       if (a === "Fiber") { const x = parseFloat(fiberLbs); const dose = x > 0 ? x : fiberDose(fiberType); return `${fiberType}: ${dose} lbs/yd`; }
       if (a === "Air Entrainer") { const x = parseFloat(airOz); const dose = x > 0 ? x : 3; return `MasterAir AE90: ${dose} oz/yd`; }
-      if (a === "MasterLife 300D") { const x = parseFloat(lifeLbs); return x > 0 ? `MasterLife 300D: ${x} lbs/yd` : "MasterLife 300D"; }
+      if (a === "MasterLife 300D") { const x = parseFloat(lifeLbs); const dose = x > 0 ? x : 9.5; return `MasterLife 300D: ${dose} lbs/yd`; }
       return a;
     }),
     project: project.trim(),
@@ -804,9 +804,9 @@ function useConcreteSpec(initial, customerName, isStaff = false) {
       )}
       {admix.includes("MasterLife 300D") && (
         <div className="mb-3">
-          <label className={lbl}>MasterLife 300D dose — lbs/yd (optional)</label>
+          <label className={lbl}>MasterLife 300D dose — lbs/yd (9.5 is standard)</label>
           <div className="flex items-center rounded-lg" style={inSt}>
-            <input type="number" min="0" step="0.1" value={lifeLbs} onChange={(e) => setLifeLbs(e.target.value)} placeholder="e.g. 5" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <input type="number" min="0" step="0.5" value={lifeLbs} onChange={(e) => setLifeLbs(e.target.value)} placeholder="9.5 (standard)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
             <span className="px-3 text-white/55 text-sm">lbs/yd</span>
           </div>
         </div>
