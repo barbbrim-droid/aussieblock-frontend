@@ -628,7 +628,7 @@ function parseSpec(o = {}) {
   const uf = o.use_for || "";
   const useFor = !uf ? "" : (USES.includes(uf) ? uf : "Other");
   const useOther = useFor === "Other" ? uf : "";
-  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "", fiberType = FIBER_PRODUCTS[0].name, airOz = "";
+  const admix = []; let extraSet = "1 hr", fiberLbs = "", colorDetail = "", fiberType = FIBER_PRODUCTS[0].name, airOz = "", lifeLbs = "";
   String(o.admixtures || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((p) => {
     if (p.startsWith("Set Control")) { admix.push("Set Control"); const m = p.match(/\+\s*(.+)/); if (m) extraSet = m[1].trim(); }
     else if (/fiber|matrix|mac\s*3\d0/i.test(p)) {
@@ -648,8 +648,14 @@ function parseSpec(o = {}) {
       const m = p.match(/([\d.]+)\s*oz/i);
       if (m) { const t = parseFloat(m[1]); if (t && t !== 3) airOz = m[1]; }
     }
+    // MasterLife 300D — specialty durability admixture dosed in lbs/yd.
+    else if (/masterlife|300\s*d\b/i.test(p)) {
+      admix.push("MasterLife 300D");
+      const m = p.match(/([\d.]+)\s*lb/i);
+      if (m) lifeLbs = m[1];
+    }
   });
-  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, airOz, project: o.project || "" };
+  return { mix, qty, slump, useFor, useOther, admix, extraSet, fiberLbs, fiberType, colorDetail, airOz, lifeLbs, project: o.project || "" };
 }
 
 function useConcreteSpec(initial, customerName, isStaff = false) {
@@ -669,14 +675,15 @@ function useConcreteSpec(initial, customerName, isStaff = false) {
   const [fiberType, setFiberType] = useState(p.fiberType);
   const [colorDetail, setColorDetail] = useState(p.colorDetail);
   const [airOz, setAirOz] = useState(p.airOz);
+  const [lifeLbs, setLifeLbs] = useState(p.lifeLbs);
   const [project, setProject] = useState(p.project);
   const [acceptShort, setAcceptShort] = useState(!!initial);   // editing → fee already accepted
 
   const OPPOSITE = { Accelerant: "Set Control", "Set Control": "Accelerant" };
   const toggleAdmix = (a) => setAdmix((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur.filter((x) => x !== OPPOSITE[a]), a]));
-  // Air Entrainer (MasterAir AE90) is a staff-only add-on — dosed at the truck,
-  // not something a customer selects when placing an order.
-  const admixOptions = isStaff ? [...ADMIXTURES, "Air Entrainer"] : ADMIXTURES;
+  // Air Entrainer (MasterAir AE90) and MasterLife 300D are staff-only add-ons —
+  // specialty admixtures dosed at the plant/truck, not customer-selectable.
+  const admixOptions = isStaff ? [...ADMIXTURES, "Air Entrainer", "MasterLife 300D"] : ADMIXTURES;
   const shortLoad = parseFloat(qty) > 0 && parseFloat(qty) < 5;
   const valid = !!(mix && qty.trim() && (!shortLoad || acceptShort));
   const shortNote = shortLoad ? "Short load fee $200 (accepted)" : "";
@@ -690,6 +697,7 @@ function useConcreteSpec(initial, customerName, isStaff = false) {
       if (a === "Set Control" && extraSet) return `Set Control: +${extraSet}`;
       if (a === "Fiber") { const x = parseFloat(fiberLbs); const dose = x > 0 ? x : fiberDose(fiberType); return `${fiberType}: ${dose} lbs/yd`; }
       if (a === "Air Entrainer") { const x = parseFloat(airOz); const dose = x > 0 ? x : 3; return `MasterAir AE90: ${dose} oz/yd`; }
+      if (a === "MasterLife 300D") { const x = parseFloat(lifeLbs); return x > 0 ? `MasterLife 300D: ${x} lbs/yd` : "MasterLife 300D"; }
       return a;
     }),
     project: project.trim(),
@@ -791,6 +799,15 @@ function useConcreteSpec(initial, customerName, isStaff = false) {
           <div className="flex items-center rounded-lg" style={inSt}>
             <input type="number" min="0" step="0.5" value={airOz} onChange={(e) => setAirOz(e.target.value)} placeholder="3 (standard)" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
             <span className="px-3 text-white/55 text-sm">oz/yd</span>
+          </div>
+        </div>
+      )}
+      {admix.includes("MasterLife 300D") && (
+        <div className="mb-3">
+          <label className={lbl}>MasterLife 300D dose — lbs/yd (optional)</label>
+          <div className="flex items-center rounded-lg" style={inSt}>
+            <input type="number" min="0" step="0.1" value={lifeLbs} onChange={(e) => setLifeLbs(e.target.value)} placeholder="e.g. 5" className="w-full bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30" />
+            <span className="px-3 text-white/55 text-sm">lbs/yd</span>
           </div>
         </div>
       )}
