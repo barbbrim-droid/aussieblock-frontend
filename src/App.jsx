@@ -7524,29 +7524,48 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
   // it white. Run AFTER layout (rAF) and on resize/rotate — the old code measured
   // once on mount before layout settled, so the first stroke could land offset
   // until the pad was reopened. setTransform (not scale) keeps it idempotent.
-  const setup = () => {
+  //
+  // preserve=true keeps whatever is already inked. The tablet keyboard fires a
+  // resize the moment a driver taps a field, and re-priming there wiped a
+  // signature that had already been captured. Pass false only to wipe on purpose.
+  const setup = (preserve = true) => {
     const c = canvasRef.current;
     if (!c) return;
     const rect = c.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const ratio = window.devicePixelRatio || 1;
-    c.width = Math.round(rect.width * ratio);
-    c.height = Math.round(rect.height * ratio);
+    const w = Math.round(rect.width * ratio);
+    const h = Math.round(rect.height * ratio);
+    if (preserve && c.width === w && c.height === h) return;   // keyboard opened, nothing to redo
+    const prev = preserve && c.width && c.height ? c.toDataURL("image/png") : null;
+    c.width = w;
+    c.height = h;
     const ctx = c.getContext("2d");
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
     ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.strokeStyle = "#0c1117";
+    // Carry the old strokes onto the new buffer (rotation / real size change).
+    if (prev) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = prev;
+    }
   };
 
   useEffect(() => {
-    const id = requestAnimationFrame(setup);
+    const id = requestAnimationFrame(() => setup(false));
     const onResize = () => setup();
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
     return () => { cancelAnimationFrame(id); window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize); };
   }, []);
+
+  // Name + water have to be in BEFORE the pad accepts ink. Filling them after
+  // signing means tapping a field, which opens the keyboard — see setup().
+  const waterOk = water.trim() !== "" && !isNaN(Number(water)) && Number(water) >= 0;
+  const ready = name.trim() !== "" && waterOk;
 
   const pos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -7554,6 +7573,12 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
   };
   const start = (e) => {
     e.preventDefault();
+    if (!ready) {
+      setErr(!name.trim()
+        ? "Enter who's signing and the water added first, then sign."
+        : "Enter the water added in gallons first (enter 0 if none), then sign.");
+      return;
+    }
     try { canvasRef.current.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
     drawing.current = true;
     last.current = pos(e);
@@ -7572,11 +7597,11 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
     last.current = p;
   };
   const end = () => { drawing.current = false; };
-  const clear = () => { setup(); setHasInk(false); setErr(""); };
+  const clear = () => { setup(false); setHasInk(false); setErr(""); };
   const submit = () => {
-    if (!hasInk) { setErr("Please have the customer sign above."); return; }
     if (!name.trim()) { setErr("Enter the name of who signed."); return; }
-    if (water.trim() === "" || isNaN(Number(water)) || Number(water) < 0) { setErr("Enter the water added in gallons (enter 0 if none)."); return; }
+    if (!waterOk) { setErr("Enter the water added in gallons (enter 0 if none)."); return; }
+    if (!hasInk) { setErr("Please have the customer sign above."); return; }
     setBusy(true); setErr("");
     canvasRef.current.toBlob((blob) => {
       Promise.resolve(onSubmit(blob, name.trim(), water.trim())).catch((e) => { setErr(e.message || "Could not save"); setBusy(false); });
@@ -7591,21 +7616,35 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
           <button onClick={onCancel} disabled={busy} className="p-1 md:p-2 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5" style={{ fontFamily: C.body }}>
-          <div className="text-white/60 text-xs md:text-base mb-2">Have the customer sign below to confirm delivery.</div>
-          <canvas ref={canvasRef} className="w-full h-56 md:h-96 rounded-xl touch-none" style={{ background: "#fff", border: "2px solid rgba(255,255,255,0.15)" }}
-            onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} onPointerCancel={end} />
-          <div className="flex justify-end mt-1.5">
-            <button onClick={clear} disabled={busy} className="text-xs md:text-base font-semibold px-2.5 py-1 md:px-4 md:py-2 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear &amp; redo</button>
+          <div className="text-white/60 text-xs md:text-base mb-2">
+            <span className="font-bold" style={{ color: ORANGE }}>Step 1</span> — fill both boxes in first. The pad won't take a signature until they're done.
           </div>
-          <div className="grid grid-cols-2 gap-2 md:gap-4 mt-3">
+          <div className="grid grid-cols-2 gap-2 md:gap-4">
             <label className="flex flex-col gap-1">
-              <span className="text-white/40 text-[10px] md:text-xs uppercase tracking-wide">Printed name</span>
-              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span className="text-white/40 text-[10px] md:text-xs uppercase tracking-wide">Printed name <span style={{ color: ORANGE }}>*</span></span>
+              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: `1px solid ${name.trim() ? "rgba(255,255,255,0.15)" : ORANGE}` }} />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-white/40 text-[10px] md:text-xs uppercase tracking-wide">Water added (gal) <span style={{ color: ORANGE }}>*</span></span>
-              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: `1px solid ${waterOk ? "rgba(255,255,255,0.15)" : ORANGE}` }} />
             </label>
+          </div>
+          <div className="text-white/60 text-xs md:text-base mt-4 mb-2">
+            <span className="font-bold" style={{ color: ready ? GREEN : "rgba(255,255,255,0.35)" }}>Step 2</span> — have the customer sign below to confirm delivery.
+          </div>
+          <div className="relative">
+            <canvas ref={canvasRef} className="w-full h-56 md:h-96 rounded-xl touch-none" style={{ background: "#fff", border: `2px solid ${ready ? "rgba(255,255,255,0.15)" : ORANGE}`, opacity: ready ? 1 : 0.45 }}
+              onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} onPointerCancel={end} />
+            {!ready && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl pointer-events-none px-4 text-center">
+                <span className="text-sm md:text-xl font-bold px-3 py-2 rounded-lg" style={{ background: NAVY_DEEP, color: ORANGE, border: `1px solid ${ORANGE}`, fontFamily: C.cond }}>
+                  Enter the name and gallons above before signing
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end mt-1.5">
+            <button onClick={clear} disabled={busy} className="text-xs md:text-base font-semibold px-2.5 py-1 md:px-4 md:py-2 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear &amp; redo</button>
           </div>
           {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs md:text-base" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
           <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 md:py-5 text-base md:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
