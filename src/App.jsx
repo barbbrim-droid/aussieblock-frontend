@@ -7585,30 +7585,30 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
-      <div className="w-full max-w-lg lg:max-w-4xl rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
-        <div className="px-5 py-3.5 lg:py-5 flex items-center justify-between" style={{ background: ORANGE }}>
-          <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg lg:text-2xl font-bold">Customer sign-off · {orderRef}</span>
-          <button onClick={onCancel} disabled={busy} className="p-1 lg:p-2 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+      <div className="w-full max-w-lg md:max-w-4xl rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
+        <div className="px-5 py-3.5 md:py-5 flex items-center justify-between" style={{ background: ORANGE }}>
+          <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg md:text-2xl font-bold">Customer sign-off · {orderRef}</span>
+          <button onClick={onCancel} disabled={busy} className="p-1 md:p-2 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5" style={{ fontFamily: C.body }}>
-          <div className="text-white/60 text-xs lg:text-base mb-2">Have the customer sign below to confirm delivery.</div>
-          <canvas ref={canvasRef} className="w-full h-56 lg:h-96 rounded-xl touch-none" style={{ background: "#fff", border: "2px solid rgba(255,255,255,0.15)" }}
+          <div className="text-white/60 text-xs md:text-base mb-2">Have the customer sign below to confirm delivery.</div>
+          <canvas ref={canvasRef} className="w-full h-56 md:h-96 rounded-xl touch-none" style={{ background: "#fff", border: "2px solid rgba(255,255,255,0.15)" }}
             onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} onPointerCancel={end} />
           <div className="flex justify-end mt-1.5">
-            <button onClick={clear} disabled={busy} className="text-xs lg:text-base font-semibold px-2.5 py-1 lg:px-4 lg:py-2 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear &amp; redo</button>
+            <button onClick={clear} disabled={busy} className="text-xs md:text-base font-semibold px-2.5 py-1 md:px-4 md:py-2 rounded-lg active:scale-95 flex items-center gap-1" style={{ color: "rgba(255,255,255,0.6)", background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}><Trash2 size={12} /> Clear &amp; redo</button>
           </div>
-          <div className="grid grid-cols-2 gap-2 lg:gap-4 mt-3">
+          <div className="grid grid-cols-2 gap-2 md:gap-4 mt-3">
             <label className="flex flex-col gap-1">
-              <span className="text-white/40 text-[10px] lg:text-xs uppercase tracking-wide">Printed name</span>
-              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 lg:py-3.5 text-base lg:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span className="text-white/40 text-[10px] md:text-xs uppercase tracking-wide">Printed name</span>
+              <input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} placeholder="Who signed for it" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-white/40 text-[10px] lg:text-xs uppercase tracking-wide">Water added (gal) <span style={{ color: ORANGE }}>*</span></span>
-              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 lg:py-3.5 text-base lg:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+              <span className="text-white/40 text-[10px] md:text-xs uppercase tracking-wide">Water added (gal) <span style={{ color: ORANGE }}>*</span></span>
+              <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
             </label>
           </div>
-          {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs lg:text-base" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
-          <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 lg:py-5 text-base lg:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
+          {err && <div className="mt-2 rounded-lg px-3 py-2 text-xs md:text-base" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          <button onClick={submit} disabled={busy} className="w-full mt-4 rounded-xl py-3 md:py-5 text-base md:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>
             {busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : <><CheckCircle2 size={18} /> Confirm delivery</>}
           </button>
         </div>
@@ -7807,13 +7807,13 @@ function DriverApp({ driver, onLogout }) {
   // Driver status buttons (backup for when the geofence misses it).
   const StatusRow = ({ orderRef, current, seq }) => (
     <div className="mb-3">
-      <div className="text-white/45 text-[10px] lg:text-xs uppercase tracking-wide mb-1.5">Update status (if GPS misses it)</div>
+      <div className="text-white/45 text-[10px] md:text-xs uppercase tracking-wide mb-1.5">Update status (if GPS misses it)</div>
       <div className="grid grid-cols-3 gap-2">
         {[["onsite", "On site"], ["washout", "Washing out"], ["returning", "Returning"]].map(([sv, label]) => {
           const on = current === sv;
           return (
             <button key={sv} onClick={() => pushStatus(orderRef, sv, seq)} disabled={!!statusBusy}
-              className="rounded-xl py-3 lg:py-4 text-sm lg:text-base font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
+              className="rounded-xl py-3 md:py-4 text-sm md:text-base font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
               style={on ? { background: GREEN, color: NAVY_DEEP } : { background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
               {statusBusy === `${seq ?? "o"}:${sv}` ? <Loader2 size={14} className="animate-spin" /> : null}{label}
             </button>
@@ -7947,13 +7947,16 @@ function DriverApp({ driver, onLogout }) {
           ) : (
             <>
             {/* LEFT pane — delivery list. Full width on a phone (hidden once a job is
-                open); a fixed sidebar on a landscape tablet (always visible). */}
-            <div className={`overflow-y-auto overscroll-contain p-4 lg:p-3 lg:w-64 lg:shrink-0 lg:border-r lg:border-white/10 ${active ? "hidden lg:block" : "w-full"}`}>
-              <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                open); a fixed sidebar on a tablet (always visible). The tablet
+                split turns on at md (768px) — older truck tablets report well
+                under 1024 CSS px (a 1280x800 screen at 1.5x density is 853), so
+                gating this on lg left them stuck in the phone layout. */}
+            <div className={`overflow-y-auto overscroll-contain p-4 md:p-3 md:w-64 md:shrink-0 md:border-r md:border-white/10 ${active ? "hidden md:block" : "w-full"}`}>
+              <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 md:py-5 mb-3 text-base md:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                 <MessageSquare size={18} color={ORANGE} /> Message dispatch
                 {driverUnread > 0 && <span className="absolute top-2 right-3 text-xs font-bold rounded-full px-2 py-0.5 leading-none flex items-center justify-center min-w-[20px]" style={{ background: "#ef5350", color: "#fff" }}>{driverUnread}</span>}
               </button>
-              <button onClick={() => { setFuelMsg(null); setPumpMsg(null); setPumpPin(""); setFuelTab("pump"); setShowFuel(true); }} className="w-full rounded-xl py-3.5 lg:py-5 mb-3 text-base lg:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: pumpOn ? "#1a3a1a" : ORANGE, color: pumpOn ? "#4caf50" : NAVY_DEEP, border: pumpOn ? "1px solid #4caf50" : "none" }}>
+              <button onClick={() => { setFuelMsg(null); setPumpMsg(null); setPumpPin(""); setFuelTab("pump"); setShowFuel(true); }} className="w-full rounded-xl py-3.5 md:py-5 mb-3 text-base md:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: pumpOn ? "#1a3a1a" : ORANGE, color: pumpOn ? "#4caf50" : NAVY_DEEP, border: pumpOn ? "1px solid #4caf50" : "none" }}>
                 {pumpOn ? <Power size={18} color="#4caf50" /> : <Droplets size={18} />}
                 {pumpOn ? "Pump ON — tap to manage" : "Fuel station"}
               </button>
@@ -7963,27 +7966,29 @@ function DriverApp({ driver, onLogout }) {
               orders.map((o) => {
                 const sm = STATUS_META[o.status] || { label: o.status, color: "#7c8794" };
                 return (
-                  <button key={o.ref} onClick={() => setActiveRef(o.ref)} className={`w-full text-left rounded-xl mb-2.5 p-3.5 lg:p-4 active:scale-[0.99] ${activeRef === o.ref ? "lg:ring-2" : ""}`} style={{ background: activeRef === o.ref ? ORANGE + "1f" : NAVY, border: `1px solid ${activeRef === o.ref ? ORANGE : "rgba(255,255,255,0.08)"}` }}>
+                  <button key={o.ref} onClick={() => setActiveRef(o.ref)} className={`w-full text-left rounded-xl mb-2.5 p-3.5 md:p-4 active:scale-[0.99] ${activeRef === o.ref ? "md:ring-2" : ""}`} style={{ background: activeRef === o.ref ? ORANGE + "1f" : NAVY, border: `1px solid ${activeRef === o.ref ? ORANGE : "rgba(255,255,255,0.08)"}` }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-white font-bold text-base lg:text-lg" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</span>
+                      <span className="text-white font-bold text-base md:text-lg" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</span>
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
                     </div>
-                    <div className="text-white/55 text-xs lg:text-sm mt-1 flex items-center gap-1"><MapPin size={12} /> {o.site}</div>
-                    <div className="text-white/70 text-sm lg:text-base mt-1.5">{o.mix} · {o.qty} yd{o.time ? ` · ${o.time}` : ""}</div>
+                    <div className="text-white/55 text-xs md:text-sm mt-1 flex items-center gap-1"><MapPin size={12} /> {o.site}</div>
+                    <div className="text-white/70 text-sm md:text-base mt-1.5">{o.mix} · {o.qty} yd{o.time ? ` · ${o.time}` : ""}</div>
                     {o.has_signature && <div className="text-xs mt-1 flex items-center gap-1" style={{ color: GREEN }}><CheckCircle2 size={13} /> Signed by {o.signed_by}</div>}
                   </button>
                 );
               })
               )}
             </div>
-            {/* RIGHT pane — the open delivery; on a landscape tablet shows a prompt when none is open. */}
-            <div className={`flex-1 min-w-0 overflow-y-auto overscroll-contain p-4 ${active ? "" : "hidden lg:flex lg:items-center lg:justify-center"}`}>
+            {/* RIGHT pane — the open delivery; on a tablet shows a prompt when none is open. */}
+            <div className={`flex-1 min-w-0 overflow-y-auto overscroll-contain p-4 ${active ? "" : "hidden md:flex md:items-center md:justify-center"}`}>
             {!active ? (
               <div className="text-white/35 text-sm text-center" style={{ fontFamily: C.body }}><Truck size={40} className="mx-auto mb-2 opacity-40" /><div>Select a delivery to view it here.</div></div>
             ) : (
             <div className="lg:max-w-6xl lg:mx-auto">
-              <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3 lg:hidden" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
-              {/* On a landscape tablet: two columns so the driver sees everything without scrolling. */}
+              <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3 md:hidden" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
+              {/* Still lg (1024px+): side-by-side columns need real landscape width.
+                  Between 768 and 1024 the driver gets the sidebar + big type, but
+                  the delivery card stays one column so nothing gets squeezed. */}
               <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
               <div className="lg:min-w-0">
 
@@ -8004,21 +8009,21 @@ function DriverApp({ driver, onLogout }) {
 
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="text-white font-bold text-lg lg:text-3xl leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
+                  <div className="text-white font-bold text-lg md:text-3xl leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
                   {(() => { const sm = STATUS_META[active.status] || { label: active.status, color: "#7c8794" }; return <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>; })()}
                 </div>
                 {/* tappable address → opens turn-by-turn directions */}
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 lg:py-4 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
-                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm lg:text-lg flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs lg:text-base font-semibold shrink-0"><Navigation size={13} /> Directions</span>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 md:py-4 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
+                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm md:text-lg flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs md:text-base font-semibold shrink-0"><Navigation size={13} /> Directions</span>
                 </a>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 lg:gap-y-4 gap-x-3 mt-3.5 text-sm lg:text-lg">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 md:gap-y-4 gap-x-3 mt-3.5 text-sm md:text-lg">
                   {[
                     ["Customer", active.customer], ["Order #", active.ref],
                     ["Mix", active.mix], ["Quantity", active.qty ? `${active.qty} yd` : null],
                     ["Time", active.time], ["Slump", active.slump],
                     ["For", active.use_for], ["Truck", active.truck && active.truck !== "—" ? active.truck : null],
                   ].filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k}><div className="text-white/35 text-[10px] lg:text-[11px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold lg:text-lg">{v}</div></div>
+                    <div key={k}><div className="text-white/35 text-[10px] md:text-[11px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold md:text-lg">{v}</div></div>
                   ))}
                 </div>
                 {active.admixtures && <div className="mt-3 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
@@ -8039,7 +8044,7 @@ function DriverApp({ driver, onLogout }) {
                   onFocus={(e) => { const el = e.target; el.style.height = "auto"; el.style.height = Math.max(el.scrollHeight, 180) + "px"; setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 60); }}
                   rows={3}
                   placeholder="Notes from the site — gate code, where to pour, who received it, any issues…"
-                  className="w-full rounded-lg px-3 py-2.5 lg:py-3 text-base lg:text-xl leading-relaxed text-white outline-none resize-none placeholder:text-white/30"
+                  className="w-full rounded-lg px-3 py-2.5 md:py-3 text-base md:text-xl leading-relaxed text-white outline-none resize-none placeholder:text-white/30"
                   style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.14)", fontFamily: C.body, minHeight: 140 }}
                 />
                 <button onClick={saveNotes} disabled={notesBusy || notesDraft === (active.driver_notes || "")} className="w-full mt-2 rounded-lg py-2.5 text-sm font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: ORANGE, color: NAVY_DEEP }}>
@@ -8060,7 +8065,7 @@ function DriverApp({ driver, onLogout }) {
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
                         </div>
                         <StatusRow orderRef={active.ref} current={l.status} seq={l.seq} />
-                        <button onClick={() => openTicket(l.seq)} disabled={ticketBusy || !l.has_batch_ticket} className="w-full rounded-lg py-2.5 lg:py-4 mb-2 text-sm lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                        <button onClick={() => openTicket(l.seq)} disabled={ticketBusy || !l.has_batch_ticket} className="w-full rounded-lg py-2.5 md:py-4 mb-2 text-sm md:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                           {ticketBusy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={16} />} {l.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
                         </button>
                         {l.has_signature ? (
@@ -8072,7 +8077,7 @@ function DriverApp({ driver, onLogout }) {
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 lg:py-5 text-base lg:text-xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 md:py-5 text-base md:text-xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                             <ClipboardList size={17} /> Get customer signature
                           </button>
                         )}
@@ -8083,7 +8088,7 @@ function DriverApp({ driver, onLogout }) {
               ) : (
                 <>
                   <StatusRow orderRef={active.ref} current={active.status} />
-                  <button onClick={() => openTicket()} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 lg:py-4 mb-2.5 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                  <button onClick={() => openTicket()} disabled={ticketBusy || !active.has_batch_ticket} className="w-full rounded-xl py-3 md:py-4 mb-2.5 text-base md:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                     {ticketBusy ? <Loader2 size={16} className="animate-spin" /> : <FileText size={18} />} {active.has_batch_ticket ? "View batch ticket" : "No batch ticket yet"}
                   </button>
                   {active.has_signature ? (
@@ -8095,12 +8100,12 @@ function DriverApp({ driver, onLogout }) {
                           <div className="text-white/50 text-xs">{fmtDateTime(active.signed_at)}{active.water_added ? ` · ${active.water_added} gal water added` : ""}</div>
                         </div>
                       </div>
-                      <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 lg:py-4 text-base lg:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                      <button onClick={() => setShowTicket(true)} className="w-full rounded-xl py-3 md:py-4 text-base md:text-lg font-semibold active:scale-95 flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                         <FileText size={18} /> View signed delivery ticket
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 lg:py-6 text-base lg:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 md:py-6 text-base md:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                       <ClipboardList size={18} /> Get customer signature
                     </button>
                   )}
