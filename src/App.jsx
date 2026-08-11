@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -125,6 +125,31 @@ const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|
 const RECOMMENDED_MIX = "3500 PSI";
 const TXDOT_MIXES = ["TxDOT Class A", "TxDOT Class B", "TxDOT Class C"];
 const PRECAST_MIXES = ["Precast", "Block Fill"];   // specialty mixes
+// Anything else priced on the price sheet (e.g. Flowable Fill) is orderable too —
+// the sheet is the source of truth, so a mix added there needs no code change.
+// Matching mirrors the backend's _mix_matches: case/punctuation-insensitive,
+// substring either way, so "TxDot Class A" on the sheet isn't offered twice.
+const normMix = (m) => String(m || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+function extraSheetMixes(sheetMixes) {
+  const known = [...MIXES, ...TXDOT_MIXES, ...PRECAST_MIXES].map(normMix);
+  return (sheetMixes || []).filter((m) => {
+    const n = normMix(m);
+    return n && !known.some((k) => k.includes(n) || n.includes(k));
+  });
+}
+// One fetch per session, shared by every order form (customer and staff). Falls
+// back to the hardcoded groups above if the call fails — the form still works.
+function useSheetMixes() {
+  const [extra, setExtra] = useState([]);
+  useEffect(() => {
+    let live = true;
+    getMixes()
+      .then((r) => { if (live) setExtra(extraSheetMixes(r?.mixes)); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return extra;
+}
 // Customers locked to a single mix — they never order anything else, so the mix
 // field defaults to (and locks on) it. Matched as a substring of the customer
 // name, case-insensitive. The backend enforces this too. Keep in sync there.
@@ -661,6 +686,7 @@ function parseSpec(o = {}) {
 function useConcreteSpec(initial, customerName, isStaff = false) {
   const p = parseSpec(initial);
   const forcedMix = forcedMixFor(customerName);   // e.g. Landers → always "Precast"
+  const sheetMixes = useSheetMixes();             // extras priced on the price sheet
   const [mix, setMix] = useState(forcedMix || p.mix);
   // When the order is for a single-mix customer, snap the mix to theirs and keep
   // it there even if the customer is picked/changed after the form opened.
@@ -725,7 +751,13 @@ function useConcreteSpec(initial, customerName, isStaff = false) {
         </optgroup>
         <optgroup label="Specialty">
           {PRECAST_MIXES.map((m) => <option key={m} value={m}>{m}</option>)}
+          {sheetMixes.map((m) => <option key={m} value={m}>{m}</option>)}
         </optgroup>
+        {/* An order saved with a mix that's since been renamed/removed still shows
+            its own value, rather than silently reading as the first option. */}
+        {mix && ![...MIXES, ...TXDOT_MIXES, ...PRECAST_MIXES, ...sheetMixes].includes(mix) && (
+          <option value={mix}>{mix}</option>
+        )}
         </>)}
       </select>
       {forcedMix && <div className="text-white/35 text-[11px] mb-3">This customer only uses {forcedMix} — mix is set automatically.</div>}

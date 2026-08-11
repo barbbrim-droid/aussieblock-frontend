@@ -759,7 +759,17 @@ export function savePriceSheet(sheet) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sheet),
-  })
+  }).then((saved) => { _mixesCache = null; return saved })   // a new mix shows in the order form right away
+}
+// Mix names from the price sheet, for the order form's Mix dropdown (any login —
+// names only, no prices). Adding a mix to the sheet makes it orderable. Cached
+// for the session: every order form asks, and the sheet rarely changes.
+let _mixesCache = null
+export function getMixes() {
+  if (!_mixesCache) {
+    _mixesCache = request('/mixes').catch((e) => { _mixesCache = null; throw e })
+  }
+  return _mixesCache
 }
 
 // ── Dispatch (staff only) ──
