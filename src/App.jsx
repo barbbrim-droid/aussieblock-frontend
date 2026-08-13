@@ -2426,6 +2426,13 @@ function LoadsPanel({ o, trucks, onEdited }) {
                       <FileText size={11} /> Original
                     </button>
                   )}
+                  {/* The scan is saved and viewable straight away; the branded ticket is
+                      still rendering in the background and swaps in on the next poll. */}
+                  {ld.batch_status === "branding" && (
+                    <span title="Saved — converting to the branded Aussieblock ticket" className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md" style={{ color: ORANGE, background: ORANGE + "1a", border: `1px solid ${ORANGE}55`, fontFamily: C.body }}>
+                      <Loader2 size={11} className="animate-spin" /> Converting…
+                    </span>
+                  )}
                   <button onClick={() => pickTicket(ld.seq)} disabled={tBusy === ld.seq} className="text-[11px] font-semibold px-2 py-0.5 rounded-md active:scale-95 disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
                     {tBusy === ld.seq ? <Loader2 size={11} className="animate-spin" /> : "Replace"}
                   </button>
@@ -2691,6 +2698,13 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
                 <button onClick={() => openBatchTicket(o.ref, "print").catch((e) => setErr(e.message))} title="Open the printer-friendly (light) version" className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform" style={{ color: ORANGE, background: ORANGE + "1a", border: `1px solid ${ORANGE}55`, fontFamily: C.body }}>
                   <Printer size={12} /> Print
                 </button>
+              )}
+              {/* The scan is saved and viewable straight away; the branded ticket is
+                  still rendering in the background and swaps in on the next poll. */}
+              {o.batch_status === "branding" && (
+                <span title="Saved — converting to the branded Aussieblock ticket" className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg" style={{ color: ORANGE, background: ORANGE + "1a", border: `1px solid ${ORANGE}55`, fontFamily: C.body }}>
+                  <Loader2 size={12} className="animate-spin" /> Converting…
+                </span>
               )}
               <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg active:scale-95 transition-transform disabled:opacity-50" style={{ color: "rgba(255,255,255,0.6)", background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }}>
                 {busy ? <Loader2 size={12} className="animate-spin" /> : "Replace"}

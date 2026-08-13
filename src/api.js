@@ -141,13 +141,25 @@ export async function uploadBatchTicket(ref, file, variant = 'view') {
   const fd = new FormData()
   fd.append('file', file)
   const q = variant === 'print' ? '?variant=print' : ''
-  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket${q}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
-    body: fd,
-  })
+  const res = await uploadFetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/batch-ticket${q}`, fd)
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   return res.json()
+}
+
+// POST a multipart upload with the auth header. A dropped connection here is
+// reported by the browser as a bare "Failed to fetch" — which reads as though the
+// upload was lost, when in fact the server saves the file before doing anything
+// slow, so it has almost always landed. Say that instead of the raw error.
+async function uploadFetch(url, fd) {
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },   // no Content-Type: browser sets the multipart boundary
+      body: fd,
+    })
+  } catch (e) {
+    throw new Error("Lost connection while uploading — the ticket has most likely saved. Refresh the board to check before re-uploading.", { cause: e })
+  }
 }
 
 // Remove an order's batch-ticket PDF (staff). Returns the updated order.
@@ -341,11 +353,7 @@ export function getLoadBatchTicketImages(ref, seq) {
 export async function uploadLoadBatchTicket(ref, seq, file) {
   const fd = new FormData()
   fd.append('file', file)
-  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/loads/${seq}/batch-ticket`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },   // browser sets the multipart boundary
-    body: fd,
-  })
+  const res = await uploadFetch(`${API_BASE}/orders/${encodeURIComponent(ref)}/loads/${seq}/batch-ticket`, fd)
   if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
   return res.json()
 }
