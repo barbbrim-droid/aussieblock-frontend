@@ -7805,6 +7805,7 @@ function DeliveryTicketModal({ order, onClose }) {
 // (which marks the delivery complete). No board, no billing.
 function DriverApp({ driver, onLogout }) {
   const [data, setData] = useState(null);
+  const [trucks, setTrucks] = useState([]);   // for the driver's live concrete-temp box
   const [err, setErr] = useState("");
   const [activeRef, setActiveRef] = useState(null);
   const [signSeq, setSignSeq] = useState(null);   // null=closed, "order"=order-level, or a load seq number
@@ -7915,7 +7916,10 @@ function DriverApp({ driver, onLogout }) {
   );
 
   const load = async () => {
-    try { setData(await getDriverOrders()); setErr(""); }
+    try {
+      const [d, ts] = await Promise.all([getDriverOrders(), getTrucks().catch(() => [])]);
+      setData(d); setTrucks(ts || []); setErr("");
+    }
     catch (e) { setErr(e.message); }
   };
   useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, []);
@@ -7969,6 +7973,10 @@ function DriverApp({ driver, onLogout }) {
 
   const orders = data?.orders || [];
   const active = orders.find((o) => o.ref === activeRef) || null;
+  // The driver's truck (from their deliveries) and its live concrete temp — only
+  // shows if that truck has a mixer temp probe (currently just RTS 7329).
+  const myTruck = (active && active.truck) || orders.find((o) => o.truck)?.truck || null;
+  const myTemp = myTruck ? trucks.find((t) => t.label === myTruck)?.mixer_temp_f : null;
   // A continuous pour keeps its tickets on the loads, not the order. Show the
   // driver ONLY the load(s) they drove (matched by name) — not the whole pour —
   // otherwise Rodney sees every truck's ticket instead of just his.
@@ -8051,6 +8059,13 @@ function DriverApp({ driver, onLogout }) {
                 {pumpOn ? <Power size={18} color="#4caf50" /> : <Droplets size={18} />}
                 {pumpOn ? "Pump ON — tap to manage" : "Fuel station"}
               </button>
+              {myTemp != null && (
+                <div className="w-full rounded-xl py-3 md:py-4 mb-3 flex items-center justify-center gap-2.5" style={{ background: NAVY, border: "1px solid rgba(255,157,77,0.45)" }}>
+                  <Thermometer size={22} color="#ff9d4d" />
+                  <span className="text-white/60 text-sm font-semibold uppercase tracking-wide">Concrete</span>
+                  <span className="text-3xl font-bold leading-none" style={{ color: "#ff9d4d", fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
+                </div>
+              )}
               {orders.length === 0 ? (
               <div className="text-white/40 text-sm py-10 text-center">No deliveries assigned for today.</div>
             ) : (
