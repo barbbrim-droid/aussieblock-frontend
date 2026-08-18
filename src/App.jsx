@@ -7171,7 +7171,7 @@ function DispatchApp({ email, role, onLogout }) {
   // Live pours (>10 yd continuous pours actively being delivered) get their own
   // big column; they're pulled out of Today's/Upcoming so each shows in one place.
   // A pour still sitting at Scheduled stays in the schedule until it goes live.
-  const LIVE_POUR_STATUS = ["batched", "enroute", "onsite", "pouring", "returning"];
+  const LIVE_POUR_STATUS = ["batched", "enroute", "onsite", "pouring", "washout", "returning"];
   // A pour is "current" once it's in flight: its umbrella status is "ongoing"
   // (set when the pour starts), or it carries a stray truck stage. Scheduled /
   // requested / complete pours are not current.
@@ -7185,6 +7185,7 @@ function DispatchApp({ email, role, onLogout }) {
   // geofences for the yard / job site will drive At yard vs On site automatically.)
   const statusToTruck = (status, ref, job) => {
     if (status === "returning") return { label: "Returning", color: "#4da3ff", order: ref, job };
+    if (status === "washout") return { label: "Washing out", color: "#e3c04a", order: ref, job };
     if (status === "pouring") return { label: "Pouring", color: GREEN, order: ref, job };
     if (status === "onsite") return { label: "On site", color: GREEN, order: ref, job };
     if (status === "enroute") return { label: "En route", color: ORANGE_HOT, order: ref, job };
