@@ -8136,6 +8136,20 @@ function DriverApp({ driver, onLogout }) {
                 <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 md:py-4 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
                   <MapPin size={16} className="shrink-0" /> <span className="underline text-sm md:text-lg flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs md:text-base font-semibold shrink-0"><Navigation size={13} /> Directions</span>
                 </a>
+                {myTemp != null && (
+                  <div className="mt-2.5 rounded-lg px-3 py-2.5 flex items-center justify-between" style={{ background: "#ff9d4d14", border: "1px solid rgba(255,157,77,0.4)" }}>
+                    <span className="flex items-center gap-2" style={{ color: "#ff9d4d" }}>
+                      <Thermometer size={18} className="shrink-0" />
+                      <span className="text-xs md:text-sm font-semibold uppercase tracking-wide">Concrete</span>
+                      <span className="text-2xl md:text-3xl font-bold leading-none" style={{ fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
+                    </span>
+                    {myBatt != null && (
+                      <span className="flex items-center gap-1 text-xs md:text-sm font-semibold" style={{ color: myBatt < 20 ? "#ef5350" : myBatt < 50 ? "#ffb74d" : "#7ed07e" }}>
+                        <Battery size={14} /> {Math.round(myBatt)}%
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 md:gap-y-4 gap-x-3 mt-3.5 text-sm md:text-lg">
                   {[
                     ["Customer", active.customer], ["Order #", active.ref],
