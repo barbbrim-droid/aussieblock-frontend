@@ -7980,7 +7980,11 @@ function DriverApp({ driver, onLogout }) {
   const active = orders.find((o) => o.ref === activeRef) || null;
   // The driver's truck (from their deliveries) and its live concrete temp — only
   // shows if that truck has a mixer temp probe (currently just RTS 7329).
-  const myTruck = (active && active.truck) || orders.find((o) => o.truck)?.truck || null;
+  // The driver's truck for this delivery: the order's truck, or — on a pour — the
+  // truck on their load. "—" means unassigned, so treat it as none.
+  const _tl = (t) => (t && t !== "—" ? t : null);
+  const _orderTruck = (o) => _tl(o?.truck) || (o?.loads || []).map((l) => _tl(l.truck)).find(Boolean) || null;
+  const myTruck = _orderTruck(active) || orders.map(_orderTruck).find(Boolean) || null;
   const myTruckRow = myTruck ? trucks.find((t) => t.label === myTruck) : null;
   const myTemp = myTruckRow?.mixer_temp_f ?? null;
   const myBatt = myTruckRow?.mixer_batt_pct ?? null;
