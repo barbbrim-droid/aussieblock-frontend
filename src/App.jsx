@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer } from "lucide-react";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery } from "lucide-react";
 import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
@@ -7481,6 +7481,11 @@ function DispatchApp({ email, role, onLogout }) {
                             <Thermometer size={11} /> Concrete {Math.round(t.mixer_temp_f)}°F
                           </div>
                         )}
+                        {t.mixer_batt_pct != null && (
+                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: t.mixer_batt_pct < 20 ? "#ef5350" : t.mixer_batt_pct < 50 ? "#ffb74d" : "#7ed07e", fontFamily: C.body }}>
+                            <Battery size={11} /> Sensor batt {Math.round(t.mixer_batt_pct)}%
+                          </div>
+                        )}
                       </div>
                       <span className="shrink-0">
                         <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
@@ -7976,7 +7981,9 @@ function DriverApp({ driver, onLogout }) {
   // The driver's truck (from their deliveries) and its live concrete temp — only
   // shows if that truck has a mixer temp probe (currently just RTS 7329).
   const myTruck = (active && active.truck) || orders.find((o) => o.truck)?.truck || null;
-  const myTemp = myTruck ? trucks.find((t) => t.label === myTruck)?.mixer_temp_f : null;
+  const myTruckRow = myTruck ? trucks.find((t) => t.label === myTruck) : null;
+  const myTemp = myTruckRow?.mixer_temp_f ?? null;
+  const myBatt = myTruckRow?.mixer_batt_pct ?? null;
   // A continuous pour keeps its tickets on the loads, not the order. Show the
   // driver ONLY the load(s) they drove (matched by name) — not the whole pour —
   // otherwise Rodney sees every truck's ticket instead of just his.
@@ -8060,10 +8067,17 @@ function DriverApp({ driver, onLogout }) {
                 {pumpOn ? "Pump ON — tap to manage" : "Fuel station"}
               </button>
               {myTemp != null && (
-                <div className="w-full rounded-xl py-3 md:py-4 mb-3 flex items-center justify-center gap-2.5" style={{ background: NAVY, border: "1px solid rgba(255,157,77,0.45)" }}>
-                  <Thermometer size={22} color="#ff9d4d" />
-                  <span className="text-white/60 text-sm font-semibold uppercase tracking-wide">Concrete</span>
-                  <span className="text-3xl font-bold leading-none" style={{ color: "#ff9d4d", fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
+                <div className="w-full rounded-xl py-3 md:py-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,157,77,0.45)" }}>
+                  <div className="flex items-center justify-center gap-2.5">
+                    <Thermometer size={22} color="#ff9d4d" />
+                    <span className="text-white/60 text-sm font-semibold uppercase tracking-wide">Concrete</span>
+                    <span className="text-3xl font-bold leading-none" style={{ color: "#ff9d4d", fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
+                  </div>
+                  {myBatt != null && (
+                    <div className="flex items-center justify-center gap-1.5 mt-2 text-xs font-semibold" style={{ color: myBatt < 20 ? "#ef5350" : myBatt < 50 ? "#ffb74d" : "#7ed07e" }}>
+                      <Battery size={13} /> Sensor battery {Math.round(myBatt)}%
+                    </div>
+                  )}
                 </div>
               )}
               {orders.length === 0 ? (
