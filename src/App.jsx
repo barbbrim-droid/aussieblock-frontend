@@ -1634,6 +1634,26 @@ function isStale(updatedAt) {
   return (Date.now() - t) / 1000 > 45;
 }
 
+// How old the mixer probe's last temperature is. The probe posts every few minutes
+// while a truck is working and sleeps overnight and weekends, so it's the AGE that
+// says whether the number on the card is the concrete right now or the last thing
+// the probe saw days ago — a dead sensor otherwise reads as a live temperature.
+//   fresh  (< 30m) — show it plainly
+//   stale  (≥ 30m) — grey it and say how old; normal overnight/weekend state
+//   dead   (≥ 24h) — red; the probe should have woken up by now
+const MIXER_FRESH_MINS = 30;
+const MIXER_DEAD_HOURS = 24;
+function mixerAge(at) {
+  // No timestamp (backend predates mixer_updated_at) — don't guess, show it plainly.
+  if (!at) return { known: false, stale: false, dead: false, label: "" };
+  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(at);
+  const mins = (Date.now() - new Date(hasTz ? at : at + "Z").getTime()) / 60000;
+  return { known: true, stale: mins > MIXER_FRESH_MINS, dead: mins > MIXER_DEAD_HOURS * 60,
+           label: timeAgo(at) };
+}
+// Grey "this reading is old", red "the probe looks down", else the usual orange.
+const mixerColor = (age) => (age.dead ? "#ef5350" : age.stale ? "#9aa7b5" : "#ff9d4d");
+
 // Dark Google Maps style so the real map matches the dispatch UI.
 const MAP_DARK_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#1b2430" }] },
@@ -7476,11 +7496,17 @@ function DispatchApp({ email, role, onLogout }) {
                             <Navigation size={11} /> Back to yard · ~{yardEta} min
                           </div>
                         )}
-                        {t.mixer_temp_f != null && (
-                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#ff9d4d", fontFamily: C.body }}>
-                            <Thermometer size={11} /> Concrete {Math.round(t.mixer_temp_f)}°F
-                          </div>
-                        )}
+                        {t.mixer_temp_f != null && (() => {
+                          const age = mixerAge(t.mixer_updated_at);
+                          return (
+                            <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: mixerColor(age), fontFamily: C.body }}
+                                 title={age.known ? `Last sensor reading ${fmtDateTime(t.mixer_updated_at)}` : undefined}>
+                              <Thermometer size={11} /> Concrete {Math.round(t.mixer_temp_f)}°F
+                              {age.stale && <span className="opacity-90">· {age.label}</span>}
+                              {age.dead && <span className="font-semibold">· sensor down?</span>}
+                            </div>
+                          );
+                        })()}
                         {t.mixer_batt_pct != null && (
                           <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: t.mixer_batt_pct < 20 ? "#ef5350" : t.mixer_batt_pct < 50 ? "#ffb74d" : "#7ed07e", fontFamily: C.body }}>
                             <Battery size={11} /> Sensor batt {Math.round(t.mixer_batt_pct)}%
@@ -7987,6 +8013,9 @@ function DriverApp({ driver, onLogout }) {
   const myTruck = _orderTruck(active) || orders.map(_orderTruck).find(Boolean) || null;
   const myTruckRow = myTruck ? trucks.find((t) => t.label === myTruck) : null;
   const myTemp = myTruckRow?.mixer_temp_f ?? null;
+  // Same staleness read as the dispatch board — a driver looking at a big 3-digit
+  // temperature should be able to see when it's hours old rather than live.
+  const myTempAge = mixerAge(myTruckRow?.mixer_updated_at);
   const myBatt = myTruckRow?.mixer_batt_pct ?? null;
   // A continuous pour keeps its tickets on the loads, not the order. Show the
   // driver ONLY the load(s) they drove (matched by name) — not the whole pour —
@@ -8071,12 +8100,17 @@ function DriverApp({ driver, onLogout }) {
                 {pumpOn ? "Pump ON — tap to manage" : "Fuel station"}
               </button>
               {myTemp != null && (
-                <div className="w-full rounded-xl py-3 md:py-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,157,77,0.45)" }}>
+                <div className="w-full rounded-xl py-3 md:py-4 mb-3" style={{ background: NAVY, border: `1px solid ${mixerColor(myTempAge)}73` }}>
                   <div className="flex items-center justify-center gap-2.5">
-                    <Thermometer size={22} color="#ff9d4d" />
+                    <Thermometer size={22} color={mixerColor(myTempAge)} />
                     <span className="text-white/60 text-sm font-semibold uppercase tracking-wide">Concrete</span>
-                    <span className="text-3xl font-bold leading-none" style={{ color: "#ff9d4d", fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
+                    <span className="text-3xl font-bold leading-none" style={{ color: mixerColor(myTempAge), fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
                   </div>
+                  {myTempAge.stale && (
+                    <div className="text-center mt-1.5 text-xs font-semibold" style={{ color: mixerColor(myTempAge), fontFamily: C.body }}>
+                      {myTempAge.dead ? "Sensor down? Last reading " : "Last reading "}{myTempAge.label}
+                    </div>
+                  )}
                   {myBatt != null && (
                     <div className="flex items-center justify-center gap-1.5 mt-2 text-xs font-semibold" style={{ color: myBatt < 20 ? "#ef5350" : myBatt < 50 ? "#ffb74d" : "#7ed07e" }}>
                       <Battery size={13} /> Sensor battery {Math.round(myBatt)}%
@@ -8141,11 +8175,16 @@ function DriverApp({ driver, onLogout }) {
                   <MapPin size={16} className="shrink-0" /> <span className="underline text-sm md:text-lg flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs md:text-base font-semibold shrink-0"><Navigation size={13} /> Directions</span>
                 </a>
                 {myTemp != null && (
-                  <div className="mt-2.5 rounded-lg px-3 py-2.5 flex items-center justify-between" style={{ background: "#ff9d4d14", border: "1px solid rgba(255,157,77,0.4)" }}>
-                    <span className="flex items-center gap-2" style={{ color: "#ff9d4d" }}>
+                  <div className="mt-2.5 rounded-lg px-3 py-2.5 flex items-center justify-between" style={{ background: mixerColor(myTempAge) + "14", border: `1px solid ${mixerColor(myTempAge)}66` }}>
+                    <span className="flex items-center gap-2 flex-wrap" style={{ color: mixerColor(myTempAge) }}>
                       <Thermometer size={18} className="shrink-0" />
                       <span className="text-xs md:text-sm font-semibold uppercase tracking-wide">Concrete</span>
                       <span className="text-2xl md:text-3xl font-bold leading-none" style={{ fontFamily: C.cond }}>{Math.round(myTemp)}°F</span>
+                      {myTempAge.stale && (
+                        <span className="text-xs font-semibold">
+                          {myTempAge.dead ? "· sensor down? " : "· "}{myTempAge.label}
+                        </span>
+                      )}
                     </span>
                     {myBatt != null && (
                       <span className="flex items-center gap-1 text-xs md:text-sm font-semibold" style={{ color: myBatt < 20 ? "#ef5350" : myBatt < 50 ? "#ffb74d" : "#7ed07e" }}>
