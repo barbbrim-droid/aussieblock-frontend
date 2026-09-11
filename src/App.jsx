@@ -29,6 +29,11 @@ function truckColorMap(trucks) {
     .forEach((label, i) => { m[label] = TRUCK_COLORS[i % TRUCK_COLORS.length]; });
   return m;
 }
+// Ready-mix trucks only. An aggregate hauler (rock/sand) is still a truck for
+// GPS, fuel and the fleet list, but it never carries concrete — so it's kept out
+// of every truck picker on an order or load (the backend refuses it too).
+const isMixer = (t) => (t.kind || "mixer") !== "aggregate";
+const mixerTrucks = (trucks) => (trucks || []).filter(isMixer);
 // Straight-line distance in miles between two {lat,lng} points (null if either missing).
 function milesBetween(a, b) {
   if (!a || !b || a.lat == null || b.lat == null) return null;
@@ -2421,7 +2426,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
               <LoadQtyInput qty={ld.qty} disabled={busy === ld.seq} style={selSt} onSave={(q) => upd(ld.seq, { qty: q })} />
               <select value={ld.truck} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { truck: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
                 <option value="—">Unassigned</option>
-                {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+                {mixerTrucks(trucks).map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
               </select>
               {/* Each load carries its own driver (one truck-load = one driver). Send "" to clear (the backend only clears on empty). */}
               <select value={ld.driver && ld.driver !== "—" ? ld.driver : ""} disabled={busy === ld.seq} onChange={(e) => upd(ld.seq, { driver: e.target.value })} className="rounded-lg px-1.5 py-1 text-xs outline-none disabled:opacity-50 cursor-pointer" style={selSt}>
@@ -2471,7 +2476,7 @@ function LoadsPanel({ o, trucks, onEdited }) {
         <div className="grid gap-1.5 mb-1 items-center" style={{ gridTemplateColumns: "minmax(0,100px) minmax(0,100px) 50px auto", maxWidth: 460 }}>
           <select value={nTruck} onChange={(e) => setNTruck(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
             <option value="—">Pick truck…</option>
-            {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+            {mixerTrucks(trucks).map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
           <select value={nDriver} onChange={(e) => setNDriver(e.target.value)} className="rounded-lg px-1.5 py-1 text-xs outline-none cursor-pointer" style={selSt}>
             <option value="">Driver…</option>
@@ -2669,7 +2674,7 @@ function OrderRow({ o, trucks, onStatus, onAssign, onCancel, onEdited, onCreated
             style={{ background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
           >
             <option value="—">Unassigned</option>
-            {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+            {mixerTrucks(trucks).map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
         </label>
         {onDriver && !compact && (
@@ -3258,12 +3263,19 @@ function CustomerLogins({ orders = [], trucks = [], onReordered }) {
 
 // Staff modal: add/remove the trucks in the fleet. The GPS device id is optional
 // (fill it in later, paired with a One Step GPS API key, to enable live tracking).
+// Purple "AGGREGATE" tag on a rock/sand hauler wherever trucks are listed, so
+// nobody mistakes it for a mixer.
+function AggregateBadge() {
+  return <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#c77dff22", color: "#c77dff", fontFamily: C.body }}>Aggregate</span>;
+}
+
 function ManageTrucksModal({ onClose, onChanged }) {
   const [trucks, setTrucks] = useState([]);
   const [label, setLabel] = useState("");
   const [device, setDevice] = useState("");
   const [fuelVehicle, setFuelVehicle] = useState("");
   const [notes, setNotes] = useState("");
+  const [kind, setKind] = useState("mixer");   // "mixer" (ready-mix) or "aggregate" (rock/sand hauler)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
@@ -3275,9 +3287,9 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const add = async () => {
     setBusy(true); setMsg(null);
     try {
-      const r = await addTruck(label.trim(), device.trim(), notes.trim(), fuelVehicle.trim());
-      setMsg({ ok: true, text: `Truck ${r.action}: ${r.label}` });
-      setLabel(""); setDevice(""); setFuelVehicle(""); setNotes("");
+      const r = await addTruck(label.trim(), device.trim(), notes.trim(), fuelVehicle.trim(), kind);
+      setMsg({ ok: true, text: `Truck ${r.action}: ${r.label}${r.kind === "aggregate" ? " (aggregate hauler)" : ""}` });
+      setLabel(""); setDevice(""); setFuelVehicle(""); setNotes(""); setKind("mixer");
       await load(); onChanged && onChanged();
     } catch (e) { setMsg({ ok: false, text: e.message }); }
     finally { setBusy(false); }
@@ -3311,8 +3323,8 @@ function ManageTrucksModal({ onClose, onChanged }) {
             <div className="mb-4">
               {trucks.map((t) => (
                 <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: `1px solid ${existing && existing.label === t.label ? ORANGE : "rgba(255,255,255,0.06)"}` }}>
-                  <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setFuelVehicle(t.fuel_vehicle || ""); setNotes(t.notes || ""); }} className="min-w-0 flex-1 text-left">
-                    <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
+                  <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setFuelVehicle(t.fuel_vehicle || ""); setNotes(t.notes || ""); setKind(t.kind || "mixer"); }} className="min-w-0 flex-1 text-left">
+                    <div className="text-white text-sm font-semibold truncate flex items-center gap-1.5" style={{ fontFamily: C.cond }}>{t.label}{!isMixer(t) && <AggregateBadge />}</div>
                     <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}{t.fuel_vehicle ? ` · Fuel: ${t.fuel_vehicle}` : ""}</div>
                     {t.notes && <div className="text-white/55 text-xs truncate mt-0.5 flex items-center gap-1"><FileText size={11} /> {t.notes}</div>}
                   </button>
@@ -3330,8 +3342,13 @@ function ManageTrucksModal({ onClose, onChanged }) {
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Truck name (e.g. RTS 4554)" className={inCls + " mb-2"} style={inSt} />
             <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-2"} style={inSt} />
             <input value={fuelVehicle} onChange={(e) => setFuelVehicle(e.target.value)} placeholder="Fuel meter truck # (optional)" className={inCls + " mb-2"} style={inSt} />
+            <div className="flex gap-1.5 mb-2">
+              {[["mixer", "Ready-mix truck"], ["aggregate", "Aggregate hauler"]].map(([k, lab]) => (
+                <button key={k} type="button" onClick={() => setKind(k)} className="flex-1 rounded-lg py-1.5 text-xs font-bold active:scale-95" style={{ background: kind === k ? ORANGE : NAVY_DEEP, color: kind === k ? NAVY_DEEP : "rgba(255,255,255,0.6)", border: `1px solid ${kind === k ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>{lab}</button>
+              ))}
+            </div>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (driver, capacity, maintenance…)" className={inCls + " mb-1 resize-none"} style={inSt} />
-            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking (optional). Fuel fills match this truck by its name/number automatically — set a fuel meter # only if the meter reports a different number.</p>
+            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking (optional). Fuel fills match this truck by its name/number automatically — set a fuel meter # only if the meter reports a different number. An <b>aggregate hauler</b> (rock/sand only) stays on the fleet list and map but is never offered on a concrete order.</p>
             <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {existing ? "Update truck" : "Add truck"}
             </button>
@@ -6687,7 +6704,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
           <label className={lbl}>Truck (optional)</label>
           <select value={truck} onChange={(e) => setTruck(e.target.value)} className={inCls} style={inSt}>
             <option value="">Unassigned</option>
-            {trucks.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+            {mixerTrucks(trucks).map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
           <p className="text-white/35 text-xs mt-1 mb-3">Assign a truck now or later from the board.</p>
 
@@ -7483,13 +7500,14 @@ function DispatchApp({ email, role, onLogout }) {
                         <div className="flex items-center gap-2">
                           <Truck size={14} color={tColor} />
                           <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
+                          {!isMixer(t) && <AggregateBadge />}
                         </div>
                         {s.job ? (
                           <div className="text-xs truncate mt-0.5" style={{ color: "rgba(255,255,255,0.7)", fontFamily: C.body }}>
                             {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}
                           </div>
                         ) : (
-                          <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>No active job{t.notes ? ` · ${t.notes}` : ""}</div>
+                          <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{isMixer(t) ? "No active job" : "Hauls aggregate only"}{t.notes ? ` · ${t.notes}` : ""}</div>
                         )}
                         {yardEta != null && (
                           <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#4da3ff", fontFamily: C.body }}>

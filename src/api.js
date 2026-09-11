@@ -430,7 +430,7 @@ export function getTrucks() {
 // Add a truck (or update it if the name already exists) — staff only.
 // gps_device_id (One Step GPS) and fluidsecure_vehicle_id (FluidSecure fuel) are
 // both optional; fill them in later to enable live tracking / fuel tracking.
-export function addTruck(label, gps_device_id, notes, fluidsecure_vehicle_id) {
+export function addTruck(label, gps_device_id, notes, fluidsecure_vehicle_id, kind = 'mixer') {
   return request('/trucks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -439,6 +439,7 @@ export function addTruck(label, gps_device_id, notes, fluidsecure_vehicle_id) {
       gps_device_id: gps_device_id || null,
       fluidsecure_vehicle_id: fluidsecure_vehicle_id || null,
       notes: notes || '',
+      kind: kind || 'mixer',
     }),
   })
 }
