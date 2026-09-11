@@ -7484,9 +7484,12 @@ function DispatchApp({ email, role, onLogout }) {
             <Panel fill>
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0"><GoogleFleetMap trucks={trucks} sites={mapSites} /></div>
-                <div className="shrink-0 overflow-y-auto flex flex-col gap-1 mt-2" style={{ maxHeight: "30%" }}>
+                {/* Fleet cards: two columns so the whole fleet is visible at once without
+                    scrolling — the map above gives up the room. Scrolls only if the fleet
+                    outgrows a bit over half the panel. */}
+                <div className="shrink-0 overflow-y-auto grid grid-cols-2 gap-1.5 mt-2 content-start" style={{ maxHeight: "55%" }}>
                 {trucks.length === 0 ? (
-                  <div className="text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
+                  <div className="col-span-2 text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
                 ) : trucks.map((t) => {
                   const s = truckStatus(t);
                   const tColor = truckColorMap(trucks)[t.label] || ORANGE;
