@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Jun18-v77";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep12-v78";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
@@ -3373,7 +3373,7 @@ function FuelModal({ onClose }) {
   const [fills, setFills] = useState(null);           // fills for the expanded truck
   const [loadingFills, setLoadingFills] = useState(false);
   const [editId, setEditId] = useState(null);         // fill being edited inline
-  const [editForm, setEditForm] = useState({ truck_label: "", gallons: "" });
+  const [editForm, setEditForm] = useState({ truck_label: "", gallons: "", odometer: "" });
   const [busy, setBusy] = useState(false);            // an edit/delete is in flight
   const [addOpen, setAddOpen] = useState(false);      // "add fuel fill" form open
   const [addForm, setAddForm] = useState({ truck_label: "", gallons: "", odometer: "", occurred_at: "" });
@@ -3405,7 +3405,7 @@ function FuelModal({ onClose }) {
 
   const startEdit = (fill, currentLabel) => {
     setEditId(fill.id);
-    setEditForm({ truck_label: currentLabel || "", gallons: fill.gallons != null ? String(fill.gallons) : "" });
+    setEditForm({ truck_label: currentLabel || "", gallons: fill.gallons != null ? String(fill.gallons) : "", odometer: fill.odometer != null ? String(fill.odometer) : "" });
   };
 
   const saveEdit = async (fill) => {
@@ -3413,6 +3413,7 @@ function FuelModal({ onClose }) {
     try {
       const body = { truck_label: editForm.truck_label };   // "" = move to Unmatched
       if (editForm.gallons !== "" && Number(editForm.gallons) >= 0) body.gallons = Number(editForm.gallons);
+      if (editForm.odometer !== "" && Number(editForm.odometer) > 0) body.odometer = Number(editForm.odometer);
       await editFuelFill(fill.id, body);
       setEditId(null);
       await refresh();
@@ -3451,41 +3452,117 @@ function FuelModal({ onClose }) {
   const card = { background: NAVY, border: "1px solid rgba(255,255,255,0.06)" };
   const truckLabels = data ? data.trucks.map((t) => t.label) : [];
 
-  // One fill row: details + edit/delete controls; expands to an inline editor.
-  // `currentLabel` is the truck the fill sits on now ("" when Unmatched).
-  const renderFill = (f, currentLabel, isLast) => {
-    const editing = editId === f.id;
+  // Miles driven between consecutive fills, from the odometer the driver enters at
+  // the pump. Only counted when both readings exist and the gap is believable —
+  // a driver typing another truck's mileage would otherwise read as thousands of
+  // miles on one tank. Returns {fillId -> miles|null}.
+  const milesBetweenFills = (list) => {
+    const asc = [...list].sort((a, b) => String(a.when || "").localeCompare(String(b.when || "")));
+    const out = new Map();
+    let prevOdo = null;
+    for (const f of asc) {
+      let mi = null;
+      if (f.odometer != null && prevOdo != null) {
+        const d = f.odometer - prevOdo;
+        if (d > 0 && d < 3000) mi = d;
+      }
+      // A reading that doesn't follow on from the last good one (typo, or another
+      // truck's mileage) is skipped, so the next real reading still gets its miles.
+      if (f.odometer != null && (prevOdo == null || mi != null)) prevOdo = f.odometer;
+      out.set(f.id, mi);
+    }
+    return out;
+  };
+  const num = (v, d = 0) => (v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
+
+  // The full fill history for one truck (or the Unmatched bucket) as a table:
+  // when, who, odometer, miles since the prior fill, gallons, MPG, plus edit /
+  // delete. `currentLabel` is the truck the fills sit on now ("" when Unmatched).
+  const renderFills = (list, currentLabel) => {
+    const miles = milesBetweenFills(list);
+    const totGal = list.reduce((a, f) => a + (f.gallons || 0), 0);
+    const totMi = list.reduce((a, f) => a + (miles.get(f.id) || 0), 0);
+    const galOnMi = list.reduce((a, f) => a + (miles.get(f.id) != null ? (f.gallons || 0) : 0), 0);
     const selSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: C.body };
+    const th = "text-left text-white/40 text-[10px] uppercase tracking-wide font-semibold py-1.5 pr-3 whitespace-nowrap";
+    const td = "py-1.5 pr-3 whitespace-nowrap align-middle";
+    const unmatched = currentLabel === "";
     return (
-      <div key={f.id} style={{ borderBottom: !isLast ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-        <div className="flex items-center justify-between text-xs py-1.5 gap-2">
-          <span className="text-white/55 min-w-0 truncate">
-            {f.when ? formatOrderDate(f.when) : "—"}{f.fuel_type ? ` · ${f.fuel_type}` : ""}{f.driver ? ` · ${f.driver}` : ""}{f.odometer != null ? ` · ${Number(f.odometer).toLocaleString()} odo` : ""}{currentLabel === "" && f.vehicle_no ? ` · #${f.vehicle_no}` : ""}
-          </span>
-          <span className="flex items-center gap-1.5 shrink-0">
-            <span className="text-white font-semibold">{(f.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal</span>
-            <button onClick={() => (editing ? setEditId(null) : startEdit(f, currentLabel))} disabled={busy} title="Edit / reassign" className="p-1 rounded active:scale-90 disabled:opacity-40" style={{ background: "rgba(255,255,255,0.06)" }}><Pencil size={12} color="#cfe0ff" /></button>
-            <button onClick={() => doDelete(f)} disabled={busy} title="Delete fill" className="p-1 rounded active:scale-90 disabled:opacity-40" style={{ background: "rgba(239,83,80,0.14)" }}><Trash2 size={12} color="#ff8a85" /></button>
-          </span>
-        </div>
-        {editing && (
-          <div className="flex flex-wrap items-center gap-1.5 pb-2 pt-0.5">
-            <select value={editForm.truck_label} onChange={(e) => setEditForm({ ...editForm, truck_label: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={selSt}>
-              <option value="">Unmatched</option>
-              {truckLabels.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-            <input value={editForm.gallons} onChange={(e) => setEditForm({ ...editForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="gal" className="w-16 rounded-md px-2 py-1 text-xs outline-none" style={selSt} />
-            <button onClick={() => saveEdit(f)} disabled={busy} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save</button>
-            <button onClick={() => setEditId(null)} disabled={busy} className="rounded-md px-2 py-1 text-xs text-white/55 active:scale-95" style={{ background: "rgba(255,255,255,0.06)" }}>Cancel</button>
-          </div>
-        )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <th className={th}>Date</th>
+              <th className={th}>Driver</th>
+              {unmatched && <th className={th}>Vehicle #</th>}
+              <th className={th + " text-right"}>Odometer</th>
+              <th className={th + " text-right"}>Miles</th>
+              <th className={th + " text-right"}>Gallons</th>
+              <th className={th + " text-right"}>MPG</th>
+              <th className={th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((f) => {
+              const editing = editId === f.id;
+              const mi = miles.get(f.id);
+              const mpg = mi != null && f.gallons > 0 ? mi / f.gallons : null;
+              return (
+                <Fragment key={f.id}>
+                  <tr style={{ borderBottom: editing ? "none" : "1px solid rgba(255,255,255,0.04)", background: editing ? "rgba(255,255,255,0.03)" : "transparent" }}>
+                    <td className={td + " text-white/80"}>{f.when ? fmtDateTime(f.when) : "—"}{f.fuel_type && f.fuel_type !== "Diesel" ? <span className="text-white/40"> · {f.fuel_type}</span> : null}</td>
+                    <td className={td + " text-white/70"}>{f.driver || "—"}</td>
+                    {unmatched && <td className={td + " text-white/70"}>{f.vehicle_no ? `#${f.vehicle_no}` : "—"}</td>}
+                    <td className={td + " text-right text-white/85"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(f.odometer)}</td>
+                    <td className={td + " text-right text-white/70"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(mi)}</td>
+                    <td className={td + " text-right text-white font-semibold"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(f.gallons, 1)}</td>
+                    <td className={td + " text-right"} style={{ fontVariantNumeric: "tabular-nums", color: mpg == null ? "rgba(255,255,255,0.35)" : mpg < 2 ? "#ffb74d" : "#7ed07e" }}>{mpg == null ? "—" : mpg.toFixed(1)}</td>
+                    <td className={td + " text-right"}>
+                      <span className="inline-flex items-center gap-1">
+                        <button onClick={() => (editing ? setEditId(null) : startEdit(f, currentLabel))} disabled={busy} title="Edit / reassign" className="p-1 rounded active:scale-90 disabled:opacity-40" style={{ background: "rgba(255,255,255,0.06)" }}><Pencil size={12} color="#cfe0ff" /></button>
+                        <button onClick={() => doDelete(f)} disabled={busy} title="Delete fill" className="p-1 rounded active:scale-90 disabled:opacity-40" style={{ background: "rgba(239,83,80,0.14)" }}><Trash2 size={12} color="#ff8a85" /></button>
+                      </span>
+                    </td>
+                  </tr>
+                  {editing && (
+                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.03)" }}>
+                      <td colSpan={unmatched ? 8 : 7} className="pb-2 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <select value={editForm.truck_label} onChange={(e) => setEditForm({ ...editForm, truck_label: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={selSt}>
+                            <option value="">Unmatched</option>
+                            {truckLabels.map((l) => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                          <input value={editForm.gallons} onChange={(e) => setEditForm({ ...editForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="gal" className="w-16 rounded-md px-2 py-1 text-xs outline-none" style={selSt} />
+                          <input value={editForm.odometer} onChange={(e) => setEditForm({ ...editForm, odometer: e.target.value })} type="number" inputMode="numeric" placeholder="odometer" className="w-24 rounded-md px-2 py-1 text-xs outline-none" style={selSt} />
+                          <button onClick={() => saveEdit(f)} disabled={busy} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save</button>
+                          <button onClick={() => setEditId(null)} disabled={busy} className="rounded-md px-2 py-1 text-xs text-white/55 active:scale-95" style={{ background: "rgba(255,255,255,0.06)" }}>Cancel</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+              <td className={td + " text-white/50"} colSpan={unmatched ? 3 : 2}>{list.length} fill{list.length === 1 ? "" : "s"}</td>
+              <td className={td}></td>
+              <td className={td + " text-right text-white/70"} style={{ fontVariantNumeric: "tabular-nums" }}>{totMi > 0 ? num(totMi) : "—"}</td>
+              <td className={td + " text-right text-white font-bold"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(totGal, 1)}</td>
+              <td className={td + " text-right text-white/70"} style={{ fontVariantNumeric: "tabular-nums" }}>{totMi > 0 && galOnMi > 0 ? (totMi / galOnMi).toFixed(1) : "—"}</td>
+              <td className={td}></td>
+            </tr>
+          </tfoot>
+        </table>
+        <div className="text-white/30 text-[10px] mt-1">Miles = odometer gap from the previous fill (needs a mileage entered at both fills). MPG = those miles ÷ that fill's gallons.</div>
       </div>
     );
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-3xl rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
           <div className="flex items-center gap-2"><Droplets size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Fuel usage</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
@@ -3499,7 +3576,7 @@ function FuelModal({ onClose }) {
               <div className="mb-3 flex items-end justify-between gap-2">
                 <div>
                   <div className="text-white/50 text-xs uppercase tracking-wide">Total fuel — all trucks</div>
-                  <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span></div>
+                  <div className="text-white text-2xl font-bold" style={{ fontFamily: C.cond }}>{totalGal.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/50 text-base font-normal">gal</span>{data.fleet && data.fleet.cost > 0 && <span className="text-white/50 text-base font-normal"> · ${Number(data.fleet.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}</div>
                 </div>
                 <button onClick={() => { setAddOpen((v) => !v); setErr(""); }} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold active:scale-95 shrink-0" style={{ background: addOpen ? "rgba(255,255,255,0.08)" : ORANGE, color: addOpen ? "#cfe0ff" : NAVY_DEEP }}>
                   {addOpen ? <X size={13} /> : <Plus size={13} />} {addOpen ? "Cancel" : "Add fill"}
@@ -3530,16 +3607,20 @@ function FuelModal({ onClose }) {
                     <div key={t.label} className="rounded-lg mb-1.5 overflow-hidden" style={card}>
                       <button onClick={() => t.fills > 0 && toggle(t.label)} className="w-full flex items-center justify-between px-3 py-2.5 text-left">
                         <div className="min-w-0">
-                          <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</div>
-                          <div className="text-white/40 text-xs truncate">
-                            {t.fills > 0 ? `${t.fills} fill${t.fills === 1 ? "" : "s"}` : "No fills yet"}
-                            {t.last_fill ? ` · last ${timeAgo(t.last_fill)}` : ""}
-                            {t.last_odometer != null ? ` · ${Number(t.last_odometer).toLocaleString()} odo` : ""}
+                          <div className="text-white text-sm font-semibold truncate flex items-center gap-2" style={{ fontFamily: C.cond }}>
+                            {t.label}
+                            {t.fills > 0 && <span className="text-white/35 text-[10px] font-normal" style={{ fontFamily: C.body }}>{openLabel === t.label ? "hide fills" : "tap for fills"}</span>}
+                          </div>
+                          <div className="text-white/45 text-xs flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                            <span>{t.fills > 0 ? `${t.fills} fill${t.fills === 1 ? "" : "s"}` : "No fills yet"}{t.last_fill ? ` · last ${timeAgo(t.last_fill)}` : ""}</span>
+                            {t.last_odometer != null && <span>Odometer <span className="text-white/75">{Number(t.last_odometer).toLocaleString()}</span></span>}
+                            {t.yards > 0 && <span>{Number(t.yards).toLocaleString(undefined, { maximumFractionDigits: 0 })} yd delivered</span>}
+                            {t.gal_per_yd != null && t.gal_per_yd > 0 && <span><span className="text-white/75">{t.gal_per_yd}</span> gal/yd</span>}
                           </div>
                         </div>
                         <div className="text-right shrink-0 ml-2">
-                          <div className="text-white font-bold" style={{ fontFamily: C.cond }}>{(t.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</div>
-                          <div className="text-white/40 text-[11px]">gal</div>
+                          <div className="text-white font-bold" style={{ fontFamily: C.cond }}>{(t.gallons || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-white/40 text-[11px] font-normal">gal</span></div>
+                          {t.cost > 0 && <div className="text-white/50 text-[11px]">${Number(t.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>}
                         </div>
                       </button>
                       {openLabel === t.label && (
@@ -3549,7 +3630,7 @@ function FuelModal({ onClose }) {
                           ) : !fills || fills.length === 0 ? (
                             <div className="text-white/40 text-xs py-2">No fills recorded.</div>
                           ) : (
-                            fills.map((f, i) => renderFill(f, t.label, i === fills.length - 1))
+                            renderFills(fills, t.label)
                           )}
                         </div>
                       )}
@@ -3571,7 +3652,7 @@ function FuelModal({ onClose }) {
                       {(data.unmatched.list || []).length === 0 ? (
                         <div className="text-white/40 text-xs py-2">No fills.</div>
                       ) : (
-                        data.unmatched.list.map((f, i) => renderFill(f, "", i === data.unmatched.list.length - 1))
+                        renderFills(data.unmatched.list, "")
                       )}
                     </div>
                   )}
@@ -7957,7 +8038,7 @@ function DriverApp({ driver, onLogout }) {
           const on = current === sv;
           return (
             <button key={sv} onClick={() => pushStatus(orderRef, sv, seq)} disabled={!!statusBusy}
-              className="rounded-xl py-3 md:py-4 text-sm md:text-base font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
+              className="rounded-xl py-3 md:py-4 text-sm lg:text-base font-bold active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
               style={on ? { background: GREEN, color: NAVY_DEEP } : { background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
               {statusBusy === `${seq ?? "o"}:${sv}` ? <Loader2 size={14} className="animate-spin" /> : null}{label}
             </button>
@@ -8111,15 +8192,19 @@ function DriverApp({ driver, onLogout }) {
                 split turns on at md (768px) — older truck tablets report well
                 under 1024 CSS px (a 1280x800 screen at 1.5x density is 853), so
                 gating this on lg left them stuck in the phone layout. */}
-            <div className={`overflow-y-auto overscroll-contain p-4 md:p-3 md:w-64 md:shrink-0 md:border-r md:border-white/10 ${active ? "hidden md:block" : "w-full"}`}>
-              <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 md:py-5 mb-3 text-base md:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
-                <MessageSquare size={18} color={ORANGE} /> Message dispatch
+            <div className={`overflow-y-auto overscroll-contain p-4 md:p-3 md:w-64 lg:w-72 md:shrink-0 md:border-r md:border-white/10 ${active ? "hidden md:block" : "w-full"}`}>
+              {/* Tablet: the two tool buttons share one row so the delivery list starts
+                  higher — in landscape the screen is short and they were eating a third of it. */}
+              <div className="md:grid md:grid-cols-2 md:gap-2 md:mb-3">
+              <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 md:py-4 mb-3 md:mb-0 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                <MessageSquare size={18} color={ORANGE} /> <span className="md:hidden">Message dispatch</span><span className="hidden md:inline">Dispatch</span>
                 {driverUnread > 0 && <span className="absolute top-2 right-3 text-xs font-bold rounded-full px-2 py-0.5 leading-none flex items-center justify-center min-w-[20px]" style={{ background: "#ef5350", color: "#fff" }}>{driverUnread}</span>}
               </button>
-              <button onClick={() => { setFuelMsg(null); setPumpMsg(null); setPumpPin(""); setFuelTab("pump"); setShowFuel(true); }} className="w-full rounded-xl py-3.5 md:py-5 mb-3 text-base md:text-lg font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: pumpOn ? "#1a3a1a" : ORANGE, color: pumpOn ? "#4caf50" : NAVY_DEEP, border: pumpOn ? "1px solid #4caf50" : "none" }}>
+              <button onClick={() => { setFuelMsg(null); setPumpMsg(null); setPumpPin(""); setFuelTab("pump"); setShowFuel(true); }} className="w-full rounded-xl py-3.5 md:py-4 mb-3 md:mb-0 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: pumpOn ? "#1a3a1a" : ORANGE, color: pumpOn ? "#4caf50" : NAVY_DEEP, border: pumpOn ? "1px solid #4caf50" : "none" }}>
                 {pumpOn ? <Power size={18} color="#4caf50" /> : <Droplets size={18} />}
-                {pumpOn ? "Pump ON — tap to manage" : "Fuel station"}
+                <span className="md:hidden">{pumpOn ? "Pump ON — tap to manage" : "Fuel station"}</span><span className="hidden md:inline">{pumpOn ? "Pump ON" : "Fuel"}</span>
               </button>
+              </div>
               {myTemp != null && (
                 <div className="w-full rounded-xl py-3 md:py-4 mb-3" style={{ background: NAVY, border: `1px solid ${mixerColor(myTempAge)}73` }}>
                   <div className="flex items-center justify-center gap-2.5">
@@ -8146,12 +8231,13 @@ function DriverApp({ driver, onLogout }) {
                 const sm = STATUS_META[o.status] || { label: o.status, color: "#7c8794" };
                 return (
                   <button key={o.ref} onClick={() => setActiveRef(o.ref)} className={`w-full text-left rounded-xl mb-2.5 p-3.5 md:p-4 active:scale-[0.99] ${activeRef === o.ref ? "md:ring-2" : ""}`} style={{ background: activeRef === o.ref ? ORANGE + "1f" : NAVY, border: `1px solid ${activeRef === o.ref ? ORANGE : "rgba(255,255,255,0.08)"}` }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white font-bold text-base md:text-lg" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</span>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
+                    <div className="text-white font-bold text-base md:text-lg leading-tight truncate" style={{ fontFamily: C.cond }}>{o.project || o.customer || o.ref}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>
+                      {o.time && <span className="text-white/70 text-sm font-semibold">{o.time}</span>}
                     </div>
-                    <div className="text-white/55 text-xs md:text-sm mt-1 flex items-center gap-1"><MapPin size={12} /> {o.site}</div>
-                    <div className="text-white/70 text-sm md:text-base mt-1.5">{o.mix} · {o.qty} yd{o.time ? ` · ${o.time}` : ""}</div>
+                    <div className="text-white/55 text-xs md:text-sm mt-1 flex items-center gap-1 min-w-0"><MapPin size={12} className="shrink-0" /> <span className="truncate">{o.site}</span></div>
+                    <div className="text-white/70 text-sm md:text-base mt-1 truncate"><span className="text-white font-semibold">{o.qty} yd</span> · {o.mix}</div>
                     {o.has_signature && <div className="text-xs mt-1 flex items-center gap-1" style={{ color: GREEN }}><CheckCircle2 size={13} /> Signed by {o.signed_by}</div>}
                   </button>
                 );
@@ -8165,11 +8251,13 @@ function DriverApp({ driver, onLogout }) {
             ) : (
             <div className="lg:max-w-6xl lg:mx-auto">
               <button onClick={() => setActiveRef(null)} className="flex items-center gap-1 text-sm mb-3 md:hidden" style={{ color: ORANGE }}><ChevronLeft size={16} /> All deliveries</button>
-              {/* Still lg (1024px+): side-by-side columns need real landscape width.
-                  Between 768 and 1024 the driver gets the sidebar + big type, but
-                  the delivery card stays one column so nothing gets squeezed. */}
-              <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
-              <div className="lg:min-w-0">
+              {/* Two columns side by side on any tablet held in LANDSCAPE (md+), and
+                  always at lg (1024px+). Left: the job (details + driver notes).
+                  Right: the actions — status, ticket, signature — so they're on
+                  screen without scrolling on a short landscape screen. A tablet in
+                  portrait keeps one column so nothing gets squeezed. */}
+              <div className="md:landscape:grid lg:grid md:landscape:grid-cols-2 lg:grid-cols-2 md:landscape:gap-3 lg:gap-4 md:landscape:items-start lg:items-start">
+              <div className="md:landscape:min-w-0 lg:min-w-0">
 
               {/* payment alert — drivers must know whether to collect before unloading */}
               {active.prepay_required && (
@@ -8188,12 +8276,12 @@ function DriverApp({ driver, onLogout }) {
 
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="text-white font-bold text-lg md:text-3xl leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
+                  <div className="text-white font-bold text-lg md:text-2xl leading-tight" style={{ fontFamily: C.cond }}>{active.project || active.customer || active.ref}</div>
                   {(() => { const sm = STATUS_META[active.status] || { label: active.status, color: "#7c8794" }; return <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: sm.color + "22", color: sm.color }}>{sm.label}</span>; })()}
                 </div>
                 {/* tappable address → opens turn-by-turn directions */}
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 md:py-4 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
-                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm md:text-lg flex-1">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs md:text-base font-semibold shrink-0"><Navigation size={13} /> Directions</span>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(active.site || "")}`} target="_blank" rel="noreferrer" className="mt-2 rounded-lg px-3 py-2.5 md:py-3 flex items-center gap-2 active:opacity-70" style={{ background: "#6aa9ff14", color: "#9cc4ff", fontFamily: C.body }}>
+                  <MapPin size={16} className="shrink-0" /> <span className="underline text-sm md:text-base flex-1 line-clamp-2">{active.site || "No address"}</span> <span className="flex items-center gap-1 text-xs md:text-base font-semibold shrink-0"><Navigation size={15} /> <span className="hidden lg:inline">Directions</span></span>
                 </a>
                 {myTemp != null && (
                   <div className="mt-2.5 rounded-lg px-3 py-2.5 flex items-center justify-between" style={{ background: mixerColor(myTempAge) + "14", border: `1px solid ${mixerColor(myTempAge)}66` }}>
@@ -8214,22 +8302,19 @@ function DriverApp({ driver, onLogout }) {
                     )}
                   </div>
                 )}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 md:gap-y-4 gap-x-3 mt-3.5 text-sm md:text-lg">
+                <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3.5 text-sm md:text-base">
                   {[
                     ["Customer", active.customer], ["Order #", active.ref],
                     ["Mix", active.mix], ["Quantity", active.qty ? `${active.qty} yd` : null],
                     ["Time", active.time], ["Slump", active.slump],
                     ["For", active.use_for], ["Truck", active.truck && active.truck !== "—" ? active.truck : null],
                   ].filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k}><div className="text-white/35 text-[10px] md:text-[11px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold md:text-lg">{v}</div></div>
+                    <div key={k} className="min-w-0"><div className="text-white/35 text-[10px] md:text-[11px] uppercase tracking-wide">{k}</div><div className="text-white/90 font-semibold">{v}</div></div>
                   ))}
                 </div>
                 {active.admixtures && <div className="mt-3 text-sm"><span className="text-white/35 text-[10px] uppercase tracking-wide">Admixtures</span><div className="text-white/90">{active.admixtures}</div></div>}
                 {active.notes && <div className="mt-3 rounded-lg px-3 py-2 text-sm" style={{ background: ORANGE + "14", color: "#ffd9bf" }}><span className="font-semibold uppercase text-[10px] tracking-wide block mb-0.5" style={{ color: ORANGE }}>Dispatch instructions</span>{active.notes}</div>}
               </div>
-              </div>{/* end left column */}
-              <div className="lg:min-w-0">
-
               {/* driver's on-site notes — saved to the order, visible to dispatch */}
               <div className="rounded-xl p-4 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <div className="flex items-center justify-between mb-2">
@@ -8249,6 +8334,9 @@ function DriverApp({ driver, onLogout }) {
                   {notesBusy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save notes
                 </button>
               </div>
+
+              </div>{/* end left column */}
+              <div className="md:landscape:min-w-0 lg:min-w-0">
 
               {isPour ? (
                 /* continuous pour: a ticket + customer signature for EACH of the driver's loads */
@@ -8275,7 +8363,7 @@ function DriverApp({ driver, onLogout }) {
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 md:py-5 text-base md:text-xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                          <button onClick={() => setSignSeq(l.seq)} className="w-full rounded-lg py-3 md:py-4 text-base md:text-lg font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                             <ClipboardList size={17} /> Get customer signature
                           </button>
                         )}
@@ -8303,7 +8391,7 @@ function DriverApp({ driver, onLogout }) {
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 md:py-6 text-base md:text-2xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
+                    <button onClick={() => setSignSeq("order")} className="w-full rounded-xl py-3.5 md:py-5 text-base md:text-xl font-bold active:scale-95 flex items-center justify-center gap-2" style={{ background: GREEN, color: NAVY_DEEP }}>
                       <ClipboardList size={18} /> Get customer signature
                     </button>
                   )}
