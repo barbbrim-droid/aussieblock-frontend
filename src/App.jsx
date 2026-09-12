@@ -124,6 +124,11 @@ const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
 const BUILD_TAG = "build Sep12-v78";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
+// A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
+// display and "+13252621710" for a tel: link. Returns null when there's no usable number.
+function phoneDigits(p) { const d = String(p || "").replace(/\D/g, ""); return d.length === 11 && d[0] === "1" ? d.slice(1) : d; }
+function fmtPhone(p) { const d = phoneDigits(p); return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : (d || null); }
+function telHref(p) { const d = phoneDigits(p); return d.length === 10 ? `tel:+1${d}` : d ? `tel:${d}` : null; }
 // Phones have a working sms: handler; laptops/desktops don't. On desktop we offer
 // "Copy & open Google Messages" instead of a dead sms: link.
 const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
@@ -434,6 +439,7 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
   const trackPos = (repLoad && repLoad.truck_position) || live.truck_position || null;
   const trackTruck = repLoad ? repLoad.truck : live.truck;
   const trackDriver = repLoad ? repLoad.driver : live.driver;
+  const trackPhone = repLoad ? repLoad.driver_phone : live.driver_phone;   // driver's cell, when on file
   const trackProgress = repLoad ? repLoad.progress : (live.progress || 0.05);
   const trackStatus = repLoad ? repLoad.status : live.status;
 
@@ -556,6 +562,11 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
                         {received ? <><CheckCircle2 size={12} /> Received</> : <>{custLabel(ld.status)}{eta && <span className="text-white/45">{` · ${eta}`}</span>}</>}
                       </div>
                     </div>
+                    {ld.driver && ld.driver !== "—" && telHref(ld.driver_phone) && !received && (
+                      <a href={telHref(ld.driver_phone)} title={`Call ${ld.driver} · ${fmtPhone(ld.driver_phone)}`} className="shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-lg active:scale-95 transition-transform" style={{ color: GREEN, background: GREEN + "18", border: `1px solid ${GREEN}55`, fontFamily: C.body }}>
+                        <Phone size={13} /> {ld.driver}
+                      </a>
+                    )}
                     {ld.has_batch_ticket && (
                       <button onClick={() => openLoadBatchTicket(order.ref, ld.seq).catch((e) => alert(e.message))} className="shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-lg active:scale-95 transition-transform" style={{ color: "#fff", background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}>
                         <FileText size={14} /> Ticket
@@ -586,6 +597,13 @@ function TrackScreen({ order, onBack, onChanged, canFinance = true }) {
       )}
       {showSignedTicket && <DeliveryTicketModal order={live} onClose={() => setShowSignedTicket(false)} />}
 
+      {/* Call the driver bringing this load (their cell, from their login) — only once
+          a driver is assigned and has a number on file. Dispatch stays the fallback. */}
+      {trackDriver && trackDriver !== "—" && telHref(trackPhone) && (
+        <a href={telHref(trackPhone)} className="w-full mt-3 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold active:scale-95 transition-transform" style={{ background: GREEN + "18", border: `1px solid ${GREEN}55`, color: GREEN, fontFamily: C.body }}>
+          <Phone size={17} /> Call your driver · {trackDriver} · {fmtPhone(trackPhone)}
+        </a>
+      )}
       {/* Reach dispatch about this delivery — one number, call or text */}
       <div className="grid grid-cols-2 gap-3 mt-3">
         <a href={`tel:${DISPATCH_TEL}`} className="rounded-2xl py-3 flex items-center justify-center gap-2 font-semibold text-white active:scale-95 transition-transform" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.18)", fontFamily: C.body }}><Phone size={16} color={ORANGE} /> Call dispatch</a>
