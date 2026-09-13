@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v84";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v85";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7707,7 +7707,7 @@ function ProfitModal({ onClose }) {
   };
   const winKey = `${from}|${to}`;
   const busy = !err && (!data || data._key !== winKey);   // a stale answer = still loading the new window
-  const [include, setInclude] = useState({ materials: true, hauling: true, fuel: true, aggregate_haul: true });
+  const [include, setInclude] = useState({ materials: true, aggregate_delivery: true, hauling: true, fuel: true });
   const mb = monthBounds();
   const dayShift = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const weekStart = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
@@ -7724,7 +7724,7 @@ function ProfitModal({ onClose }) {
 
   const T = data?.totals;
   // Client-side totals honouring the include toggles.
-  const costOf = (row) => ["materials", "hauling", "fuel", "aggregate_haul"].reduce((sum, k) => sum + (include[k] ? Number(row[k] || 0) : 0), 0);
+  const costOf = (row) => ["materials", "aggregate_delivery", "hauling", "fuel"].reduce((sum, k) => sum + (include[k] ? Number(row[k] || 0) : 0), 0);
   const costs = T ? costOf(T) : 0;
   const profit = T ? T.revenue - costs : 0;
   const margin = T && T.revenue ? (profit / T.revenue) * 100 : null;
@@ -7740,10 +7740,10 @@ function ProfitModal({ onClose }) {
   );
   const pc = profit >= 0 ? GREEN : "#ff8a85";
   const costLines = T ? [
-    ["materials", "Materials batched", T.materials, "ticket actuals × $/unit (Materials tracker)"],
+    ["materials", "Materials batched", T.materials, "tons batched into these yards × $/unit at the pit"],
+    ["aggregate_delivery", "Aggregate delivery", T.aggregate_delivery, "batched gravel & sand tons × $/ton haul rate (Aggregate → Rates)"],
     ["hauling", "Hauling paid out", T.hauling, "delivery, short-load & back-haul to third-party haulers"],
-    ["fuel", "Fuel", T.fuel, `${Number(T.fuel_gallons || 0).toLocaleString()} gal × $/gal`],
-    ["aggregate_haul", "Aggregate haul-in", T.aggregate_haul, `${t1(T.aggregate_tons)} t on weight tickets · material $ (${money(T.aggregate_material)}) already in Materials`],
+    ["fuel", "Fuel", T.fuel, `${fmtYards(T.yards)} CY × ${money(T.fuel_rate_per_yd)}/CY (fleet's trailing ${T.fuel_trailing_days || 30}-day rate)`],
   ] : [];
 
   return (
@@ -7811,10 +7811,12 @@ function ProfitModal({ onClose }) {
                             <td className="py-1 pr-2">{m.name}{m.estimated && <span className="text-white/35"> · part estimated</span>}</td>
                             <td className="py-1 pr-2 text-right whitespace-nowrap">{amt(m.used, m.unit)} {m.unit}</td>
                             <td className="py-1 pr-2 text-right text-white/45 whitespace-nowrap">{m.cost_rate ? `${money(m.cost_rate)}/${m.unit}` : "no rate"}</td>
-                            <td className="py-1 text-right font-semibold text-white whitespace-nowrap">{money(m.cost)}</td>
+                            <td className="py-1 pr-2 text-right font-semibold text-white whitespace-nowrap">{money(m.cost)}</td>
+                            <td className="py-1 text-right whitespace-nowrap" style={{ color: m.haul_rate ? ORANGE : "rgba(255,255,255,0.3)" }}>{m.haul_rate ? `+ ${money(m.delivery)}` : ""}<div className="text-[10px] text-white/35">{m.haul_rate ? `${money(m.haul_rate)}/t haul` : ""}</div></td>
                           </tr>))}</tbody></table>
                       )}
                       {data.notes?.unmapped_mixes?.length > 0 && <div className="text-[10px] mt-1.5" style={{ color: WARN }}>Mixes with no design or ticket weights (material cost missing): {data.notes.unmapped_mixes.map((u) => `${u.mix} (${fmtYards(u.yards)} CY)`).join(", ")}</div>}
+                      <div className="text-[10px] text-white/40 mt-2 leading-snug">For reference, not counted: weight tickets in this window {T.weight_tickets?.loads || 0} load{T.weight_tickets?.loads === 1 ? "" : "s"} · {t1(T.weight_tickets?.tons)} t · {money(T.weight_tickets?.material_cost)} material + {money(T.weight_tickets?.haul_cost)} haul (that's inventory — it's costed above as the tons are batched). Fuel fills in this window: {Number(T.fuel_fills?.gallons || 0).toLocaleString()} gal, {money(T.fuel_fills?.cost)}.</div>
                     </div>
                     <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
                       <div className="text-white text-sm font-semibold mb-1" style={{ fontFamily: C.cond }}>Hauling paid out</div>
@@ -7833,13 +7835,13 @@ function ProfitModal({ onClose }) {
               {tab === "days" && (
                 data.days.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>No completed orders in this window.</div> : (
                   <div className="overflow-x-auto"><table className="w-full text-xs">
-                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Day</th><th className="py-1.5 pr-2 font-semibold text-right">Orders</th><th className="py-1.5 pr-2 font-semibold text-right">CY</th><th className="py-1.5 pr-2 font-semibold text-right">Revenue</th><th className="py-1.5 pr-2 font-semibold text-right">Materials</th><th className="py-1.5 pr-2 font-semibold text-right">Hauling</th><th className="py-1.5 pr-2 font-semibold text-right">Fuel</th><th className="py-1.5 pr-2 font-semibold text-right">Agg. haul</th><th className="py-1.5 pr-2 font-semibold text-right">Net</th><th className="py-1.5 font-semibold text-right">$/CY</th></tr></thead>
+                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Day</th><th className="py-1.5 pr-2 font-semibold text-right">Orders</th><th className="py-1.5 pr-2 font-semibold text-right">CY</th><th className="py-1.5 pr-2 font-semibold text-right">Revenue</th><th className="py-1.5 pr-2 font-semibold text-right">Materials</th><th className="py-1.5 pr-2 font-semibold text-right">Agg. delivery</th><th className="py-1.5 pr-2 font-semibold text-right">Hauling</th><th className="py-1.5 pr-2 font-semibold text-right">Fuel</th><th className="py-1.5 pr-2 font-semibold text-right">Net</th><th className="py-1.5 font-semibold text-right">$/CY</th></tr></thead>
                     <tbody>{data.days.map((d) => { const dc = costOf(d); const dp = d.revenue - dc; return (
                       <tr key={d.date} className="text-white/85" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                         <td className="py-1.5 pr-2 whitespace-nowrap font-semibold text-white">{orderDateUS(d.date) || d.date}</td><td className="py-1.5 pr-2 text-right">{d.orders}</td><td className="py-1.5 pr-2 text-right">{fmtYards(d.yards)}</td>
                         <td className="py-1.5 pr-2 text-right" style={{ color: GREEN }}>{money(d.revenue)}</td>
-                        <td className="py-1.5 pr-2 text-right" style={{ opacity: include.materials ? 1 : 0.4 }}>{money(d.materials)}</td><td className="py-1.5 pr-2 text-right" style={{ opacity: include.hauling ? 1 : 0.4 }}>{money(d.hauling)}</td>
-                        <td className="py-1.5 pr-2 text-right" style={{ opacity: include.fuel ? 1 : 0.4 }}>{money(d.fuel)}</td><td className="py-1.5 pr-2 text-right" style={{ opacity: include.aggregate_haul ? 1 : 0.4 }}>{money(d.aggregate_haul)}</td>
+                        <td className="py-1.5 pr-2 text-right" style={{ opacity: include.materials ? 1 : 0.4 }}>{money(d.materials)}</td><td className="py-1.5 pr-2 text-right" style={{ opacity: include.aggregate_delivery ? 1 : 0.4 }}>{money(d.aggregate_delivery)}</td>
+                        <td className="py-1.5 pr-2 text-right" style={{ opacity: include.hauling ? 1 : 0.4 }}>{money(d.hauling)}</td><td className="py-1.5 pr-2 text-right" style={{ opacity: include.fuel ? 1 : 0.4 }}>{money(d.fuel)}</td>
                         <td className="py-1.5 pr-2 text-right font-bold" style={{ color: dp >= 0 ? GREEN : "#ff8a85" }}>{money(dp)}</td><td className="py-1.5 text-right text-white/60">{d.yards ? money(dp / d.yards) : "—"}</td>
                       </tr>); })}</tbody>
                   </table></div>
@@ -7860,7 +7862,7 @@ function ProfitModal({ onClose }) {
                   </table></div>
                 )
               )}
-              <div className="text-white/35 text-[10px] mt-3 leading-snug">Revenue is what completed orders bill for the yards actually poured (pre-tax), placed on their pour date. Materials and fuel are costed on the day they were batched or filled. Aggregate purchase $ isn't subtracted again here because the Materials line already costs gravel and sand as they're batched.</div>
+              <div className="text-white/35 text-[10px] mt-3 leading-snug">Revenue is what completed orders bill for the yards actually poured (pre-tax), placed on their pour date. Materials are the tons batched into those yards at the pit price; aggregate delivery is those same gravel and sand tons at the $/ton haul rate; fuel is allocated per yard at the fleet's trailing 30-day rate. Weight tickets and fuel fills are inventory events and are never charged to the day they arrived.</div>
             </>
           )}
         </div>
