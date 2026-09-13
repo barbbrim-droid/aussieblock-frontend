@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v79";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v80";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7278,7 +7278,7 @@ function WeightTicketForm({ mode = "driver", options, onLogged }) {
             <Camera size={isDriver ? 24 : 16} /> {file ? `${file.name} attached` : isDriver ? "Take a photo of the weight ticket" : "Attach ticket photo / PDF (optional)"}
           </button>
         )}
-        {isDriver && options?.vision && <p className="text-white/40 text-xs mt-1.5 text-center">The weight, ticket # and pit are read off the photo automatically — fill in anything you know below.</p>}
+        {isDriver && <p className="text-white/40 text-xs mt-1.5 text-center">{options?.vision ? "The weight, ticket # and pit are read off the photo automatically — fill in anything you know below. " : ""}Each photo is turned into a clean PDF of the ticket for the office.</p>}
       </div>
 
       <div className={grid}>
@@ -7409,7 +7409,12 @@ function DriverWeightTicketsModal({ onClose }) {
                           : rm ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: rm.color + "22", color: rm.color }}>{t.read_status === "pending" && <Loader2 size={10} className="animate-spin" />}{rm.label}</span> : null}
                       </div>
                     </div>
-                    <WeightTicketPhotos ticket={t} canDelete={false} onChanged={load} size={14} />
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <WeightTicketPhotos ticket={t} canDelete={false} onChanged={load} size={14} />
+                      <button onClick={() => openWeightTicketPdf(t.id).catch((e) => setErr(e.message))} className="ml-auto rounded-lg px-3 py-2 text-sm font-bold active:scale-95 inline-flex items-center gap-1.5" style={{ background: t.pdf ? ORANGE : NAVY_DEEP, color: t.pdf ? NAVY_DEEP : "rgba(255,255,255,0.6)", border: t.pdf ? "none" : "1px solid rgba(255,255,255,0.15)" }}>
+                        <FileText size={15} /> Open PDF
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -7626,6 +7631,7 @@ function AggregateTicketsModal({ onClose }) {
                               {!t.reviewed && miss.length > 0 && <div className="text-[9px] mt-0.5 whitespace-nowrap" style={{ color: WARN }}>needs {miss.join(", ")}</div>}
                             </td>
                             <td className="py-1.5 text-right whitespace-nowrap">
+                              <button onClick={() => openWeightTicketPdf(t.id).catch((e) => setMsg({ ok: false, text: e.message }))} title="Open the readable PDF of this ticket" className="p-1 rounded active:scale-90 align-middle"><FileText size={14} color={t.pdf ? ORANGE : "rgba(255,255,255,0.35)"} /></button>
                               <button onClick={() => setOpenPhotos(openPhotos === t.id ? null : t.id)} title="Ticket photos" className="p-1 rounded active:scale-90 inline-flex items-center gap-0.5 align-middle">
                                 <Camera size={14} color={(t.photos || []).length ? ORANGE : "rgba(255,255,255,0.4)"} />{(t.photos || []).length > 0 && <span className="text-[10px] font-semibold" style={{ color: ORANGE }}>{t.photos.length}</span>}
                               </button>

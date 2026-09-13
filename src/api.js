@@ -1037,3 +1037,15 @@ export async function fetchWeightTicketPhotoUrl(id, name) {
 export function deleteWeightTicketPhoto(id, name) {
   return request(`/weight-tickets/${id}/photos/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
+// The readable PDF of a weight ticket (typed figures + cleaned-up photo). Built
+// on the server after upload; the route builds it on demand if it's not there
+// yet, so this always opens something for a real ticket. Opens in a new tab.
+export async function openWeightTicketPdf(id) {
+  const res = await fetch(`${API_BASE}/weight-tickets/${id}/pdf`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  const url = URL.createObjectURL(await res.blob())
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
