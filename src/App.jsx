@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v81";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v82";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7711,7 +7711,8 @@ function DispatchApp({ email, role, onLogout }) {
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
   const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
-  const [mobileTab, setMobileTab] = useState("today");   // phone widths: which board panel fills the screen
+  const [mobileTab, setMobileTab] = useState("now");   // phone widths: which board panel fills the screen ("now" = at-a-glance overview)
+  const [showMobileMap, setShowMobileMap] = useState(false);   // phone: the fleet map is folded into the Now tab behind a toggle
   const [showMore, setShowMore] = useState(false);   // phone widths: overflow menu for admin-only actions
   const [, forceTick] = useState(0);   // keep "Xm ago" / staleness labels ticking
   const [alerts, setAlerts] = useState([]);   // new customer order requests to flag
@@ -7885,6 +7886,9 @@ function DispatchApp({ email, role, onLogout }) {
   const currentPours = activeOrders.filter(isLivePour).sort(byTimeAsc);
   const todayOrders = activeOrders.filter((o) => !isLivePour(o) && orderDay(o.when, today) === "today").sort(byTimeAsc);
   const upcomingOrders = activeOrders.filter((o) => !isLivePour(o) && orderDay(o.when, today) === "upcoming");
+  // Customer-placed requests waiting for dispatch to confirm — the first thing the
+  // phone "Now" view surfaces. They still live in Today/Upcoming by date.
+  const requestedOrders = activeOrders.filter((o) => o.status === "requested").sort((a, b) => String(a.when).localeCompare(String(b.when)) || byTimeAsc(a, b));
   const movingTrucks = trucks.filter((t) => t.lat != null && !isStale(t.updated_at)).length;
 
   // Each truck's status, derived from the order it's assigned to. (Later, GPS
@@ -7914,6 +7918,59 @@ function DispatchApp({ email, role, onLogout }) {
     }
     if (best) return statusToTruck(best.ld.status, best.p.ref, best.p);
     return { label: "At yard", color: "#7c8794" };
+  };
+
+  // One fleet card (truck, status, job, yard ETA, mixer probe) — the map panel and
+  // the phone "Now" view both render these.
+  const fleetCard = (t) => {
+    const s = truckStatus(t);
+    const tColor = truckColorMap(trucks)[t.label] || ORANGE;
+    // ETA back to the yard while returning (straight-line ~30mph, 1.3x roads).
+    // Key off the derived stage so pour loads count too (their order stays "ongoing").
+    const yardMi = s.label === "Returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
+    const yardEta = yardMi != null ? Math.max(1, Math.round((yardMi * 1.3) / 30 * 60)) : null;
+    return (
+      <div key={t.label} className="flex items-center justify-between rounded-lg px-2.5 py-1" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Truck size={14} color={tColor} />
+            <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
+            {!isMixer(t) && <AggregateBadge />}
+          </div>
+          {s.job ? (
+            <div className="text-xs truncate mt-0.5" style={{ color: "rgba(255,255,255,0.7)", fontFamily: C.body }}>
+              {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}
+            </div>
+          ) : (
+            <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{isMixer(t) ? "No active job" : "Hauls aggregate only"}{t.notes ? ` · ${t.notes}` : ""}</div>
+          )}
+          {yardEta != null && (
+            <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#4da3ff", fontFamily: C.body }}>
+              <Navigation size={11} /> Back to yard · ~{yardEta} min
+            </div>
+          )}
+          {t.mixer_temp_f != null && (() => {
+            const age = mixerAge(t.mixer_updated_at);
+            return (
+              <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: mixerColor(age), fontFamily: C.body }}
+                   title={age.known ? `Last sensor reading ${fmtDateTime(t.mixer_updated_at)}` : undefined}>
+                <Thermometer size={11} /> Concrete {Math.round(t.mixer_temp_f)}°F
+                {age.stale && <span className="opacity-90">· {age.label}</span>}
+                {age.dead && <span className="font-semibold">· sensor down?</span>}
+              </div>
+            );
+          })()}
+          {t.mixer_batt_pct != null && (
+            <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: t.mixer_batt_pct < 20 ? "#ef5350" : t.mixer_batt_pct < 50 ? "#ffb74d" : "#7ed07e", fontFamily: C.body }}>
+              <Battery size={11} /> Sensor batt {Math.round(t.mixer_batt_pct)}%
+            </div>
+          )}
+        </div>
+      <span className="shrink-0">
+        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
+      </span>
+    </div>
+    );
   };
 
   // Trucks heading back to the yard, with a clear ETA so dispatch can plan the next
@@ -7975,7 +8032,7 @@ function DispatchApp({ email, role, onLogout }) {
   ].filter(Boolean);
 
   const mobileTabs = [
-    { key: "map", label: "Map & trucks", short: "Map", icon: Truck, count: trucks.length },
+    { key: "now", label: "Now", icon: Activity, count: requestedOrders.length || null },
     { key: "pours", label: "Pours", icon: Droplets, count: currentPours.length },
     { key: "today", label: "Today", icon: Package, count: todayOrders.length },
     { key: "upcoming", label: "Upcoming", short: "Next", icon: CalendarPlus, count: upcomingOrders.length },
@@ -8158,7 +8215,7 @@ function DispatchApp({ email, role, onLogout }) {
                   ? { background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }
                   : { background: NAVY, color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
               >
-                <t.icon size={13} className="shrink-0" /><span className="truncate"><span className="sm:hidden">{t.short || t.label}</span><span className="hidden sm:inline">{t.label}</span></span> <span className="opacity-70"><span className="sm:hidden">{t.count}</span><span className="hidden sm:inline">({t.count})</span></span>
+                <t.icon size={13} className="shrink-0" /><span className="truncate"><span className="sm:hidden">{t.short || t.label}</span><span className="hidden sm:inline">{t.label}</span></span> {t.count != null && <span className="opacity-70"><span className="sm:hidden">{t.count}</span><span className="hidden sm:inline">({t.count})</span></span>}
               </button>
             ))}
           </div>
@@ -8169,6 +8226,91 @@ function DispatchApp({ email, role, onLogout }) {
               columns. Completed orders aren't a column — they drop straight into the
               "Past orders" tab above. */}
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,2.9fr)_minmax(0,1.9fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
+            {/* Phone / tablet "Now" — the whole day at a glance, most urgent first:
+                order requests waiting on dispatch, live pours, the fleet, today's
+                orders, then what's next. Every row taps through to its full panel.
+                The wide (lg) board shows all four panels at once and never renders this. */}
+            <div className={(mobileTab === "now" ? "contents" : "hidden") + " lg:hidden"}>
+            <Panel fill>
+              {(() => {
+                const pill = (st) => { const m = STATUS_META[st] || { label: st, color: "#7c8794" }; return <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap" style={{ background: m.color + "22", color: m.color, fontFamily: C.body }}>{m.label}</span>; };
+                const head = (Icon, color, label, count, tab) => (
+                  <button onClick={() => setMobileTab(tab)} className="w-full flex items-center gap-2 mb-2 mt-1 active:opacity-70">
+                    <Icon size={15} color={color} />
+                    <span className="text-white text-base font-bold" style={{ fontFamily: C.cond }}>{label}</span>
+                    {count != null && <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({count})</span>}
+                    <span className="ml-auto text-xs font-semibold flex items-center" style={{ color: ORANGE, fontFamily: C.body }}>Open <ChevronRight size={14} /></span>
+                  </button>
+                );
+                const orderRow = (o, tab, showProgress = false) => {
+                  const req = parseYards(o.qty); const done = parseFloat(o.yards_loaded) || 0;
+                  return (
+                    <button key={o.ref} onClick={() => setMobileTab(tab)} className="w-full text-left rounded-xl px-3 py-2 mb-1.5 active:scale-[0.99]" style={{ background: NAVY, border: `1px solid ${o.status === "requested" ? "#6aa9ff66" : "rgba(255,255,255,0.08)"}` }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs truncate min-w-0" style={{ fontFamily: C.body }}><span className="text-sm font-bold" style={{ color: ORANGE, fontFamily: C.cond }}>{o.ref}</span><span className="text-white/55"> · {[formatOrderDate(o.when), o.time].filter(Boolean).join(" ")}</span></span>
+                        {pill(o.status)}
+                      </div>
+                      <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{o.project || o.customer}{o.project ? <span className="text-white/50 font-normal"> · {o.customer}</span> : null}</div>
+                      <div className="flex items-center justify-between gap-2 text-xs mt-0.5" style={{ fontFamily: C.body }}>
+                        <span className="text-white/55 truncate">{o.site}</span>
+                        <span className="text-white font-bold whitespace-nowrap">{showProgress ? `${fmtYards(done)} / ${fmtYards(req)} CY` : `${o.qty} CY`}{!showProgress && o.mix ? <span className="text-white/45 font-normal"> · {o.mix}</span> : null}</span>
+                      </div>
+                      {showProgress && req > 0 && (
+                        <div className="h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}><div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round((done / req) * 100))}%`, background: GREEN }} /></div>
+                      )}
+                      {!showProgress && o.status !== "requested" && (() => { const who = [o.truck, o.driver].filter((v) => v && v !== "—"); return <div className="text-xs mt-0.5 truncate" style={{ color: who.length ? "rgba(255,255,255,0.45)" : WARN, fontFamily: C.body }}><Truck size={11} className="inline -mt-0.5" /> {who.length ? who.join(" · ") : "No truck assigned yet"}</div>; })()}
+                    </button>
+                  );
+                };
+                const nextDay = upcomingDays[0];
+                const nextOrders = nextDay ? upcomingByDay[nextDay] : [];
+                return (
+                  <>
+                    {requestedOrders.length > 0 && (
+                      <div className="rounded-xl p-2.5 mb-3" style={{ background: "#6aa9ff14", border: "1px solid #6aa9ff88" }}>
+                        <div className="flex items-center gap-2 mb-1.5"><Bell size={15} color="#6aa9ff" /><span className="text-sm font-bold" style={{ color: "#6aa9ff", fontFamily: C.cond }}>{requestedOrders.length} order request{requestedOrders.length > 1 ? "s" : ""} to confirm</span></div>
+                        {requestedOrders.map((o) => orderRow(o, orderDay(o.when, today) === "today" ? "today" : "upcoming"))}
+                      </div>
+                    )}
+                    {currentPours.length > 0 && (
+                      <>
+                        {head(Droplets, GREEN, "Live pours", currentPours.length, "pours")}
+                        <div className="text-white/50 text-xs mb-1.5 -mt-1" style={{ fontFamily: C.body }}>{fmtYards(pourProducedYards)} / {fmtYards(pourTotalYards)} CY produced</div>
+                        {currentPours.map((o) => orderRow(o, "pours", true))}
+                      </>
+                    )}
+                    <div className="flex items-center gap-2 mb-2 mt-1">
+                      <Truck size={15} color={ORANGE} />
+                      <span className="text-white text-base font-bold" style={{ fontFamily: C.cond }}>Fleet</span>
+                      <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({trucks.length})</span>
+                      <button onClick={() => setShowMobileMap((v) => !v)} className="ml-auto text-xs font-semibold flex items-center gap-1 rounded-lg px-2 py-1 active:scale-95" style={{ color: showMobileMap ? NAVY_DEEP : ORANGE, background: showMobileMap ? ORANGE : "transparent", border: `1px solid ${ORANGE}66`, fontFamily: C.body }}><MapPin size={12} /> {showMobileMap ? "Hide map" : "Map"}</button>
+                    </div>
+                    {showMobileMap && <div className="rounded-xl overflow-hidden mb-2" style={{ height: 240 }}><GoogleFleetMap trucks={trucks} sites={mapSites} /></div>}
+                    {trucks.length === 0 ? (
+                      <div className="text-white/40 text-sm text-center py-2 mb-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
+                    ) : <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-2">{trucks.map(fleetCard)}</div>}
+                    {head(List, ORANGE, "Today's orders", todayOrders.length, "today")}
+                    {todayOrders.length === 0
+                      ? <div className="text-white/40 text-sm text-center py-2 mb-2 rounded-xl" style={{ background: NAVY, fontFamily: C.body }}>No orders scheduled for today.</div>
+                      : todayOrders.map((o) => orderRow(o, "today"))}
+                    {head(CalendarPlus, ORANGE_HOT, "Next up", upcomingOrders.length, "upcoming")}
+                    {!nextDay
+                      ? <div className="text-white/40 text-sm text-center py-2 mb-2 rounded-xl" style={{ background: NAVY, fontFamily: C.body }}>Nothing scheduled ahead.</div>
+                      : (
+                        <>
+                          <div className="flex items-center justify-between text-xs mb-1.5 -mt-1" style={{ fontFamily: C.body }}>
+                            <span className="text-white font-semibold">{formatOrderDateLong(nextDay)}</span>
+                            <span className="text-white/50">{nextOrders.length} order{nextOrders.length === 1 ? "" : "s"} · <span className="font-bold" style={{ color: ORANGE }}>{fmtYards(nextOrders.reduce((sum, o) => sum + parseYards(o.qty), 0))} CY</span></span>
+                          </div>
+                          {nextOrders.slice(0, 3).map((o) => orderRow(o, "upcoming"))}
+                          {(nextOrders.length > 3 || upcomingDays.length > 1) && <button onClick={() => setMobileTab("upcoming")} className="w-full text-xs font-semibold py-1.5 active:opacity-70" style={{ color: ORANGE, fontFamily: C.body }}>See all upcoming ({upcomingOrders.length})</button>}
+                        </>
+                      )}
+                  </>
+                );
+              })()}
+            </Panel>
+            </div>
             <div className={(mobileTab === "map" ? "contents" : "hidden") + " lg:contents"}>
             <Panel fill>
               <div className="h-full flex flex-col">
@@ -8179,56 +8321,7 @@ function DispatchApp({ email, role, onLogout }) {
                 <div className="shrink-0 overflow-y-auto grid grid-cols-2 gap-1.5 mt-2 content-start" style={{ maxHeight: "55%" }}>
                 {trucks.length === 0 ? (
                   <div className="col-span-2 text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
-                ) : trucks.map((t) => {
-                  const s = truckStatus(t);
-                  const tColor = truckColorMap(trucks)[t.label] || ORANGE;
-                  // ETA back to the yard while returning (straight-line ~30mph, 1.3x roads).
-                  // Key off the derived stage so pour loads count too (their order stays "ongoing").
-                  const yardMi = s.label === "Returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
-                  const yardEta = yardMi != null ? Math.max(1, Math.round((yardMi * 1.3) / 30 * 60)) : null;
-                  return (
-                    <div key={t.label} className="flex items-center justify-between rounded-lg px-2.5 py-1" style={{ background: NAVY, border: `1px solid ${tColor}55`, borderLeft: `4px solid ${tColor}` }}>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Truck size={14} color={tColor} />
-                          <span className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{t.label}</span>
-                          {!isMixer(t) && <AggregateBadge />}
-                        </div>
-                        {s.job ? (
-                          <div className="text-xs truncate mt-0.5" style={{ color: "rgba(255,255,255,0.7)", fontFamily: C.body }}>
-                            {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}
-                          </div>
-                        ) : (
-                          <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{isMixer(t) ? "No active job" : "Hauls aggregate only"}{t.notes ? ` · ${t.notes}` : ""}</div>
-                        )}
-                        {yardEta != null && (
-                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#4da3ff", fontFamily: C.body }}>
-                            <Navigation size={11} /> Back to yard · ~{yardEta} min
-                          </div>
-                        )}
-                        {t.mixer_temp_f != null && (() => {
-                          const age = mixerAge(t.mixer_updated_at);
-                          return (
-                            <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: mixerColor(age), fontFamily: C.body }}
-                                 title={age.known ? `Last sensor reading ${fmtDateTime(t.mixer_updated_at)}` : undefined}>
-                              <Thermometer size={11} /> Concrete {Math.round(t.mixer_temp_f)}°F
-                              {age.stale && <span className="opacity-90">· {age.label}</span>}
-                              {age.dead && <span className="font-semibold">· sensor down?</span>}
-                            </div>
-                          );
-                        })()}
-                        {t.mixer_batt_pct != null && (
-                          <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: t.mixer_batt_pct < 20 ? "#ef5350" : t.mixer_batt_pct < 50 ? "#ffb74d" : "#7ed07e", fontFamily: C.body }}>
-                            <Battery size={11} /> Sensor batt {Math.round(t.mixer_batt_pct)}%
-                          </div>
-                        )}
-                      </div>
-                      <span className="shrink-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
-                      </span>
-                    </div>
-                  );
-                })}
+                ) : trucks.map(fleetCard)}
                 </div>
               </div>
             </Panel>
