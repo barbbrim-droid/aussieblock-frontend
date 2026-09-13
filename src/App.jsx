@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v85";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v86";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -3296,11 +3296,25 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const [kind, setKind] = useState("mixer");   // "mixer" (ready-mix) or "aggregate" (rock/sand hauler)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [odo, setOdo] = useState("");   // "dash odometer now" — sets the GPS odometer baseline for the truck being edited
 
   const load = async () => {
     try { setTrucks(await getTrucks()); } catch (e) { setMsg({ ok: false, text: e.message }); }
   };
   useEffect(() => { load(); }, []);
+
+  const saveOdo = async (lbl) => {
+    const n = Number(odo);
+    if (!(n > 0)) { setMsg({ ok: false, text: "Type the mileage off the dash first." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const r = await setTruckOdometer(lbl, n);
+      setMsg({ ok: true, text: `${lbl} odometer set to ${Number(r.gps_odometer).toLocaleString()} — GPS miles count up from here.` });
+      setOdo("");
+      await load(); onChanged && onChanged();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
 
   const add = async () => {
     setBusy(true); setMsg(null);
@@ -3343,7 +3357,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
                 <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: `1px solid ${existing && existing.label === t.label ? ORANGE : "rgba(255,255,255,0.06)"}` }}>
                   <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setFuelVehicle(t.fuel_vehicle || ""); setNotes(t.notes || ""); setKind(t.kind || "mixer"); }} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate flex items-center gap-1.5" style={{ fontFamily: C.cond }}>{t.label}{!isMixer(t) && <AggregateBadge />}</div>
-                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}{t.fuel_vehicle ? ` · Fuel: ${t.fuel_vehicle}` : ""}</div>
+                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}{t.fuel_vehicle ? ` · Fuel: ${t.fuel_vehicle}` : ""}{t.gps_odometer != null ? ` · Odometer ${Math.round(t.gps_odometer).toLocaleString()}` : (t.device ? " · Odometer not set" : "")}</div>
                     {t.notes && <div className="text-white/55 text-xs truncate mt-0.5 flex items-center gap-1"><FileText size={11} /> {t.notes}</div>}
                   </button>
                   <button onClick={() => remove(t.label)} disabled={busy} title="Remove truck" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
@@ -3366,6 +3380,18 @@ function ManageTrucksModal({ onClose, onChanged }) {
               ))}
             </div>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (driver, capacity, maintenance…)" className={inCls + " mb-1 resize-none"} style={inSt} />
+            {existing && (
+              <div className="rounded-lg p-2.5 mb-2" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.10)" }}>
+                <div className="text-white/70 text-xs font-semibold mb-1" style={{ fontFamily: C.cond }}>
+                  Odometer {existing.gps_odometer != null ? <span className="text-white/45 font-normal">— app reads <span className="text-white/80">{Math.round(existing.gps_odometer).toLocaleString()}</span> mi{existing.odo_baseline_at ? ` (set ${timeAgo(existing.odo_baseline_at)}, +${Math.round(existing.gps_miles || 0).toLocaleString()} GPS mi since)` : ""}</span> : <span className="text-white/45 font-normal">— not set yet</span>}
+                </div>
+                <div className="flex gap-1.5">
+                  <input value={odo} onChange={(e) => setOdo(e.target.value)} type="number" inputMode="numeric" placeholder="Dash odometer right now" className={inCls} style={inSt} />
+                  <button type="button" onClick={() => saveOdo(existing.label)} disabled={busy || !odo} className="rounded-lg px-3 text-xs font-bold shrink-0 active:scale-95 disabled:opacity-50" style={{ background: "rgba(255,255,255,0.10)", color: "#cfe0ff", border: "1px solid rgba(255,255,255,0.15)" }}>Set</button>
+                </div>
+                <p className="text-white/35 text-[11px] mt-1">Type what the dash shows today. From then on the app adds up GPS miles so a driver's fuel-fill mileage is pre-filled and checked. Re-set it any time it drifts.</p>
+              </div>
+            )}
             <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking (optional). Fuel fills match this truck by its name/number automatically — set a fuel meter # only if the meter reports a different number. An <b>aggregate hauler</b> (rock/sand only) stays on the fleet list and map but is never offered on a concrete order.</p>
             <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {existing ? "Update truck" : "Add truck"}
@@ -3466,7 +3492,23 @@ function FuelModal({ onClose }) {
     finally { setBusy(false); }
   };
 
+  // From the "Flagged mileage" list: open that truck's fills with the bad entry
+  // already in edit mode, odometer pre-filled with the GPS reading (or the typed
+  // one if there's no GPS) so fixing it is one tap on Save.
+  const openFlagged = async (fl) => {
+    setErr("");
+    if (!fl.truck) { if (openLabel !== "__unmatched__") await toggle("__unmatched__"); return; }
+    setOpenLabel(fl.truck); setFills(null); setLoadingFills(true);
+    try {
+      setFills((await getTruckFuel(fl.truck)).fills);
+      setEditId(fl.id);
+      setEditForm({ truck_label: fl.truck, gallons: fl.gallons != null ? String(fl.gallons) : "", odometer: fl.odometer_gps != null ? String(Math.round(fl.odometer_gps)) : (fl.odometer != null ? String(fl.odometer) : "") });
+    } catch (e) { setErr(e.message); }
+    finally { setLoadingFills(false); }
+  };
+
   const totalGal = data ? data.trucks.reduce((a, t) => a + (t.gallons || 0), 0) : 0;
+  const flagged = (data && data.flagged) || [];
   const card = { background: NAVY, border: "1px solid rgba(255,255,255,0.06)" };
   const truckLabels = data ? data.trucks.map((t) => t.label) : [];
 
@@ -3474,23 +3516,27 @@ function FuelModal({ onClose }) {
   // the pump. Only counted when both readings exist and the gap is believable —
   // a driver typing another truck's mileage would otherwise read as thousands of
   // miles on one tank. Returns {fillId -> miles|null}.
+  // The GPS odometer snapshot is preferred over the typed one when a fill has it.
+  const fillOdo = (f) => (f.odometer_gps != null ? f.odometer_gps : f.odometer);
   const milesBetweenFills = (list) => {
     const asc = [...list].sort((a, b) => String(a.when || "").localeCompare(String(b.when || "")));
     const out = new Map();
     let prevOdo = null;
     for (const f of asc) {
       let mi = null;
-      if (f.odometer != null && prevOdo != null) {
-        const d = f.odometer - prevOdo;
+      const odo = fillOdo(f);
+      if (odo != null && prevOdo != null) {
+        const d = odo - prevOdo;
         if (d > 0 && d < 3000) mi = d;
       }
       // A reading that doesn't follow on from the last good one (typo, or another
       // truck's mileage) is skipped, so the next real reading still gets its miles.
-      if (f.odometer != null && (prevOdo == null || mi != null)) prevOdo = f.odometer;
+      if (odo != null && (prevOdo == null || mi != null)) prevOdo = odo;
       out.set(f.id, mi);
     }
     return out;
   };
+  const FLAG_TEXT = { out_of_sequence: "out of order with the fills around it", jump: "implausibly far past the previous fill", off_gps: "doesn't match the GPS odometer" };
   const num = (v, d = 0) => (v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
 
   // The full fill history for one truck (or the Unmatched bucket) as a table:
@@ -3531,7 +3577,11 @@ function FuelModal({ onClose }) {
                     <td className={td + " text-white/80"}>{f.when ? fmtDateTime(f.when) : "—"}{f.fuel_type && f.fuel_type !== "Diesel" ? <span className="text-white/40"> · {f.fuel_type}</span> : null}</td>
                     <td className={td + " text-white/70"}>{f.driver || "—"}</td>
                     {unmatched && <td className={td + " text-white/70"}>{f.vehicle_no ? `#${f.vehicle_no}` : "—"}</td>}
-                    <td className={td + " text-right text-white/85"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(f.odometer)}</td>
+                    <td className={td + " text-right text-white/85"} style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {f.odometer_flag && <span title={`Typed mileage looks wrong: ${FLAG_TEXT[f.odometer_flag] || f.odometer_flag}`} className="inline-flex items-center mr-1 align-middle"><AlertTriangle size={12} color="#ffb74d" /></span>}
+                      <span style={{ color: f.odometer_flag ? "#ffb74d" : undefined }}>{num(f.odometer)}</span>
+                      {f.odometer_gps != null && <div className="text-[10px]" style={{ color: GREEN }}>GPS {num(f.odometer_gps)}</div>}
+                    </td>
                     <td className={td + " text-right text-white/70"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(mi)}</td>
                     <td className={td + " text-right text-white font-semibold"} style={{ fontVariantNumeric: "tabular-nums" }}>{num(f.gallons, 1)}</td>
                     <td className={td + " text-right"} style={{ fontVariantNumeric: "tabular-nums", color: mpg == null ? "rgba(255,255,255,0.35)" : mpg < 2 ? "#ffb74d" : "#7ed07e" }}>{mpg == null ? "—" : mpg.toFixed(1)}</td>
@@ -3617,6 +3667,27 @@ function FuelModal({ onClose }) {
                 </div>
               )}
 
+              {flagged.length > 0 && (
+                <div className="rounded-lg overflow-hidden mb-3" style={{ background: "rgba(255,170,60,0.10)", border: "1px solid rgba(255,170,60,0.30)" }}>
+                  <div className="px-3 py-2 text-xs font-semibold flex items-center gap-1.5" style={{ color: ORANGE }}><AlertTriangle size={13} /> {flagged.length} fill{flagged.length === 1 ? "" : "s"} with mileage that looks wrong — tap one to fix it</div>
+                  <div className="px-2 pb-2">
+                    {flagged.map((fl) => (
+                      <button key={fl.id} onClick={() => openFlagged(fl)} className="w-full text-left rounded-md px-2 py-1.5 mb-1 active:scale-[0.99]" style={{ background: "rgba(0,0,0,0.20)" }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{fl.truck || "Unmatched"} <span className="text-white/45 text-[11px] font-normal" style={{ fontFamily: C.body }}>{fl.when ? fmtDateTime(fl.when) : ""}{fl.driver ? ` · ${fl.driver}` : ""}{fl.gallons != null ? ` · ${Number(fl.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal` : ""}</span></div>
+                          <div className="text-[11px] shrink-0" style={{ color: "#ffb74d" }}>{FLAG_TEXT[fl.flag] || fl.flag}</div>
+                        </div>
+                        <div className="text-white/55 text-[11px] mt-0.5 flex flex-wrap gap-x-3">
+                          <span>Typed <span className="font-semibold" style={{ color: "#ffb74d" }}>{fl.odometer != null ? Number(fl.odometer).toLocaleString() : "—"}</span></span>
+                          {fl.odometer_gps != null && <span>GPS <span className="text-white/85 font-semibold">{Math.round(fl.odometer_gps).toLocaleString()}</span></span>}
+                          {fl.prev_odometer != null && <span>Previous fill <span className="text-white/85">{Number(fl.prev_odometer).toLocaleString()}</span></span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {data.trucks.length === 0 ? (
                 <div className="text-white/40 text-sm py-4 text-center mb-3" style={{ ...card, borderRadius: 12 }}>No trucks yet.</div>
               ) : (
@@ -3631,7 +3702,8 @@ function FuelModal({ onClose }) {
                           </div>
                           <div className="text-white/45 text-xs flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                             <span>{t.fills > 0 ? `${t.fills} fill${t.fills === 1 ? "" : "s"}` : "No fills yet"}{t.last_fill ? ` · last ${timeAgo(t.last_fill)}` : ""}</span>
-                            {t.last_odometer != null && <span>Odometer <span className="text-white/75">{Number(t.last_odometer).toLocaleString()}</span></span>}
+                            {t.last_odometer != null && <span>Last fill odo <span className="text-white/75">{Number(t.last_odometer).toLocaleString()}</span></span>}
+                            {t.gps_odometer != null && <span>GPS odo <span className="text-white/75">{Math.round(t.gps_odometer).toLocaleString()}</span></span>}
                             {t.yards > 0 && <span>{Number(t.yards).toLocaleString(undefined, { maximumFractionDigits: 0 })} yd delivered</span>}
                             {t.gal_per_yd != null && t.gal_per_yd > 0 && <span><span className="text-white/75">{t.gal_per_yd}</span> gal/yd</span>}
                           </div>
@@ -8851,6 +8923,38 @@ function DriverApp({ driver, onLogout }) {
   const [fuelForm, setFuelForm] = useState({ truck_no: localStorage.getItem("driver_truck_no") || "", odometer: "", gallons: "" });
   const [fuelBusy, setFuelBusy] = useState(false);
   const [fuelMsg, setFuelMsg] = useState(null);
+  // What the app knows about this truck's mileage (GPS odometer + last fill), for
+  // pre-filling the odometer and catching a mistyped one before it's saved.
+  const [odoInfo, setOdoInfo] = useState(null);
+  const [odoWarn, setOdoWarn] = useState(null);   // {text, gps} — shown once; "Save anyway" clears it
+  useEffect(() => {
+    const truck = fuelForm.truck_no.trim();
+    if (!showFuel || fuelTab !== "fill" || !truck) return undefined;
+    let live = true;
+    const t = setTimeout(() => {
+      getFuelOdometer(truck).then((r) => {
+        if (!live) return;
+        setOdoInfo(r && r.ok ? r : null);
+        // pre-fill from GPS when the driver hasn't typed anything yet
+        if (r && r.ok && r.gps_odometer && r.gps_live) setFuelForm((f) => (f.odometer.trim() ? f : { ...f, odometer: String(Math.round(r.gps_odometer)) }));
+      }).catch(() => { if (live) setOdoInfo(null); });
+    }, 400);
+    return () => { live = false; clearTimeout(t); };
+  }, [fuelForm.truck_no, showFuel, fuelTab]);
+  // Same rules as the server: lower than the last fill, an implausible jump, or
+  // more than 5% from the GPS odometer.
+  const odometerProblem = (odo) => {
+    if (!odoInfo || !(odo > 0)) return null;
+    const prev = odoInfo.last_odometer, gps = odoInfo.gps_odometer;
+    // GPS is the authority when the truck has one; otherwise check against the last fill.
+    if (gps && odoInfo.gps_live) {
+      if (Math.abs(odo - gps) > (odoInfo.tolerance_mi || 250)) return `GPS puts ${odoInfo.truck} at about ${Math.round(gps).toLocaleString()} mi — that's ${Math.round(Math.abs(odo - gps)).toLocaleString()} off. Double-check the dash.`;
+      return null;
+    }
+    if (prev != null && odo < prev) return `That's lower than the last fill on ${odoInfo.truck} (${Math.round(prev).toLocaleString()} mi). Check the dash.`;
+    if (prev != null && odo - prev > (odoInfo.max_jump_mi || 3000)) return `That's ${Math.round(odo - prev).toLocaleString()} miles past the last fill (${Math.round(prev).toLocaleString()} mi) — is that another truck's mileage?`;
+    return null;
+  };
   // Yard pump relay control
   const PUMP_DEVICE = "yard_diesel_1";
   const [pumpOn, setPumpOn] = useState(false);
@@ -8879,10 +8983,17 @@ function DriverApp({ driver, onLogout }) {
     } catch (e) { setPumpMsg({ ok: false, text: e.message || "Could not reach the pump." }); }
     finally { setPumpBusy(false); }
   };
-  const submitFuel = async () => {
+  const submitFuel = async (force = false) => {
     const truck = fuelForm.truck_no.trim();
     if (!truck) { setFuelMsg({ ok: false, text: "Enter your truck number." }); return; }
     if (!(Number(fuelForm.odometer) > 0)) { setFuelMsg({ ok: false, text: "Enter the current mileage." }); return; }
+    // Catch a mistyped odometer before it's saved: show the problem once, with a
+    // one-tap fix (use the GPS reading) or "Save anyway".
+    if (!force) {
+      const problem = odometerProblem(Number(fuelForm.odometer));
+      if (problem) { setOdoWarn({ text: problem, gps: odoInfo?.gps_live ? odoInfo.gps_odometer : null }); setFuelMsg(null); return; }
+    }
+    setOdoWarn(null);
     const gal = Number(fuelForm.gallons);
     setFuelBusy(true); setFuelMsg(null);
     try {
@@ -9377,11 +9488,25 @@ function DriverApp({ driver, onLogout }) {
                 <label className="text-white/50 text-xs uppercase tracking-wide">Truck number</label>
                 <input value={fuelForm.truck_no} onChange={(e) => setFuelForm({ ...fuelForm, truck_no: e.target.value })} inputMode="numeric" placeholder="e.g. 4554" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
                 <label className="text-white/50 text-xs uppercase tracking-wide">Current mileage (odometer)</label>
-                <input value={fuelForm.odometer} onChange={(e) => setFuelForm({ ...fuelForm, odometer: e.target.value })} type="number" inputMode="numeric" placeholder="e.g. 123456" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
+                <input value={fuelForm.odometer} onChange={(e) => { setFuelForm({ ...fuelForm, odometer: e.target.value }); setOdoWarn(null); }} type="number" inputMode="numeric" placeholder="e.g. 123456" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mt-1" style={{ background: NAVY, border: `1px solid ${odoWarn ? "#ffb74d" : "rgba(255,255,255,0.15)"}`, fontFamily: C.body }} />
+                <div className="text-xs mb-3 mt-1.5 min-h-[1rem]" style={{ fontFamily: C.body }}>
+                  {odoInfo?.ok && odoInfo.gps_odometer && odoInfo.gps_live && <span style={{ color: GREEN }}><Navigation size={11} className="inline -mt-0.5" /> GPS says about <b>{Math.round(odoInfo.gps_odometer).toLocaleString()}</b> mi{fuelForm.odometer.trim() === String(Math.round(odoInfo.gps_odometer)) ? " — filled in for you" : ""}. </span>}
+                  {odoInfo?.ok && !odoInfo.has_baseline && <span className="text-white/40">No GPS odometer set for {odoInfo.truck} yet — ask the office to enter the dash reading under Manage trucks. </span>}
+                  {odoInfo?.ok && odoInfo.last_odometer != null && <span className="text-white/45">Last fill: {Math.round(odoInfo.last_odometer).toLocaleString()} mi.</span>}
+                </div>
+                {odoWarn && (
+                  <div className="rounded-xl px-3 py-2.5 mb-3" style={{ background: "rgba(255,183,77,0.12)", border: "1px solid rgba(255,183,77,0.6)" }}>
+                    <div className="text-sm font-semibold mb-2" style={{ color: "#ffb74d" }}><AlertTriangle size={14} className="inline -mt-0.5" /> {odoWarn.text}</div>
+                    <div className="flex gap-2">
+                      {odoWarn.gps && <button onClick={() => { setFuelForm({ ...fuelForm, odometer: String(Math.round(odoWarn.gps)) }); setOdoWarn(null); }} className="flex-1 rounded-lg py-2 text-sm font-bold active:scale-95" style={{ background: GREEN, color: NAVY_DEEP }}>Use GPS reading</button>}
+                      <button onClick={() => submitFuel(true)} className="flex-1 rounded-lg py-2 text-sm font-semibold active:scale-95" style={{ background: NAVY, color: "#ffb74d", border: "1px solid rgba(255,183,77,0.5)" }}>Save anyway</button>
+                    </div>
+                  </div>
+                )}
                 <label className="text-white/50 text-xs uppercase tracking-wide">Gallons <span className="text-white/30 normal-case">— only if the meter missed it</span></label>
                 <input value={fuelForm.gallons} onChange={(e) => setFuelForm({ ...fuelForm, gallons: e.target.value })} type="number" inputMode="decimal" placeholder="leave blank to use the meter" className="w-full rounded-xl px-3 py-3 text-white text-lg outline-none mb-3 mt-1" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body }} />
                 {fuelMsg && <div className="rounded-lg px-3 py-2 text-sm mb-3" style={{ background: fuelMsg.ok ? GREEN + "1f" : "rgba(239,83,80,0.14)", color: fuelMsg.ok ? GREEN : "#ff8a85" }}>{fuelMsg.text}</div>}
-                <button onClick={submitFuel} disabled={fuelBusy} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
+                <button onClick={() => submitFuel(false)} disabled={fuelBusy} className="w-full rounded-xl py-3.5 text-base font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
                   {fuelBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />} Save fill
                 </button>
                 <button onClick={() => setShowFuel(false)} className="w-full rounded-xl py-2.5 mt-2 text-sm font-semibold active:scale-95 text-white/70" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>Done</button>

@@ -1075,3 +1075,17 @@ export async function openProfitReport({ from = '', to = '' } = {}) {
   window.open(url, '_blank')
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
+
+// ── GPS odometer ──
+// What the app knows about a truck's mileage for the fuel-fill form: the GPS
+// odometer (baseline the office entered + miles the tracker has seen) and the
+// previous fill's reading to check the typed number against.
+export function getFuelOdometer(truckNo) {
+  return request(`/fuel/odometer?truck_no=${encodeURIComponent(truckNo)}`)
+}
+// Office enters a truck's real dash reading; GPS miles count up from it.
+export function setTruckOdometer(label, odometer) {
+  return request(`/trucks/${encodeURIComponent(label)}/odometer`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ odometer }),
+  })
+}
