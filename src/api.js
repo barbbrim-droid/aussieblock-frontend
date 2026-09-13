@@ -1049,3 +1049,15 @@ export async function openWeightTicketPdf(id) {
   window.open(url, '_blank')
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
+
+// ── Profit ──
+// Net profit for a date window (yyyy-mm-dd, inclusive; both blank = all time):
+// revenue billed for the yards poured on completed orders, minus materials,
+// hauling paid out, fuel and aggregate haul-in. Staff (finance) only.
+export function getProfit({ from = '', to = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return request(`/profit${qs ? '?' + qs : ''}`, { timeoutMs: 60000 })
+}
