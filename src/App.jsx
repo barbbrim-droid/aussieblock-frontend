@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v80";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v81";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7975,10 +7975,10 @@ function DispatchApp({ email, role, onLogout }) {
   ].filter(Boolean);
 
   const mobileTabs = [
-    { key: "map", label: "Map & trucks", icon: Truck, count: trucks.length },
+    { key: "map", label: "Map & trucks", short: "Map", icon: Truck, count: trucks.length },
     { key: "pours", label: "Pours", icon: Droplets, count: currentPours.length },
     { key: "today", label: "Today", icon: Package, count: todayOrders.length },
-    { key: "upcoming", label: "Upcoming", icon: CalendarPlus, count: upcomingOrders.length },
+    { key: "upcoming", label: "Upcoming", short: "Next", icon: CalendarPlus, count: upcomingOrders.length },
   ];
 
   if (loading) return <Splash label="Loading dispatch…" />;
@@ -8066,22 +8066,27 @@ function DispatchApp({ email, role, onLogout }) {
               <button onClick={() => setAlerts([])} className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95" style={{ background: "#6aa9ff", color: NAVY_DEEP, fontFamily: C.body }}>Got it</button>
             </div>
           )}
-          {/* title + actions (weather centered between them) */}
+          {/* title + actions (weather centered between them). On a phone the row is
+              title + icon buttons only; the stats move to the strip underneath. */}
           <div className="flex items-center justify-between shrink-0 gap-2 flex-wrap">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
               <h1 style={{ fontFamily: C.cond }} className="text-white text-xl font-bold leading-tight">Dispatch board</h1>
+              {/* Full-size stat pills only on a wide (lg) screen; phones and tablets get the
+                  compact 3-up strip below instead, so they never wrap around the title. */}
+              <div className="hidden lg:contents">
               <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><Package size={17} color={ORANGE} /><span className="text-white/55">Today</span><span className="text-white font-bold">{todayOrders.length}</span></span>
               <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><CalendarPlus size={17} color={ORANGE_HOT} /><span className="text-white/55">Scheduled</span><span className="text-white font-bold">{upcomingOrders.length}</span></span>
               <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}><CheckCircle2 size={17} color={GREEN} /><span className="text-white/55">Poured today</span><span className="font-bold" style={{ color: GREEN }}>{fmtYards(completedTodayYards)} CY</span></span>
+              </div>
             </div>
             <div className="shrink-0 hidden md:flex"><WeatherBar /></div>
-            <div className="flex items-center gap-2 flex-wrap justify-end flex-1">
+            <div className="flex items-center gap-2 justify-end shrink-0 sm:flex-1 sm:flex-wrap">
               <button onClick={() => setShowMessages(true)} className="relative flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold active:scale-95 transition-transform" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}>
-                <MessageSquare size={16} color={ORANGE} /> Messages
+                <MessageSquare size={16} color={ORANGE} /><span className="hidden sm:inline">Messages</span>
                 {msgUnread > 0 && <span className="absolute -top-1.5 -right-1.5 text-[11px] font-bold rounded-full px-1.5 py-0.5 leading-none flex items-center justify-center min-w-[18px]" style={{ background: "#ef5350", color: "#fff" }}>{msgUnread}</span>}
               </button>
               <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}>
-                <CalendarPlus size={16} /> New order
+                <CalendarPlus size={16} /><span className="hidden sm:inline">New order</span>
               </button>
               {/* everything else — Refresh, Install app, Customers, Price sheet, etc. — lives in here */}
               <div className="relative">
@@ -8102,6 +8107,19 @@ function DispatchApp({ email, role, onLogout }) {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Phone / tablet: the three stats in one compact row (they stacked one per line before). */}
+          <div className="lg:hidden shrink-0 grid grid-cols-3 gap-1.5">
+            {[[Package, ORANGE, "Today", todayOrders.length, "#fff", NAVY, "rgba(255,255,255,0.12)"],
+              [CalendarPlus, ORANGE_HOT, "Scheduled", upcomingOrders.length, "#fff", NAVY, "rgba(255,255,255,0.12)"],
+              [CheckCircle2, GREEN, "Poured", fmtYards(completedTodayYards) + " CY", GREEN, GREEN + "1a", GREEN + "55"]].map(([Icon, ic, label, value, vc, bg, bd]) => (
+              <div key={label} className="flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 min-w-0" style={{ background: bg, border: `1px solid ${bd}`, fontFamily: C.body }}>
+                <Icon size={13} color={ic} className="shrink-0" />
+                <span className="text-white/55 text-[10px] truncate">{label}</span>
+                <span className="text-xs font-bold whitespace-nowrap" style={{ color: vc }}>{value}</span>
+              </div>
+            ))}
           </div>
 
           {err && (
@@ -8130,17 +8148,17 @@ function DispatchApp({ email, role, onLogout }) {
           {/* Phone widths: one panel fills the screen at a time instead of four
               squeezed columns. Desktop ignores this — see `lg:contents` below,
               which always shows all four regardless of the selected tab. */}
-          <div className="lg:hidden shrink-0 flex items-center gap-1.5 overflow-x-auto -mx-1 px-1">
+          <div className="lg:hidden shrink-0 grid grid-cols-4 gap-1.5 sm:flex sm:items-center sm:overflow-x-auto sm:-mx-1 sm:px-1">
             {mobileTabs.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setMobileTab(t.key)}
-                className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold active:scale-95 transition-transform"
+                className="shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 rounded-full px-1 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold active:scale-95 transition-transform min-w-0"
                 style={mobileTab === t.key
                   ? { background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }
                   : { background: NAVY, color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}
               >
-                <t.icon size={13} /> {t.label} <span className="opacity-70">({t.count})</span>
+                <t.icon size={13} className="shrink-0" /><span className="truncate"><span className="sm:hidden">{t.short || t.label}</span><span className="hidden sm:inline">{t.label}</span></span> <span className="opacity-70"><span className="sm:hidden">{t.count}</span><span className="hidden sm:inline">({t.count})</span></span>
               </button>
             ))}
           </div>
