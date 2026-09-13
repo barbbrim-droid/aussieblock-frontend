@@ -980,3 +980,60 @@ export function editTimeEntry(id, body) {
 export function deleteTimeEntry(id) {
   return request(`/timeclock/entries/${id}`, { method: 'DELETE' })
 }
+
+// ── Aggregate weight tickets ──
+// The pit scale ticket for each load of rock/sand an aggregate truck hauls in.
+// Drivers log one from the tablet (photo required — the figures are read off it
+// when the backend has the vision key); the office reviews them on the board and
+// tracks aggregate + hauling cost from net tons × the rates on each ticket.
+export function getWeightTicketOptions() {
+  return request('/weight-tickets/options')   // materials, trucks, known pits (+ rates/drivers for staff)
+}
+// fields: { ticket_date, material, material_id, supplier, ticket_no, truck, driver,
+//           net_tons, gross_lb, tare_lb, material_rate, haul_rate, notes } — all optional
+export async function createWeightTicket(fields = {}, file = null) {
+  const fd = new FormData()
+  for (const [k, v] of Object.entries(fields)) if (v != null && v !== '') fd.append(k, String(v))
+  if (file) fd.append('file', file)
+  const res = await uploadFetch(`${API_BASE}/weight-tickets`, fd)
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+export function getWeightTickets({ from = '', to = '', material_id = '', truck = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  if (material_id) q.set('material_id', material_id)
+  if (truck) q.set('truck', truck)
+  const qs = q.toString()
+  return request(`/weight-tickets${qs ? '?' + qs : ''}`)   // { tickets, summary, vision }
+}
+export function getMyWeightTickets(days = 14) {
+  return request(`/weight-tickets/mine?days=${days}`)      // driver: { driver, date, tickets, today }
+}
+export function editWeightTicket(id, patch) {
+  return request(`/weight-tickets/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+}
+export function deleteWeightTicket(id) {
+  return request(`/weight-tickets/${id}`, { method: 'DELETE' })
+}
+export function rereadWeightTicket(id) {
+  return request(`/weight-tickets/${id}/reread`, { method: 'POST' })
+}
+export async function uploadWeightTicketPhoto(id, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await uploadFetch(`${API_BASE}/weight-tickets/${id}/photos`, fd)
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return res.json()
+}
+export async function fetchWeightTicketPhotoUrl(id, name) {
+  const res = await fetch(`${API_BASE}/weight-tickets/${id}/photos/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  return URL.createObjectURL(await res.blob())
+}
+export function deleteWeightTicketPhoto(id, name) {
+  return request(`/weight-tickets/${id}/photos/${encodeURIComponent(name)}`, { method: 'DELETE' })
+}

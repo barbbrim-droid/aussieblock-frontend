@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale } from "lucide-react";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep12-v78";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v79";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7118,6 +7118,569 @@ function PriceSheetModal({ onClose }) {
   );
 }
 
+// ── Aggregate weight tickets ─────────────────────────────────────────────
+// The pit/quarry scale ticket for every load of rock or sand an aggregate truck
+// hauls in. Drivers snap it on the tablet (DriverWeightTicketsModal); the office
+// reviews it on the board (AggregateTicketsModal), where aggregate cost and
+// hauling cost roll up from net tons × the rates on each ticket.
+
+const WT_READ_META = {
+  pending: { label: "Reading photo…", color: "#6aa9ff" },
+  done:    { label: "Read from photo", color: GREEN },
+  failed:  { label: "Couldn't read photo", color: "#ff8a85" },
+  skipped: { label: "Not auto-read", color: "rgba(255,255,255,0.4)" },
+};
+
+// Thumbnails of a ticket's photos/PDFs, fetched as authed blobs. Staff can add
+// and remove; a driver can only add (the back of the ticket, a retake).
+function WeightTicketPhotos({ ticket, canDelete = false, onChanged, size = 16 }) {
+  const [urls, setUrls] = useState({});
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const names = ticket.photos || [];
+  useEffect(() => {
+    let live = true; const made = [];
+    (async () => {
+      for (const name of names) {
+        try {
+          const u = await fetchWeightTicketPhotoUrl(ticket.id, name);
+          if (!live) { URL.revokeObjectURL(u); return; }
+          made.push(u); setUrls((m) => ({ ...m, [name]: u }));
+        } catch { /* skip a missing photo */ }
+      }
+    })();
+    return () => { live = false; made.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [ticket.id, names.join(",")]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const add = async (e) => {
+    const files = Array.from(e.target.files || []); if (!files.length) return;
+    setBusy(true);
+    try { for (const f of files) await uploadWeightTicketPhoto(ticket.id, f); if (onChanged) await onChanged(); }
+    catch (err) { alert(err.message); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+  const remove = async (name) => {
+    if (!window.confirm("Remove this photo?")) return;
+    setBusy(true);
+    try { await deleteWeightTicketPhoto(ticket.id, name); if (onChanged) await onChanged(); }
+    catch (err) { alert(err.message); } finally { setBusy(false); }
+  };
+  const isPdf = (name) => /\.pdf$/i.test(name);
+  const box = `h-${size} w-${size}`;
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-1">
+      {names.map((name) => (
+        <div key={name} className="relative">
+          {!urls[name] ? (
+            <div className={`${box} rounded-lg flex items-center justify-center`} style={{ background: NAVY, minWidth: size * 4, minHeight: size * 4 }}><Loader2 size={14} className="animate-spin text-white/40" /></div>
+          ) : isPdf(name) ? (
+            <button onClick={() => window.open(urls[name], "_blank")} title="Open PDF" className={`${box} rounded-lg flex flex-col items-center justify-center gap-1`} style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", minWidth: size * 4, minHeight: size * 4 }}>
+              <FileText size={20} color={ORANGE} /><span className="text-[9px] font-semibold text-white/70">PDF</span>
+            </button>
+          ) : (
+            <img src={urls[name]} alt="weight ticket" onClick={() => window.open(urls[name], "_blank")} className={`${box} object-cover rounded-lg cursor-pointer`} style={{ border: "1px solid rgba(255,255,255,0.15)", width: size * 4, height: size * 4 }} />
+          )}
+          {canDelete && <button onClick={() => remove(name)} title="Remove" className="absolute -top-1.5 -right-1.5 rounded-full p-0.5 active:scale-90" style={{ background: "#ff5a52" }}><X size={11} color="#fff" /></button>}
+        </div>
+      ))}
+      <button onClick={() => fileRef.current?.click()} disabled={busy} className={`${box} rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 disabled:opacity-50`} style={{ background: NAVY, border: "1px dashed rgba(255,255,255,0.25)", width: size * 4, height: size * 4 }}>
+        {busy ? <Loader2 size={15} className="animate-spin text-white/50" /> : <><Camera size={16} color={ORANGE} /><span className="text-[9px] text-white/50">Add</span></>}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" multiple onChange={add} className="hidden" />
+    </div>
+  );
+}
+
+// Log-a-ticket form. mode "driver" = the tablet (big touch targets, photo
+// required, no money); mode "staff" = the board (compact, date/driver/rates,
+// photo optional). `options` comes from GET /weight-tickets/options.
+function WeightTicketForm({ mode = "driver", options, onLogged }) {
+  const isDriver = mode === "driver";
+  const today = localToday();
+  const mats = options?.materials || [];
+  const trucks = options?.trucks || [];
+  const aggTrucks = trucks.filter((t) => t.kind === "aggregate");
+  const truckList = aggTrucks.length ? aggTrucks : trucks;
+  const remembered = (() => { try { return localStorage.getItem("driver_agg_truck") || ""; } catch { return ""; } })();
+  const blank = () => ({
+    ticket_date: today, material_id: mats[0]?.id ?? "", material_other: "", supplier: "", ticket_no: "",
+    truck: remembered || (truckList[0]?.label ?? ""), driver: "", net_tons: "", gross_lb: "", tare_lb: "",
+    material_rate: "", haul_rate: "", notes: "",
+  });
+  const [f, setF] = useState(blank);
+  const [customTruck, setCustomTruck] = useState("");   // typed truck when "Other truck…" is picked
+  const [weighMode, setWeighMode] = useState("net");   // "net" (type tons) | "scale" (gross/tare lb)
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const fileRef = useRef(null);
+  // Pick a photo/PDF: keep the file and an object URL for the on-screen preview
+  // (images only); the previous preview URL is released when it's replaced.
+  const pickFile = (nf) => {
+    setPreview((old) => { if (old) URL.revokeObjectURL(old); return nf && /^image\//.test(nf.type) ? URL.createObjectURL(nf) : null; });
+    setFile(nf);
+  };
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const netFromScale = (Number(f.gross_lb) > Number(f.tare_lb) && Number(f.tare_lb) >= 0) ? (Number(f.gross_lb) - Number(f.tare_lb)) / 2000 : null;
+
+  const submit = async () => {
+    setMsg(null);
+    if (isDriver && !file) { setMsg({ ok: false, text: "Take a photo of the weight ticket first." }); return; }
+    const truckVal = (f.truck === "__other" ? customTruck : f.truck).trim();
+    if (!truckVal) { setMsg({ ok: false, text: "Pick your truck." }); return; }
+    const fields = {
+      ticket_date: isDriver ? "" : f.ticket_date,
+      material_id: f.material_id === "other" ? "" : f.material_id,
+      material: f.material_id === "other" ? f.material_other.trim() : "",
+      supplier: f.supplier.trim(), ticket_no: f.ticket_no.trim(), truck: truckVal,
+      driver: isDriver ? "" : f.driver.trim(), notes: f.notes.trim(),
+      net_tons: weighMode === "net" ? f.net_tons.trim() : "",
+      gross_lb: weighMode === "scale" ? f.gross_lb.trim() : "",
+      tare_lb: weighMode === "scale" ? f.tare_lb.trim() : "",
+      material_rate: isDriver ? "" : f.material_rate, haul_rate: isDriver ? "" : f.haul_rate,
+    };
+    setBusy(true);
+    try {
+      try { localStorage.setItem("driver_agg_truck", truckVal); } catch { /* private mode */ }
+      const t = await createWeightTicket(fields, file);
+      setF({ ...blank(), truck: f.truck, material_id: f.material_id, supplier: f.supplier, driver: f.driver, ticket_date: f.ticket_date });
+      pickFile(null); if (fileRef.current) fileRef.current.value = "";
+      setMsg({ ok: true, text: t.net_tons ? `Logged ${t1(t.net_tons)} t of ${t.material || "aggregate"} on ${t.truck || "your truck"}.`
+        : t.read_status === "pending" ? "Ticket saved — reading the weight off the photo now." : "Ticket saved — the office will enter the weight from the photo." });
+      if (onLogged) await onLogged(t);
+    } catch (e) { setMsg({ ok: false, text: e.message || "Couldn't save the ticket" }); }
+    finally { setBusy(false); }
+  };
+
+  // Driver tablet: big inputs; staff: the standard compact inputs.
+  const inCls = isDriver ? "w-full rounded-xl px-3 py-3 text-white text-lg outline-none placeholder:text-white/30"
+                         : "w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: isDriver ? NAVY : NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", fontFamily: C.body };
+  const lab = "text-white/50 text-xs uppercase tracking-wide block mb-1";
+  const chip = (on) => ({ background: on ? ORANGE : (isDriver ? NAVY : NAVY_DEEP), color: on ? NAVY_DEEP : "rgba(255,255,255,0.75)", border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.15)"}`, fontFamily: C.body });
+  const grid = isDriver ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2";
+
+  return (
+    <div>
+      {/* photo — first on the tablet; it's the whole point */}
+      <div className={isDriver ? "mb-3" : "mb-2"}>
+        <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" capture={isDriver ? "environment" : undefined} className="hidden" onChange={(e) => pickFile((e.target.files || [])[0] || null)} />
+        {preview ? (
+          <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${GREEN}66` }}>
+            <img src={preview} alt="ticket" className="w-full object-contain" style={{ maxHeight: isDriver ? 220 : 140, background: "#000" }} />
+            <div className="absolute bottom-0 inset-x-0 flex items-center justify-between px-3 py-2 text-xs" style={{ background: "rgba(0,0,0,0.6)" }}>
+              <span className="font-semibold" style={{ color: GREEN }}><CheckCircle2 size={13} className="inline -mt-0.5" /> Photo attached</span>
+              <button onClick={() => fileRef.current?.click()} className="font-semibold" style={{ color: ORANGE }}>Retake</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => fileRef.current?.click()} className={`w-full rounded-xl flex items-center justify-center gap-2 font-bold active:scale-[0.99] ${isDriver ? "py-6 text-lg" : "py-3 text-sm"}`} style={{ background: file ? GREEN + "22" : ORANGE + "1a", color: file ? GREEN : ORANGE, border: `1px dashed ${file ? GREEN : ORANGE}88`, fontFamily: C.body }}>
+            <Camera size={isDriver ? 24 : 16} /> {file ? `${file.name} attached` : isDriver ? "Take a photo of the weight ticket" : "Attach ticket photo / PDF (optional)"}
+          </button>
+        )}
+        {isDriver && options?.vision && <p className="text-white/40 text-xs mt-1.5 text-center">The weight, ticket # and pit are read off the photo automatically — fill in anything you know below.</p>}
+      </div>
+
+      <div className={grid}>
+        {/* truck */}
+        <div>
+          <label className={lab}>Truck</label>
+          {truckList.length ? (
+            <select value={f.truck} onChange={set("truck")} className={inCls} style={inSt}>
+              {!truckList.some((t) => t.label === f.truck) && f.truck && <option value={f.truck}>{f.truck}</option>}
+              {truckList.map((t) => <option key={t.label} value={t.label}>{t.label}</option>)}
+              {aggTrucks.length > 0 && trucks.length > aggTrucks.length && <option value="__other">Other truck…</option>}
+            </select>
+          ) : <input value={f.truck} onChange={set("truck")} placeholder="Truck number" className={inCls} style={inSt} />}
+          {f.truck === "__other" && <input autoFocus value={customTruck} onChange={(e) => setCustomTruck(e.target.value)} placeholder="Type the truck number" className={inCls + " mt-1"} style={inSt} />}
+        </div>
+        {/* material */}
+        <div>
+          <label className={lab}>Material</label>
+          <div className="flex flex-wrap gap-1.5">
+            {mats.map((m) => <button key={m.id} onClick={() => setF({ ...f, material_id: m.id })} className={`rounded-lg font-semibold active:scale-95 ${isDriver ? "px-4 py-3 text-base" : "px-3 py-1.5 text-xs"}`} style={chip(f.material_id === m.id)}>{m.name}</button>)}
+            <button onClick={() => setF({ ...f, material_id: "other" })} className={`rounded-lg font-semibold active:scale-95 ${isDriver ? "px-4 py-3 text-base" : "px-3 py-1.5 text-xs"}`} style={chip(f.material_id === "other")}>Other</button>
+          </div>
+          {f.material_id === "other" && <input value={f.material_other} onChange={set("material_other")} placeholder="What is it? (e.g. Road base)" className={inCls + " mt-1.5"} style={inSt} />}
+        </div>
+        {/* weight */}
+        <div className={isDriver ? "sm:col-span-2" : "col-span-2"}>
+          <div className="flex items-center justify-between mb-1">
+            <label className={lab + " mb-0"}>Weight {isDriver && options?.vision ? <span className="normal-case text-white/30">— if you can read it</span> : null}</label>
+            <div className="flex gap-1">
+              {[["net", "Net tons"], ["scale", "Gross / tare lb"]].map(([k, l]) => <button key={k} onClick={() => setWeighMode(k)} className="rounded-md px-2 py-0.5 text-[11px] font-semibold active:scale-95" style={chip(weighMode === k)}>{l}</button>)}
+            </div>
+          </div>
+          {weighMode === "net" ? (
+            <input value={f.net_tons} onChange={set("net_tons")} type="number" inputMode="decimal" step="0.01" placeholder="Net tons, e.g. 24.6" className={inCls} style={inSt} />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <input value={f.gross_lb} onChange={set("gross_lb")} type="number" inputMode="numeric" placeholder="Gross lb" className={inCls} style={inSt} />
+              <input value={f.tare_lb} onChange={set("tare_lb")} type="number" inputMode="numeric" placeholder="Tare lb" className={inCls} style={inSt} />
+              <div className="col-span-2 text-xs text-white/45">{netFromScale != null ? <>Net = <b className="text-white">{t1(netFromScale)} tons</b></> : "Net tons = (gross − tare) ÷ 2000"}</div>
+            </div>
+          )}
+        </div>
+        {/* pit + ticket # */}
+        <div>
+          <label className={lab}>Pit / quarry</label>
+          <input list="wt-suppliers" value={f.supplier} onChange={set("supplier")} placeholder="Where you loaded" className={inCls} style={inSt} />
+          <datalist id="wt-suppliers">{(options?.suppliers || []).map((s) => <option key={s} value={s} />)}</datalist>
+        </div>
+        <div>
+          <label className={lab}>Ticket #</label>
+          <input value={f.ticket_no} onChange={set("ticket_no")} placeholder="Scale ticket number" className={inCls} style={inSt} />
+        </div>
+        {!isDriver && (
+          <>
+            <div><label className={lab}>Ticket date</label><input type="date" value={f.ticket_date} onChange={set("ticket_date")} className={inCls} style={inSt} /></div>
+            <div>
+              <label className={lab}>Driver</label>
+              <input list="wt-drivers" value={f.driver} onChange={set("driver")} placeholder="Driver name" className={inCls} style={inSt} />
+              <datalist id="wt-drivers">{(options?.drivers || []).map((d) => <option key={d} value={d} />)}</datalist>
+            </div>
+            <div><label className={lab}>Material $/ton <span className="normal-case text-white/30">(blank = default)</span></label><input type="number" step="0.01" value={f.material_rate} onChange={set("material_rate")} placeholder={(() => { const m = mats.find((x) => x.id === f.material_id); return m?.cost_rate ? `${m.cost_rate}` : "0"; })()} className={inCls} style={inSt} /></div>
+            <div><label className={lab}>Haul $/ton <span className="normal-case text-white/30">(blank = default)</span></label><input type="number" step="0.01" value={f.haul_rate} onChange={set("haul_rate")} placeholder={(() => { const m = mats.find((x) => x.id === f.material_id); return m?.haul_rate ? `${m.haul_rate}` : "0"; })()} className={inCls} style={inSt} /></div>
+          </>
+        )}
+        <div className={isDriver ? "sm:col-span-2" : "col-span-2 sm:col-span-3 lg:col-span-4"}>
+          <label className={lab}>Notes <span className="normal-case text-white/30">(optional)</span></label>
+          <input value={f.notes} onChange={set("notes")} placeholder={isDriver ? "Anything the office should know" : "Notes"} className={inCls} style={inSt} />
+        </div>
+      </div>
+      {msg && <div className={`rounded-lg px-3 py-2 mt-3 ${isDriver ? "text-sm" : "text-xs"}`} style={{ background: msg.ok ? GREEN + "1f" : "rgba(239,83,80,0.14)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+      <button onClick={submit} disabled={busy} className={`w-full rounded-xl font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 mt-3 ${isDriver ? "py-4 text-lg" : "py-2.5 text-sm"}`} style={{ background: ORANGE, color: NAVY_DEEP }}>
+        {busy ? <Loader2 size={isDriver ? 20 : 15} className="animate-spin" /> : <UploadCloud size={isDriver ? 20 : 15} />} {busy ? "Saving…" : isDriver ? "Send weight ticket" : "Log ticket"}
+      </button>
+    </div>
+  );
+}
+
+// Driver tablet: full-screen "Weight tickets" — log the ticket for the load
+// just picked up, and see today's loads/tons plus recent tickets (so the
+// driver knows it went through and what was read off the photo).
+function DriverWeightTicketsModal({ onClose }) {
+  const [options, setOptions] = useState(null);
+  const [mine, setMine] = useState(null);
+  const [err, setErr] = useState("");
+  const load = async () => {
+    try { const [o, m] = await Promise.all([getWeightTicketOptions(), getMyWeightTickets(14)]); setOptions(o); setMine(m); setErr(""); }
+    catch (e) { setErr(e.message || "Couldn't load"); }
+  };
+  useEffect(() => { load(); }, []);
+  // While a photo is being read, poll so the tons appear when the reader finishes.
+  const reading = (mine?.tickets || []).some((t) => t.read_status === "pending");
+  useEffect(() => { if (!reading) return; const t = setInterval(load, 4000); return () => clearInterval(t); }, [reading]);
+  const tickets = mine?.tickets || [];
+  return (
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.875rem)" }}>
+          <div className="flex items-center gap-2"><Scale size={22} color={NAVY_DEEP} /><div className="leading-none"><div style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-xl font-bold">Weight tickets</div><div style={{ color: NAVY_DEEP, fontFamily: C.body }} className="text-[11px] font-semibold opacity-70">Snap the pit scale ticket for every load</div></div></div>
+          <button onClick={onClose} className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+        </div>
+        {err && <div className="px-4 py-2 text-xs shrink-0" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 md:p-5">
+          <div className="md:grid md:grid-cols-2 md:gap-5 lg:max-w-6xl lg:mx-auto">
+            <div className="rounded-xl p-4 mb-4 md:mb-0" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="text-white font-bold text-lg mb-3" style={{ fontFamily: C.cond }}>Log this load</div>
+              {!options ? <div className="text-white/50 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+                        : <WeightTicketForm mode="driver" options={options} onLogged={load} />}
+            </div>
+            <div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="rounded-xl p-3.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}><div className="text-white/50 text-xs uppercase tracking-wide">Today's loads</div><div className="text-3xl font-bold text-white" style={{ fontFamily: C.cond }}>{mine?.today?.loads ?? "—"}</div></div>
+                <div className="rounded-xl p-3.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}><div className="text-white/50 text-xs uppercase tracking-wide">Today's tons</div><div className="text-3xl font-bold text-white" style={{ fontFamily: C.cond }}>{mine ? t1(mine.today?.tons || 0) : "—"}</div></div>
+              </div>
+              <div className="text-white/55 text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: C.body }}>Your recent tickets</div>
+              {!mine ? null : tickets.length === 0 ? (
+                <div className="text-white/40 text-sm py-6 text-center rounded-xl" style={{ background: NAVY }}>No tickets yet — log your first load on the left.</div>
+              ) : tickets.map((t) => {
+                const rm = WT_READ_META[t.read_status];
+                return (
+                  <div key={t.id} className="rounded-xl p-3 mb-2" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-white font-bold text-base leading-tight" style={{ fontFamily: C.cond }}>{t.material || "Aggregate"} · {t.net_tons ? `${t1(t.net_tons)} t` : <span className="text-white/40 font-semibold">weight pending</span>}</div>
+                        <div className="text-white/55 text-xs mt-0.5 truncate">{orderDateUS(t.ticket_date) || t.ticket_date}{t.truck ? ` · ${t.truck}` : ""}{t.supplier ? ` · ${t.supplier}` : ""}{t.ticket_no ? ` · #${t.ticket_no}` : ""}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {t.reviewed ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>REVIEWED</span>
+                          : rm ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: rm.color + "22", color: rm.color }}>{t.read_status === "pending" && <Loader2 size={10} className="animate-spin" />}{rm.label}</span> : null}
+                      </div>
+                    </div>
+                    <WeightTicketPhotos ticket={t} canDelete={false} onChanged={load} size={14} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Which of a ticket's figures the office still needs to fill/check.
+const wtMissing = (t) => [!t.net_tons && "tons", !t.material_id && "material", !(t.material_rate > 0) && "material $/t", !(t.haul_rate > 0) && "haul $/t"].filter(Boolean);
+
+// Dispatch board: the Aggregate section — every weight ticket the haulers have
+// sent in, with aggregate + hauling cost roll-ups for a date window, default
+// $/ton rates per material, and review/correct/delete on each ticket.
+function AggregateTicketsModal({ onClose }) {
+  const mb = monthBounds();
+  const [from, setFrom] = useState(mb.first);
+  const [to, setTo] = useState(mb.last);
+  const [data, setData] = useState(null);
+  const [options, setOptions] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [tab, setTab] = useState("tickets");        // tickets | breakdown | rates
+  const [breakBy, setBreakBy] = useState("by_material");
+  const [showLog, setShowLog] = useState(false);
+  const [onlyOpen, setOnlyOpen] = useState(false);   // only unreviewed / incomplete tickets
+  const [editId, setEditId] = useState(null);
+  const [ef, setEf] = useState({});
+  const [openPhotos, setOpenPhotos] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [rates, setRates] = useState({});            // material id -> {cost_rate, haul_rate}
+
+  const load = async () => {
+    try {
+      const [d, o] = await Promise.all([getWeightTickets({ from, to }), getWeightTicketOptions()]);
+      setData(d); setOptions(o);
+      setRates(Object.fromEntries((o.materials || []).map((m) => [m.id, { cost_rate: m.cost_rate ?? 0, haul_rate: m.haul_rate ?? 0 }])));
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  useEffect(() => { load(); }, [from, to]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const reading = (data?.tickets || []).some((t) => t.read_status === "pending");
+  useEffect(() => { if (!reading) return; const t = setInterval(load, 4000); return () => clearInterval(t); }, [reading]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const today = localToday();
+  const quick = [
+    ["Today", today, today],
+    ["This week", (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })(), today],
+    ["This month", mb.first, mb.last],
+    ["All time", "", ""],
+  ];
+  const sum = data?.summary;
+  const tickets = (data?.tickets || []).filter((t) => !onlyOpen || !t.reviewed || wtMissing(t).length);
+  const mats = options?.materials || [];
+
+  const startEdit = (t) => {
+    setOpenPhotos(null); setEditId(t.id);
+    setEf({ ticket_date: t.ticket_date || today, material_id: t.material_id ?? "", supplier: t.supplier || "", ticket_no: t.ticket_no || "",
+      truck: t.truck || "", driver: t.driver || "", net_tons: t.net_tons ?? "", gross_lb: t.gross_lb ?? "", tare_lb: t.tare_lb ?? "",
+      material_rate: t.material_rate ?? "", haul_rate: t.haul_rate ?? "", notes: t.notes || "" });
+  };
+  const num = (v) => (v === "" || v == null ? null : Number(v));
+  const saveEdit = async (t) => {
+    setBusy(true); setMsg(null);
+    try {
+      const patch = { ticket_date: ef.ticket_date, supplier: ef.supplier, ticket_no: ef.ticket_no, truck: ef.truck, driver: ef.driver,
+        gross_lb: num(ef.gross_lb), tare_lb: num(ef.tare_lb), material_rate: num(ef.material_rate), haul_rate: num(ef.haul_rate), notes: ef.notes };
+      if (num(ef.net_tons) != null) patch.net_tons = num(ef.net_tons);
+      if (ef.material_id !== "" && Number(ef.material_id) !== t.material_id) patch.material_id = Number(ef.material_id);
+      await editWeightTicket(t.id, patch);
+      setEditId(null); await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+  const toggleReviewed = async (t) => { try { await editWeightTicket(t.id, { reviewed: !t.reviewed }); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  const remove = async (t) => {
+    if (!window.confirm(`Delete this ${t.material || "aggregate"} ticket${t.net_tons ? ` (${t1(t.net_tons)} t)` : ""}${t.driver ? ` from ${t.driver}` : ""}?`)) return;
+    try { await deleteWeightTicket(t.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); }
+  };
+  const reread = async (t) => { try { await rereadWeightTicket(t.id); await load(); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  const saveRates = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      for (const m of mats) {
+        const r = rates[m.id] || {};
+        if (Number(r.cost_rate) !== Number(m.cost_rate ?? 0) || Number(r.haul_rate) !== Number(m.haul_rate ?? 0)) {
+          await updateMaterial(m.id, { cost_rate: Number(r.cost_rate) || 0, haul_rate: Number(r.haul_rate) || 0 });
+        }
+      }
+      setMsg({ ok: true, text: "Default rates saved — they apply to tickets logged from now on (existing tickets keep their rates)." });
+      await load();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  const inCls = "w-full rounded-lg px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/30";
+  const inSt = { background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const tile = (label, value, sub, color) => (
+    <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="text-white/50 text-[10px] uppercase tracking-wide">{label}</div>
+      <div className="text-2xl font-bold leading-tight" style={{ fontFamily: C.cond, color: color || "#fff" }}>{value}</div>
+      {sub && <div className="text-white/40 text-[10px] mt-0.5">{sub}</div>}
+    </div>
+  );
+  const matStyle = (name) => (/sand/i.test(name || "") ? { background: "#f5c04222", color: "#f5c042" } : /gravel|rock/i.test(name || "") ? { background: "#c77dff22", color: "#c77dff" } : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-6xl max-h-[95vh] flex flex-col rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 shrink-0" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Scale size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Aggregate weight tickets</span></div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}><Plus size={13} /> Log a ticket</button>
+            <button onClick={onClose} className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4" style={{ fontFamily: C.body }}>
+          {showLog && options && (
+            <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: `1px solid ${ORANGE}55` }}>
+              <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Log a weight ticket (office)</div>
+              <WeightTicketForm mode="staff" options={options} onLogged={load} />
+            </div>
+          )}
+          {/* date window */}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {quick.map(([l, a, b]) => <button key={l} onClick={() => { setFrom(a); setTo(b); }} className="rounded-lg px-2.5 py-1 text-xs font-semibold active:scale-95" style={{ background: from === a && to === b ? ORANGE : NAVY, color: from === a && to === b ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)" }}>{l}</button>)}
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
+            <span className="text-white/40 text-xs">to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
+            <label className="flex items-center gap-1.5 text-xs text-white/60 ml-auto cursor-pointer"><input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} /> Needs attention only</label>
+          </div>
+          {/* totals */}
+          {sum && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
+              {tile("Loads", sum.loads, sum.unreviewed ? `${sum.unreviewed} to review` : "all reviewed")}
+              {tile("Tons hauled", t1(sum.tons), sum.missing_tons ? `${sum.missing_tons} missing weight` : null, sum.missing_tons ? WARN : undefined)}
+              {tile("Aggregate cost", money(sum.material_cost), "net tons × material $/t", GREEN)}
+              {tile("Hauling cost", money(sum.haul_cost), "net tons × haul $/t", GREEN)}
+              {tile("Total", money(sum.total_cost), sum.tons ? `${money(sum.total_cost / sum.tons)}/t landed` : null, ORANGE)}
+            </div>
+          )}
+          {/* tabs */}
+          <div className="flex gap-1 mb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+            {[["tickets", "Tickets"], ["breakdown", "Breakdown"], ["rates", "Rates"]].map(([k, l]) => (
+              <button key={k} onClick={() => setTab(k)} className="px-3 py-2 text-sm font-bold" style={{ color: tab === k ? ORANGE : "rgba(255,255,255,0.45)", borderBottom: tab === k ? `2px solid ${ORANGE}` : "2px solid transparent" }}>{l}</button>
+            ))}
+          </div>
+
+          {tab === "breakdown" && sum && (
+            <div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {[["by_material", "By material"], ["by_truck", "By truck"], ["by_driver", "By driver"], ["by_supplier", "By pit"]].map(([k, l]) => <button key={k} onClick={() => setBreakBy(k)} className="rounded-lg px-2.5 py-1 text-xs font-semibold active:scale-95" style={{ background: breakBy === k ? ORANGE : NAVY, color: breakBy === k ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)" }}>{l}</button>)}
+              </div>
+              {(sum[breakBy] || []).length === 0 ? <div className="text-white/40 text-sm py-6 text-center rounded-xl" style={{ background: NAVY }}>Nothing in this window.</div> : (
+                <div className="overflow-x-auto"><table className="w-full text-xs">
+                  <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">{{ by_material: "Material", by_truck: "Truck", by_driver: "Driver", by_supplier: "Pit / quarry" }[breakBy]}</th><th className="py-1.5 pr-2 font-semibold text-right">Loads</th><th className="py-1.5 pr-2 font-semibold text-right">Tons</th><th className="py-1.5 pr-2 font-semibold text-right">Aggregate $</th><th className="py-1.5 pr-2 font-semibold text-right">Hauling $</th><th className="py-1.5 pr-2 font-semibold text-right">Total</th><th className="py-1.5 font-semibold text-right">$/t</th></tr></thead>
+                  <tbody>{sum[breakBy].map((b) => (
+                    <tr key={b.label} className="text-white/85" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      <td className="py-1.5 pr-2 font-semibold text-white">{b.label}</td><td className="py-1.5 pr-2 text-right">{b.loads}</td><td className="py-1.5 pr-2 text-right">{t1(b.tons)}</td>
+                      <td className="py-1.5 pr-2 text-right">{money(b.material_cost)}</td><td className="py-1.5 pr-2 text-right">{money(b.haul_cost)}</td><td className="py-1.5 pr-2 text-right font-semibold" style={{ color: GREEN }}>{money(b.total_cost)}</td><td className="py-1.5 text-right text-white/60">{b.tons ? money(b.total_cost / b.tons) : "—"}</td>
+                    </tr>
+                  ))}</tbody>
+                </table></div>
+              )}
+            </div>
+          )}
+
+          {tab === "rates" && (
+            <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="text-white text-sm font-semibold mb-1" style={{ fontFamily: C.cond }}>Default $/ton by material</div>
+              <p className="text-white/45 text-xs mb-3">Every new ticket snapshots these rates: <b className="text-white/70">material</b> is what the pit charges per ton (the same $/ton the Materials tracker costs usage at); <b className="text-white/70">haul</b> is what it costs to truck a ton in. Correct a single ticket's rates in its edit row.</p>
+              {mats.length === 0 ? <div className="text-white/40 text-sm">No aggregate materials set up.</div> : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {mats.map((m) => (
+                    <div key={m.id} className="rounded-lg p-2.5 grid grid-cols-2 gap-2 items-end" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }}>
+                      <div className="col-span-2 text-white font-bold" style={{ fontFamily: C.cond }}>{m.name}</div>
+                      <label className="text-[10px] text-white/45 uppercase tracking-wide">Material $/ton<input type="number" step="0.01" value={rates[m.id]?.cost_rate ?? ""} onChange={(e) => setRates({ ...rates, [m.id]: { ...rates[m.id], cost_rate: e.target.value } })} className={inCls} style={{ ...inSt, background: NAVY }} /></label>
+                      <label className="text-[10px] text-white/45 uppercase tracking-wide">Haul $/ton<input type="number" step="0.01" value={rates[m.id]?.haul_rate ?? ""} onChange={(e) => setRates({ ...rates, [m.id]: { ...rates[m.id], haul_rate: e.target.value } })} className={inCls} style={{ ...inSt, background: NAVY }} /></label>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={saveRates} disabled={busy || !mats.length} className="mt-3 rounded-lg px-4 py-2 text-sm font-bold active:scale-95 inline-flex items-center gap-1.5 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save rates</button>
+            </div>
+          )}
+
+          {tab === "tickets" && (
+            !data ? <div className="text-white/50 text-sm py-8 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+            : tickets.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>{onlyOpen ? "Nothing needs attention in this window." : "No weight tickets in this window yet. Drivers log them from the tablet's Weight tickets button; you can log one here with “Log a ticket”."}</div>
+            : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-white/45 text-left">
+                    <th className="py-1.5 pr-2 font-semibold">Date</th><th className="py-1.5 pr-2 font-semibold">Material</th><th className="py-1.5 pr-2 font-semibold">Truck / driver</th><th className="py-1.5 pr-2 font-semibold">Pit</th><th className="py-1.5 pr-2 font-semibold">Ticket #</th>
+                    <th className="py-1.5 pr-2 font-semibold text-right">Net tons</th><th className="py-1.5 pr-2 font-semibold text-right">Aggregate $</th><th className="py-1.5 pr-2 font-semibold text-right">Haul $</th><th className="py-1.5 pr-2 font-semibold text-center">Reviewed</th><th></th>
+                  </tr></thead>
+                  <tbody>
+                    {tickets.map((t) => {
+                      const miss = wtMissing(t); const rm = WT_READ_META[t.read_status];
+                      return (
+                        <Fragment key={t.id}>
+                          <tr className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                            <td className="py-1.5 pr-2 whitespace-nowrap">{orderDateUS(t.ticket_date) || t.ticket_date}</td>
+                            <td className="py-1.5 pr-2"><span className="px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap" style={matStyle(t.material)}>{t.material || "?"}</span></td>
+                            <td className="py-1.5 pr-2 whitespace-nowrap"><span className="text-white font-semibold">{t.truck || "—"}</span>{t.driver && <span className="text-white/50"> · {t.driver}</span>}</td>
+                            <td className="py-1.5 pr-2">{t.supplier || "—"}</td>
+                            <td className="py-1.5 pr-2">{t.ticket_no || "—"}</td>
+                            <td className="py-1.5 pr-2 text-right font-semibold text-white whitespace-nowrap">{t.net_tons ? t1(t.net_tons) : (t.read_status === "pending" ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#6aa9ff" }}><Loader2 size={10} className="animate-spin" /> reading</span> : <span style={{ color: WARN }}>—</span>)}</td>
+                            <td className="py-1.5 pr-2 text-right whitespace-nowrap">{t.material_cost ? money(t.material_cost) : "—"}<div className="text-[10px] text-white/35">{t.material_rate ? `${money(t.material_rate)}/t` : "no rate"}</div></td>
+                            <td className="py-1.5 pr-2 text-right whitespace-nowrap">{t.haul_cost ? money(t.haul_cost) : "—"}<div className="text-[10px] text-white/35">{t.haul_rate ? `${money(t.haul_rate)}/t` : "no rate"}</div></td>
+                            <td className="py-1.5 pr-2 text-center">
+                              <button onClick={() => toggleReviewed(t)} title={miss.length ? `Still needs: ${miss.join(", ")}` : "Checked against the photo"} className="inline-flex items-center justify-center w-5 h-5 rounded active:scale-90" style={{ background: t.reviewed ? GREEN : "transparent", border: `1px solid ${t.reviewed ? GREEN : miss.length ? WARN : "rgba(255,255,255,0.25)"}` }}>{t.reviewed && <Check size={13} color={NAVY_DEEP} />}</button>
+                              {!t.reviewed && miss.length > 0 && <div className="text-[9px] mt-0.5 whitespace-nowrap" style={{ color: WARN }}>needs {miss.join(", ")}</div>}
+                            </td>
+                            <td className="py-1.5 text-right whitespace-nowrap">
+                              <button onClick={() => setOpenPhotos(openPhotos === t.id ? null : t.id)} title="Ticket photos" className="p-1 rounded active:scale-90 inline-flex items-center gap-0.5 align-middle">
+                                <Camera size={14} color={(t.photos || []).length ? ORANGE : "rgba(255,255,255,0.4)"} />{(t.photos || []).length > 0 && <span className="text-[10px] font-semibold" style={{ color: ORANGE }}>{t.photos.length}</span>}
+                              </button>
+                              <button onClick={() => (editId === t.id ? setEditId(null) : startEdit(t))} title="Edit" className="p-1 rounded active:scale-90 align-middle"><Pencil size={13} color={editId === t.id ? ORANGE : "rgba(255,255,255,0.55)"} /></button>
+                              <button onClick={() => remove(t)} title="Delete" className="p-1 rounded active:scale-90 align-middle"><Trash2 size={13} color="#ff8a85" /></button>
+                            </td>
+                          </tr>
+                          {editId === t.id && (
+                            <tr style={{ background: NAVY }}>
+                              <td colSpan={10} className="px-2 py-2.5">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="text-white/55 text-[11px] uppercase tracking-wide">Edit ticket #{t.id}{t.uploaded_by ? ` · logged by ${t.driver || t.uploaded_by} (${t.source})` : ""}</div>
+                                  {rm && <span className="text-[10px] font-semibold" style={{ color: rm.color }}>{rm.label}{t.read?.low_confidence?.length ? ` · unsure of: ${t.read.low_confidence.join(", ")}` : ""}</span>}
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Date<input type="date" value={ef.ticket_date} onChange={(e) => setEf({ ...ef, ticket_date: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Material<select value={ef.material_id} onChange={(e) => setEf({ ...ef, material_id: e.target.value })} className={inCls} style={inSt}><option value="">{t.material && !t.material_id ? `(${t.material})` : "—"}</option>{mats.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Truck<input list="wt-edit-trucks" value={ef.truck} onChange={(e) => setEf({ ...ef, truck: e.target.value })} className={inCls} style={inSt} /><datalist id="wt-edit-trucks">{(options?.trucks || []).map((x) => <option key={x.label} value={x.label} />)}</datalist></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Driver<input list="wt-drivers" value={ef.driver} onChange={(e) => setEf({ ...ef, driver: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Pit<input list="wt-suppliers" value={ef.supplier} onChange={(e) => setEf({ ...ef, supplier: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Ticket #<input value={ef.ticket_no} onChange={(e) => setEf({ ...ef, ticket_no: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Gross lb<input type="number" value={ef.gross_lb} onChange={(e) => setEf({ ...ef, gross_lb: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Tare lb<input type="number" value={ef.tare_lb} onChange={(e) => setEf({ ...ef, tare_lb: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Net tons<input type="number" step="0.01" value={ef.net_tons} onChange={(e) => setEf({ ...ef, net_tons: e.target.value })} placeholder={Number(ef.gross_lb) > Number(ef.tare_lb) ? `${t1((Number(ef.gross_lb) - Number(ef.tare_lb)) / 2000)} from scale` : ""} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Material $/t<input type="number" step="0.01" value={ef.material_rate} onChange={(e) => setEf({ ...ef, material_rate: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Haul $/t<input type="number" step="0.01" value={ef.haul_rate} onChange={(e) => setEf({ ...ef, haul_rate: e.target.value })} className={inCls} style={inSt} /></label>
+                                  <label className="text-[10px] text-white/45 uppercase tracking-wide">Notes<input value={ef.notes} onChange={(e) => setEf({ ...ef, notes: e.target.value })} className={inCls} style={inSt} /></label>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mt-2 items-center">
+                                  <button onClick={() => saveEdit(t)} disabled={busy} className="rounded-lg px-3 py-1.5 text-sm font-bold active:scale-95 inline-flex items-center gap-1.5 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save</button>
+                                  <button onClick={() => setEditId(null)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white/70 active:scale-95" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>Cancel</button>
+                                  {data?.vision && (t.photos || []).some((n) => !/\.(pdf|heic)$/i.test(n)) && <button onClick={() => reread(t)} disabled={t.read_status === "pending"} className="rounded-lg px-3 py-1.5 text-sm font-semibold active:scale-95 inline-flex items-center gap-1.5 disabled:opacity-50" style={{ background: NAVY_DEEP, color: "#6aa9ff", border: "1px solid rgba(106,169,255,0.4)" }}><RefreshCw size={13} /> Re-read photo</button>}
+                                  {t.notes && <span className="text-white/45 text-xs">Driver note: {t.notes}</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {openPhotos === t.id && (
+                            <tr style={{ background: NAVY }}><td colSpan={10} className="px-2"><WeightTicketPhotos ticket={t} canDelete onChanged={load} /></td></tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+          {msg && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: msg.ok ? GREEN + "1a" : "rgba(239,83,80,0.12)", color: msg.ok ? GREEN : "#ff8a85" }}>{msg.text}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DispatchApp({ email, role, onLogout }) {
   const canFinance = role !== "worker";   // full staff see financials/account info; workers don't
   const [orders, setOrders] = useState([]);
@@ -7138,6 +7701,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showDocs, setShowDocs] = useState(false);   // "Knowledge Center" modal
   const [showTimeclock, setShowTimeclock] = useState(false);   // employee time clock modal
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
+  const [showAgg, setShowAgg] = useState(false);   // aggregate weight tickets (rock/sand hauled in + costs)
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
   const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
@@ -7393,6 +7957,7 @@ function DispatchApp({ email, role, onLogout }) {
     canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
     canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
     canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
+    canFinance && { key: "aggregate", label: "Aggregate", icon: Scale, onClick: () => setShowAgg(true) },
     { key: "plant", label: "Plant check", icon: ClipboardCheck, onClick: () => setShowPlant(true) },
     { key: "docs", label: "Knowledge", icon: BookOpen, onClick: () => setShowDocs(true) },
     { key: "cal", label: "Calendar", icon: CalendarDays, onClick: () => setShowCal(true) },
@@ -7437,6 +8002,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showDocs && <ManageDocsModal onClose={() => setShowDocs(false)} />}
       {showTimeclock && <TimeClockModal onClose={() => setShowTimeclock(false)} />}
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
+      {showAgg && <AggregateTicketsModal onClose={() => setShowAgg(false)} />}
       {showPlant && <PlantChecklistModal onClose={() => setShowPlant(false)} />}
       {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
       {showTrucks && (
@@ -7973,6 +8539,8 @@ function DriverApp({ driver, onLogout }) {
   const [msgBusy, setMsgBusy] = useState(false);
   const [driverUnread, setDriverUnread] = useState(0);
   const msgScrollRef = useRef(null);
+  // Aggregate hauler: snap the pit weight ticket for each load
+  const [showWT, setShowWT] = useState(false);
   // Combined fuel station modal — tabs: 'pump' | 'fill'
   const [showFuel, setShowFuel] = useState(false);
   const [fuelTab, setFuelTab] = useState("pump");
@@ -8213,7 +8781,7 @@ function DriverApp({ driver, onLogout }) {
             <div className={`overflow-y-auto overscroll-contain p-4 md:p-3 md:w-64 lg:w-72 md:shrink-0 md:border-r md:border-white/10 ${active ? "hidden md:block" : "w-full"}`}>
               {/* Tablet: the two tool buttons share one row so the delivery list starts
                   higher — in landscape the screen is short and they were eating a third of it. */}
-              <div className="md:grid md:grid-cols-2 md:gap-2 md:mb-3">
+              <div className="md:grid md:grid-cols-3 md:gap-2 md:mb-3">
               <button onClick={() => setShowMsgs(true)} className="relative w-full rounded-xl py-3.5 md:py-4 mb-3 md:mb-0 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
                 <MessageSquare size={18} color={ORANGE} /> <span className="md:hidden">Message dispatch</span><span className="hidden md:inline">Dispatch</span>
                 {driverUnread > 0 && <span className="absolute top-2 right-3 text-xs font-bold rounded-full px-2 py-0.5 leading-none flex items-center justify-center min-w-[20px]" style={{ background: "#ef5350", color: "#fff" }}>{driverUnread}</span>}
@@ -8221,6 +8789,9 @@ function DriverApp({ driver, onLogout }) {
               <button onClick={() => { setFuelMsg(null); setPumpMsg(null); setPumpPin(""); setFuelTab("pump"); setShowFuel(true); }} className="w-full rounded-xl py-3.5 md:py-4 mb-3 md:mb-0 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: pumpOn ? "#1a3a1a" : ORANGE, color: pumpOn ? "#4caf50" : NAVY_DEEP, border: pumpOn ? "1px solid #4caf50" : "none" }}>
                 {pumpOn ? <Power size={18} color="#4caf50" /> : <Droplets size={18} />}
                 <span className="md:hidden">{pumpOn ? "Pump ON — tap to manage" : "Fuel station"}</span><span className="hidden md:inline">{pumpOn ? "Pump ON" : "Fuel"}</span>
+              </button>
+              <button onClick={() => setShowWT(true)} className="w-full rounded-xl py-3.5 md:py-4 mb-3 md:mb-0 text-base font-bold active:scale-[0.99] flex items-center justify-center gap-2" style={{ background: NAVY, color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                <Scale size={18} color={ORANGE} /> <span className="md:hidden">Weight ticket (aggregate)</span><span className="hidden md:inline">Weight ticket</span>
               </button>
               </div>
               {myTemp != null && (
@@ -8442,6 +9013,7 @@ function DriverApp({ driver, onLogout }) {
           </div>
         </div>
       )}
+      {showWT && <DriverWeightTicketsModal onClose={() => { setShowWT(false); }} />}
       {showFuel && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setShowFuel(false)}>
           <div className="w-full sm:max-w-sm rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
