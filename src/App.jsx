@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v86";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v87";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7873,6 +7873,11 @@ function ProfitModal({ onClose }) {
                     ))}
                     <div className="flex items-center justify-between pt-2 text-base"><span className="text-white font-bold" style={{ fontFamily: C.cond }}>Net profit</span><span className="font-bold" style={{ color: pc, fontFamily: C.cond }}>{money(profit)}</span></div>
                     {T.notes?.missing_mileage > 0 && <div className="text-[10px] mt-2" style={{ color: WARN }}>{data.notes.missing_mileage} order{data.notes.missing_mileage > 1 ? "s" : ""} have no road mileage yet, so their haul is missing from revenue and hauling — open Costs to resolve.</div>}
+                    {data.notes?.unbatched?.length > 0 && (
+                      <div className="text-[10px] mt-2 leading-snug" style={{ color: WARN }}>
+                        Not counted — marked complete with nothing batched: {data.notes.unbatched.map((u) => `${u.ref} (${fmtYards(u.qty)} CY${u.customer ? `, ${u.customer}` : ""}${u.when ? `, ${formatOrderDate(u.when)}` : ""})`).join("; ")}. Attach the batch tickets and they'll count.
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-3">
                     <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
