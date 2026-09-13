@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign } from "lucide-react";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -121,7 +121,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v82";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep13-v84";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7687,6 +7687,188 @@ function AggregateTicketsModal({ onClose }) {
   );
 }
 
+// ── Profit ─────────────────────────────────────────────────────────────────
+// Net profit for a day or a date range, from the yards actually poured: revenue
+// billed on completed orders minus materials, hauling paid out, fuel and the
+// aggregate haul-in from weight tickets. Each cost line can be switched off to
+// see the picture without it (the totals recompute on the spot).
+function ProfitModal({ onClose }) {
+  const today = localToday();
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const [data, setData] = useState(null);      // last response, tagged with the window it answers
+  const [err, setErr] = useState("");
+  const [tab, setTab] = useState("summary");   // summary | days | orders
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const openPdf = async () => {
+    setPdfBusy(true);
+    try { await openProfitReport({ from, to }); } catch (e) { setErr(e.message || "Couldn't build the report"); }
+    finally { setPdfBusy(false); }
+  };
+  const winKey = `${from}|${to}`;
+  const busy = !err && (!data || data._key !== winKey);   // a stale answer = still loading the new window
+  const [include, setInclude] = useState({ materials: true, hauling: true, fuel: true, aggregate_haul: true });
+  const mb = monthBounds();
+  const dayShift = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const weekStart = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const lastMonth = (() => { const d = new Date(); const y = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear(); const m = d.getMonth() === 0 ? 12 : d.getMonth(); const p = (n) => String(n).padStart(2, "0"); return { first: `${y}-${p(m)}-01`, last: `${y}-${p(m)}-${p(new Date(y, m, 0).getDate())}` }; })();
+  const quick = [["Today", today, today], ["Yesterday", dayShift(-1), dayShift(-1)], ["This week", weekStart, today], ["This month", mb.first, mb.last], ["Last month", lastMonth.first, lastMonth.last], ["All time", "", ""]];
+
+  useEffect(() => {
+    let live = true;
+    getProfit({ from, to })
+      .then((d) => { if (live) { setData({ ...d, _key: winKey }); setErr(""); } })
+      .catch((e) => { if (live) setErr(e.message || "Couldn't load"); });
+    return () => { live = false; };
+  }, [from, to]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const T = data?.totals;
+  // Client-side totals honouring the include toggles.
+  const costOf = (row) => ["materials", "hauling", "fuel", "aggregate_haul"].reduce((sum, k) => sum + (include[k] ? Number(row[k] || 0) : 0), 0);
+  const costs = T ? costOf(T) : 0;
+  const profit = T ? T.revenue - costs : 0;
+  const margin = T && T.revenue ? (profit / T.revenue) * 100 : null;
+  const perYd = (v) => (T && T.yards ? money(v / T.yards) : "—");
+  const inSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const label = !from && !to ? "All time" : from === to ? (formatOrderDateLong(from) || from) : `${orderDateUS(from) || "start"} – ${orderDateUS(to) || "today"}`;
+  const tile = (lbl, value, sub, color, big = false) => (
+    <div className="rounded-xl p-3" style={{ background: NAVY, border: `1px solid ${big ? (color || ORANGE) + "66" : "rgba(255,255,255,0.08)"}` }}>
+      <div className="text-white/50 text-[10px] uppercase tracking-wide">{lbl}</div>
+      <div className={`${big ? "text-3xl" : "text-2xl"} font-bold leading-tight`} style={{ fontFamily: C.cond, color: color || "#fff" }}>{value}</div>
+      {sub && <div className="text-white/40 text-[10px] mt-0.5">{sub}</div>}
+    </div>
+  );
+  const pc = profit >= 0 ? GREEN : "#ff8a85";
+  const costLines = T ? [
+    ["materials", "Materials batched", T.materials, "ticket actuals × $/unit (Materials tracker)"],
+    ["hauling", "Hauling paid out", T.hauling, "delivery, short-load & back-haul to third-party haulers"],
+    ["fuel", "Fuel", T.fuel, `${Number(T.fuel_gallons || 0).toLocaleString()} gal × $/gal`],
+    ["aggregate_haul", "Aggregate haul-in", T.aggregate_haul, `${t1(T.aggregate_tons)} t on weight tickets · material $ (${money(T.aggregate_material)}) already in Materials`],
+  ] : [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-5xl max-h-[95vh] flex flex-col rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 shrink-0" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><DollarSign size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Profit</span><span className="hidden sm:inline text-sm font-semibold opacity-70" style={{ color: NAVY_DEEP, fontFamily: C.body }}>· net on yards poured</span></div>
+          <div className="flex items-center gap-2">
+            <button onClick={openPdf} disabled={pdfBusy || !data} title="One-page margin report for this period" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: NAVY_DEEP, color: ORANGE, fontFamily: C.body }}>{pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF report</button>
+            <button onClick={onClose} className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4" style={{ fontFamily: C.body }}>
+          {/* date window */}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {quick.map(([l, a, b]) => <button key={l} onClick={() => { setFrom(a); setTo(b); }} className="rounded-lg px-2.5 py-1 text-xs font-semibold active:scale-95" style={{ background: from === a && to === b ? ORANGE : NAVY, color: from === a && to === b ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)" }}>{l}</button>)}
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
+            <span className="text-white/40 text-xs">to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
+            {busy && <Loader2 size={14} className="animate-spin text-white/50" />}
+          </div>
+          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          {!T ? (
+            !err && <div className="text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Working it out…</div>
+          ) : (
+            <>
+              <div className="text-white text-base font-bold mb-2" style={{ fontFamily: C.cond }}>{label}</div>
+              {/* headline */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
+                {tile("Net profit", money(profit), margin != null ? `${margin.toFixed(1)}% margin` : "no revenue in window", pc, true)}
+                {tile("Revenue", money(T.revenue), "billed, before sales tax", GREEN)}
+                {tile("Costs", money(costs), "included lines below", "#ff8a85")}
+                {tile("Yards poured", fmtYards(T.yards), `${T.orders} order${T.orders === 1 ? "" : "s"} completed`)}
+                {tile("Profit / CY", perYd(profit), `revenue ${perYd(T.revenue)} · cost ${perYd(costs)}`, pc)}
+                {tile("Tax collected", money(T.tax_collected), "passed through, not counted", "rgba(255,255,255,0.6)")}
+              </div>
+              {(T.orders === 0) && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: WARN + "1a", color: WARN }}>No completed orders in this window — profit shows costs only. Orders count once they're marked complete on the board.</div>}
+              {/* tabs */}
+              <div className="flex gap-1 mb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                {[["summary", "Breakdown"], ["days", "By day"], ["orders", "Orders"]].map(([k, l]) => (
+                  <button key={k} onClick={() => setTab(k)} className="px-3 py-2 text-sm font-bold" style={{ color: tab === k ? ORANGE : "rgba(255,255,255,0.45)", borderBottom: tab === k ? `2px solid ${ORANGE}` : "2px solid transparent" }}>{l}</button>
+                ))}
+              </div>
+
+              {tab === "summary" && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>Revenue − costs = net</div>
+                    <div className="flex items-center justify-between py-1.5 text-sm" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}><span className="text-white/80">Revenue (yards poured × price)</span><span className="font-bold" style={{ color: GREEN }}>{money(T.revenue)}</span></div>
+                    {costLines.map(([k, lbl, v, sub]) => (
+                      <label key={k} className="flex items-center justify-between gap-2 py-1.5 cursor-pointer" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", opacity: include[k] ? 1 : 0.45 }}>
+                        <span className="flex items-center gap-2 min-w-0"><input type="checkbox" checked={include[k]} onChange={(e) => setInclude({ ...include, [k]: e.target.checked })} /><span className="min-w-0"><span className="text-white/80 text-sm block">− {lbl}</span><span className="text-white/40 text-[10px] block truncate">{sub}</span></span></span>
+                        <span className="font-semibold text-sm whitespace-nowrap" style={{ color: "#ff8a85" }}>{money(v)}</span>
+                      </label>
+                    ))}
+                    <div className="flex items-center justify-between pt-2 text-base"><span className="text-white font-bold" style={{ fontFamily: C.cond }}>Net profit</span><span className="font-bold" style={{ color: pc, fontFamily: C.cond }}>{money(profit)}</span></div>
+                    {T.notes?.missing_mileage > 0 && <div className="text-[10px] mt-2" style={{ color: WARN }}>{data.notes.missing_mileage} order{data.notes.missing_mileage > 1 ? "s" : ""} have no road mileage yet, so their haul is missing from revenue and hauling — open Costs to resolve.</div>}
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="text-white text-sm font-semibold mb-1" style={{ fontFamily: C.cond }}>Materials batched</div>
+                      {data.materials.length === 0 ? <div className="text-white/40 text-xs py-2">No batch tickets with weights in this window.</div> : (
+                        <table className="w-full text-xs"><tbody>{data.materials.map((m) => (
+                          <tr key={m.name} className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                            <td className="py-1 pr-2">{m.name}{m.estimated && <span className="text-white/35"> · part estimated</span>}</td>
+                            <td className="py-1 pr-2 text-right whitespace-nowrap">{amt(m.used, m.unit)} {m.unit}</td>
+                            <td className="py-1 pr-2 text-right text-white/45 whitespace-nowrap">{m.cost_rate ? `${money(m.cost_rate)}/${m.unit}` : "no rate"}</td>
+                            <td className="py-1 text-right font-semibold text-white whitespace-nowrap">{money(m.cost)}</td>
+                          </tr>))}</tbody></table>
+                      )}
+                      {data.notes?.unmapped_mixes?.length > 0 && <div className="text-[10px] mt-1.5" style={{ color: WARN }}>Mixes with no design or ticket weights (material cost missing): {data.notes.unmapped_mixes.map((u) => `${u.mix} (${fmtYards(u.yards)} CY)`).join(", ")}</div>}
+                    </div>
+                    <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="text-white text-sm font-semibold mb-1" style={{ fontFamily: C.cond }}>Hauling paid out</div>
+                      {data.haulers.length === 0 ? <div className="text-white/40 text-xs py-2">No third-party hauling in this window.</div> : (
+                        <table className="w-full text-xs"><tbody>{data.haulers.map((h) => (
+                          <tr key={h.hauler} className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                            <td className="py-1 pr-2">{h.hauler}</td><td className="py-1 pr-2 text-right text-white/45">{h.orders} order{h.orders === 1 ? "" : "s"}</td>
+                            <td className="py-1 pr-2 text-right whitespace-nowrap">{fmtYards(h.yards)} CY</td><td className="py-1 text-right font-semibold text-white whitespace-nowrap">{money(h.total)}</td>
+                          </tr>))}</tbody></table>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tab === "days" && (
+                data.days.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>No completed orders in this window.</div> : (
+                  <div className="overflow-x-auto"><table className="w-full text-xs">
+                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Day</th><th className="py-1.5 pr-2 font-semibold text-right">Orders</th><th className="py-1.5 pr-2 font-semibold text-right">CY</th><th className="py-1.5 pr-2 font-semibold text-right">Revenue</th><th className="py-1.5 pr-2 font-semibold text-right">Materials</th><th className="py-1.5 pr-2 font-semibold text-right">Hauling</th><th className="py-1.5 pr-2 font-semibold text-right">Fuel</th><th className="py-1.5 pr-2 font-semibold text-right">Agg. haul</th><th className="py-1.5 pr-2 font-semibold text-right">Net</th><th className="py-1.5 font-semibold text-right">$/CY</th></tr></thead>
+                    <tbody>{data.days.map((d) => { const dc = costOf(d); const dp = d.revenue - dc; return (
+                      <tr key={d.date} className="text-white/85" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <td className="py-1.5 pr-2 whitespace-nowrap font-semibold text-white">{orderDateUS(d.date) || d.date}</td><td className="py-1.5 pr-2 text-right">{d.orders}</td><td className="py-1.5 pr-2 text-right">{fmtYards(d.yards)}</td>
+                        <td className="py-1.5 pr-2 text-right" style={{ color: GREEN }}>{money(d.revenue)}</td>
+                        <td className="py-1.5 pr-2 text-right" style={{ opacity: include.materials ? 1 : 0.4 }}>{money(d.materials)}</td><td className="py-1.5 pr-2 text-right" style={{ opacity: include.hauling ? 1 : 0.4 }}>{money(d.hauling)}</td>
+                        <td className="py-1.5 pr-2 text-right" style={{ opacity: include.fuel ? 1 : 0.4 }}>{money(d.fuel)}</td><td className="py-1.5 pr-2 text-right" style={{ opacity: include.aggregate_haul ? 1 : 0.4 }}>{money(d.aggregate_haul)}</td>
+                        <td className="py-1.5 pr-2 text-right font-bold" style={{ color: dp >= 0 ? GREEN : "#ff8a85" }}>{money(dp)}</td><td className="py-1.5 text-right text-white/60">{d.yards ? money(dp / d.yards) : "—"}</td>
+                      </tr>); })}</tbody>
+                  </table></div>
+                )
+              )}
+
+              {tab === "orders" && (
+                data.orders.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>No completed orders in this window.</div> : (
+                  <div className="overflow-x-auto"><table className="w-full text-xs">
+                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Date</th><th className="py-1.5 pr-2 font-semibold">Order</th><th className="py-1.5 pr-2 font-semibold">Customer / job</th><th className="py-1.5 pr-2 font-semibold">Mix</th><th className="py-1.5 pr-2 font-semibold text-right">CY</th><th className="py-1.5 pr-2 font-semibold text-right">$/CY</th><th className="py-1.5 pr-2 font-semibold text-right">Billed</th><th className="py-1.5 font-semibold text-right">Hauling out</th></tr></thead>
+                    <tbody>{data.orders.map((o) => (
+                      <tr key={o.ref} className="text-white/85" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <td className="py-1.5 pr-2 whitespace-nowrap">{orderDateUS(o.when) || o.when}</td><td className="py-1.5 pr-2 font-semibold whitespace-nowrap" style={{ color: ORANGE }}>{o.ref}</td>
+                        <td className="py-1.5 pr-2"><span className="text-white font-semibold">{o.customer}</span>{o.project ? <span className="text-white/50"> · {o.project}</span> : null}<div className="text-white/40 truncate max-w-[260px]">{o.site}</div></td>
+                        <td className="py-1.5 pr-2 whitespace-nowrap">{o.mix}</td><td className="py-1.5 pr-2 text-right">{fmtYards(o.yards)}</td><td className="py-1.5 pr-2 text-right text-white/60">{o.unit_price ? money(o.unit_price) : "—"}</td>
+                        <td className="py-1.5 pr-2 text-right font-semibold" style={{ color: GREEN }}>{money(o.revenue)}</td><td className="py-1.5 text-right">{o.self_haul ? <span className="text-white/40">self-haul</span> : money(o.hauling)}</td>
+                      </tr>))}</tbody>
+                  </table></div>
+                )
+              )}
+              <div className="text-white/35 text-[10px] mt-3 leading-snug">Revenue is what completed orders bill for the yards actually poured (pre-tax), placed on their pour date. Materials and fuel are costed on the day they were batched or filled. Aggregate purchase $ isn't subtracted again here because the Materials line already costs gravel and sand as they're batched.</div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DispatchApp({ email, role, onLogout }) {
   const canFinance = role !== "worker";   // full staff see financials/account info; workers don't
   const [orders, setOrders] = useState([]);
@@ -7708,6 +7890,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showTimeclock, setShowTimeclock] = useState(false);   // employee time clock modal
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [showAgg, setShowAgg] = useState(false);   // aggregate weight tickets (rock/sand hauled in + costs)
+  const [showProfit, setShowProfit] = useState(false);   // net profit on yards poured, by date
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
   const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
@@ -8017,6 +8200,7 @@ function DispatchApp({ email, role, onLogout }) {
     canFinance && { key: "customers", label: "Customers", icon: KeyRound, onClick: () => setShowLogins(true) },
     canFinance && { key: "prices", label: "Price sheet", icon: Calculator, onClick: () => setShowPrices(true) },
     canFinance && { key: "costs", label: "Costs", icon: ClipboardList, onClick: () => setShowCosts(true) },
+    canFinance && { key: "profit", label: "Profit", icon: DollarSign, onClick: () => setShowProfit(true) },
     canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
     canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
     canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
@@ -8066,6 +8250,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showTimeclock && <TimeClockModal onClose={() => setShowTimeclock(false)} />}
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
       {showAgg && <AggregateTicketsModal onClose={() => setShowAgg(false)} />}
+      {showProfit && <ProfitModal onClose={() => setShowProfit(false)} />}
       {showPlant && <PlantChecklistModal onClose={() => setShowPlant(false)} />}
       {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
       {showTrucks && (

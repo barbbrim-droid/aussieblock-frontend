@@ -1049,3 +1049,29 @@ export async function openWeightTicketPdf(id) {
   window.open(url, '_blank')
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
+
+// ── Profit ──
+// Net profit for a date window (yyyy-mm-dd, inclusive; both blank = all time):
+// revenue billed for the yards poured on completed orders, minus materials,
+// hauling paid out, fuel and aggregate haul-in. Staff (finance) only.
+export function getProfit({ from = '', to = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return request(`/profit${qs ? '?' + qs : ''}`, { timeoutMs: 60000 })
+}
+// The one-page margin report PDF for the same window as getProfit; opens in a new tab.
+export async function openProfitReport({ from = '', to = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  const res = await fetch(`${API_BASE}/profit/report.pdf${qs ? '?' + qs : ''}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  const url = URL.createObjectURL(await res.blob())
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
