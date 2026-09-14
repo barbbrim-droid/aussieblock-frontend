@@ -55,7 +55,11 @@ input[type="time"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: poin
    (100svh) so the bottom tab bar stays above the mobile browser toolbar. */
 html, body, #root { height: 100%; }
 html { overflow: hidden; }
-body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+body { margin: 0; position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+/* No pinch or double-tap zoom anywhere (driver tablets): pan-x pan-y lets inner
+   areas scroll but takes zoom away from the browser. The maps and the signature
+   pad handle their own touches. */
+html, body, #root { touch-action: pan-x pan-y; }
 `;
 
 // ── Kangaroo brand mark (stand-in until official asset is embedded) ──
@@ -121,7 +125,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep13-v87";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep14-v88";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
