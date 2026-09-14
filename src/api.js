@@ -1089,3 +1089,8 @@ export function setTruckOdometer(label, odometer) {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ odometer }),
   })
 }
+
+// Daily yardage bonus progress (drivers + staff). Today unless a date is given.
+export function getIncentive(date) {
+  return request(`/incentive/today${date ? `?date=${encodeURIComponent(date)}` : ""}`)
+}

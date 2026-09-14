@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
-import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer } from "./api";
+import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -125,7 +125,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep14-v88";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep14-v89";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7974,6 +7974,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [showAgg, setShowAgg] = useState(false);   // aggregate weight tickets (rock/sand hauled in + costs)
   const [showProfit, setShowProfit] = useState(false);   // net profit on yards poured, by date
+  const [bonusYards, setBonusYards] = useState(null);   // yards poured today per the server (batched) — keeps the Poured chip on the same number as the bonus bar
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
   const [msgUnread, setMsgUnread] = useState(0);   // total unread driver→dispatch messages
@@ -8401,7 +8402,7 @@ function DispatchApp({ email, role, onLogout }) {
               <div className="hidden lg:contents">
               <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><Package size={17} color={ORANGE} /><span className="text-white/55">Today</span><span className="text-white font-bold">{todayOrders.length}</span></span>
               <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body }}><CalendarPlus size={17} color={ORANGE_HOT} /><span className="text-white/55">Scheduled</span><span className="text-white font-bold">{upcomingOrders.length}</span></span>
-              <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}><CheckCircle2 size={17} color={GREEN} /><span className="text-white/55">Poured today</span><span className="font-bold" style={{ color: GREEN }}>{fmtYards(completedTodayYards)} CY</span></span>
+              <span className="flex items-center gap-2 rounded-full px-4 py-2 text-base" style={{ background: GREEN + "1a", border: `1px solid ${GREEN}55`, fontFamily: C.body }}><CheckCircle2 size={17} color={GREEN} /><span className="text-white/55">Poured today</span><span className="font-bold" style={{ color: GREEN }}>{fmtYards(bonusYards ?? completedTodayYards)} CY</span></span>
               </div>
             </div>
             <div className="shrink-0 hidden md:flex"><WeatherBar /></div>
@@ -8434,11 +8435,14 @@ function DispatchApp({ email, role, onLogout }) {
             </div>
           </div>
 
+          {/* Daily yardage bonus — the batch plant operator watches this from here. */}
+          <div className="shrink-0"><DailyGoal compact refreshKey={completedTodayYards} onYards={setBonusYards} /></div>
+
           {/* Phone / tablet: the three stats in one compact row (they stacked one per line before). */}
           <div className="lg:hidden shrink-0 grid grid-cols-3 gap-1.5">
             {[[Package, ORANGE, "Today", todayOrders.length, "#fff", NAVY, "rgba(255,255,255,0.12)"],
               [CalendarPlus, ORANGE_HOT, "Scheduled", upcomingOrders.length, "#fff", NAVY, "rgba(255,255,255,0.12)"],
-              [CheckCircle2, GREEN, "Poured", fmtYards(completedTodayYards) + " CY", GREEN, GREEN + "1a", GREEN + "55"]].map(([Icon, ic, label, value, vc, bg, bd]) => (
+              [CheckCircle2, GREEN, "Poured", fmtYards(bonusYards ?? completedTodayYards) + " CY", GREEN, GREEN + "1a", GREEN + "55"]].map(([Icon, ic, label, value, vc, bg, bd]) => (
               <div key={label} className="flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 min-w-0" style={{ background: bg, border: `1px solid ${bd}`, fontFamily: C.body }}>
                 <Icon size={13} color={ic} className="shrink-0" />
                 <span className="text-white/55 text-[10px] truncate">{label}</span>
@@ -8905,6 +8909,89 @@ function DeliveryTicketModal({ order, onClose }) {
 // The DRIVER tablet app: today's deliveries assigned to this driver. Tap one to
 // see details, open the batch ticket, and capture the customer's signature
 // (which marks the delivery complete). No board, no billing.
+// Daily yardage bonus — the same bar for the drivers and the batch plant operator
+// (dispatch board). Yards poured today against the tiers ($25 at 100 CY, $50 at
+// 150 CY by default), with the % of the way to the next one. Refreshes every
+// minute; `compact` is the one-line strip for the dispatch board header.
+function DailyGoal({ compact = false, refreshKey = 0, onYards }) {
+  const [g, setG] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => getIncentive().then((r) => { if (live) { setG(r); onYards && onYards(r.yards); } }).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    return () => { live = false; clearInterval(t); };
+  }, [refreshKey]);
+  if (!g || !g.tiers || g.tiers.length === 0) return null;
+  const top = g.tiers[g.tiers.length - 1].yards;
+  const pct = Math.min(100, (g.yards / top) * 100);
+  const gold = "#ffc857";
+  const barColor = g.maxed ? GREEN : g.earned > 0 ? gold : ORANGE;
+  const headline = g.maxed
+    ? `$${g.tiers[g.tiers.length - 1].bonus} bonus earned — top tier!`
+    : g.next
+      ? `${g.next.pct}% of the way to $${g.next.bonus}${g.earned > 0 ? ` · $${g.earned} already earned` : ""}`
+      : "";
+  const sub = g.maxed ? `${fmtYards(g.yards)} CY poured today` : g.next ? `${fmtYards(g.yards)} CY poured · ${fmtYards(g.next.remaining)} more to ${fmtYards(g.next.yards)}` : "";
+  const Bar = (
+    <div className="relative w-full rounded-full overflow-visible" style={{ height: compact ? 8 : 12, background: "rgba(255,255,255,0.10)" }}>
+      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: barColor }} />
+      {g.tiers.map((t) => (
+        <div key={t.yards} className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${Math.min(100, (t.yards / top) * 100)}%` }}>
+          <div className="rounded-full" style={{ width: compact ? 10 : 14, height: compact ? 10 : 14, background: t.hit ? GREEN : NAVY_DEEP, border: `2px solid ${t.hit ? GREEN : "rgba(255,255,255,0.45)"}` }} />
+        </div>
+      ))}
+    </div>
+  );
+  if (compact) {
+    return (
+      <div className="rounded-xl px-3 py-2 flex items-center gap-3 min-w-0" style={{ background: NAVY, border: `1px solid ${barColor}55` }} title="Daily yardage bonus — drivers and the batch plant operator">
+        <Trophy size={16} color={barColor} className="shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
+            <span className="text-white font-semibold truncate" style={{ fontFamily: C.cond }}>Daily bonus · {headline}</span>
+            <span className="text-white/50 whitespace-nowrap">{fmtYards(g.yards)} CY{g.next ? ` / ${fmtYards(g.next.yards)}` : ""}</span>
+          </div>
+          {Bar}
+        </div>
+        <div className="hidden sm:flex items-center gap-2 shrink-0 text-[11px]">
+          {g.tiers.map((t) => <span key={t.yards} className="rounded-full px-2 py-0.5 font-bold" style={{ background: t.hit ? GREEN + "22" : "rgba(255,255,255,0.06)", color: t.hit ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${t.hit ? GREEN + "66" : "rgba(255,255,255,0.12)"}` }}>{fmtYards(t.yards)} CY = ${t.bonus}</span>)}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl p-3.5 mb-3" style={{ background: NAVY, border: `1px solid ${barColor}66` }}>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2 text-white text-sm font-bold" style={{ fontFamily: C.cond }}><Trophy size={16} color={barColor} /> Daily bonus</div>
+        <div className="text-lg font-bold leading-none" style={{ color: barColor, fontFamily: C.cond }}>{g.maxed || g.next == null ? `$${g.earned}` : `${g.next.pct}%`}</div>
+      </div>
+      <div className="text-white text-sm font-semibold mb-0.5">{headline}</div>
+      <div className="text-white/50 text-xs mb-2.5">{sub}</div>
+      {Bar}
+      <div className="flex justify-between mt-1.5 text-[11px]">
+        <span className="text-white/40">0</span>
+        {g.tiers.map((t) => <span key={t.yards} className="font-bold" style={{ color: t.hit ? GREEN : "rgba(255,255,255,0.6)" }}>{fmtYards(t.yards)} CY = ${t.bonus}{t.hit ? " ✓" : ""}</span>)}
+      </div>
+      {g.week && g.week.length > 0 && (
+        <div className="flex items-end gap-1 mt-3 pt-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          {g.week.map((d) => {
+            const h = Math.max(3, Math.min(28, (d.yards / top) * 28));
+            const dt = new Date(d.date + "T12:00:00");
+            return (
+              <div key={d.date} className="flex-1 flex flex-col items-center gap-0.5" title={`${d.date}: ${fmtYards(d.yards)} CY${d.earned ? ` · $${d.earned}` : ""}`}>
+                <span className="text-[10px] font-bold" style={{ color: d.earned ? GREEN : "rgba(255,255,255,0.3)" }}>{d.earned ? `$${d.earned}` : ""}</span>
+                <div className="w-full rounded-sm" style={{ height: h, background: d.earned ? GREEN : d.date === g.date ? barColor : "rgba(255,255,255,0.18)" }} />
+                <span className="text-[10px] text-white/40">{dt.toLocaleDateString(undefined, { weekday: "narrow" })}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DriverApp({ driver, onLogout }) {
   const [data, setData] = useState(null);
   const [trucks, setTrucks] = useState([]);   // for the driver's live concrete-temp box
@@ -9203,6 +9290,7 @@ function DriverApp({ driver, onLogout }) {
                 under 1024 CSS px (a 1280x800 screen at 1.5x density is 853), so
                 gating this on lg left them stuck in the phone layout. */}
             <div className={`overflow-y-auto overscroll-contain p-4 md:p-3 md:w-64 lg:w-72 md:shrink-0 md:border-r md:border-white/10 ${active ? "hidden md:block" : "w-full"}`}>
+              <DailyGoal />
               {/* Tablet: the two tool buttons share one row so the delivery list starts
                   higher — in landscape the screen is short and they were eating a third of it. */}
               <div className="md:grid md:grid-cols-3 md:gap-2 md:mb-3">
