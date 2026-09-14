@@ -15,3 +15,12 @@ body,
 body {
   background: #0c1117;
 }
+
+/* Zoom is locked for the tablets: no pinch, no double-tap. Applied here too so it
+   holds before the app's own styles load. */
+html,
+body,
+#root {
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+}
