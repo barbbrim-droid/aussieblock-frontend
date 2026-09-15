@@ -125,7 +125,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep15-v90";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep15-v91";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8916,7 +8916,7 @@ function DeliveryTicketModal({ order, onClose }) {
 function DailyGoal({ compact = false, refreshKey = 0, onYards }) {
   const [g, setG] = useState(null);
   const onYardsRef = useRef(onYards);
-  onYardsRef.current = onYards;
+  useEffect(() => { onYardsRef.current = onYards; });
   useEffect(() => {
     let live = true;
     const load = () => getIncentive().then((r) => { if (live) { setG(r); onYardsRef.current && onYardsRef.current(r.yards); } }).catch(() => {});
@@ -8927,6 +8927,8 @@ function DailyGoal({ compact = false, refreshKey = 0, onYards }) {
   if (!g || !g.tiers || g.tiers.length === 0) return null;
   const top = g.tiers[g.tiers.length - 1].yards;
   const pct = Math.min(100, (g.yards / top) * 100);
+  // History starts the day the program did — days before it aren't shown at all.
+  const week = (g.week || []).filter((d) => d.active !== false);
   const gold = "#ffc857";
   const barColor = g.maxed ? GREEN : g.earned > 0 ? gold : ORANGE;
   const headline = g.active === false
@@ -8977,16 +8979,13 @@ function DailyGoal({ compact = false, refreshKey = 0, onYards }) {
         <span className="text-white/40">0</span>
         {g.tiers.map((t) => <span key={t.yards} className="font-bold" style={{ color: t.hit ? GREEN : "rgba(255,255,255,0.6)" }}>{fmtYards(t.yards)} CY = ${t.bonus}{t.hit ? " ✓" : ""}</span>)}
       </div>
-      {g.start && g.week && g.week.some((d) => d.active === false) && (
-        <div className="text-[10px] text-white/40 mt-2">Bonus program started {formatOrderDate(g.start)} — earlier days are shown for reference only.</div>
-      )}
-      {g.week && g.week.length > 0 && (
+      {week.length > 0 && (
         <div className="flex items-end gap-1 mt-3 pt-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          {g.week.map((d) => {
+          {week.map((d) => {
             const h = Math.max(3, Math.min(28, (d.yards / top) * 28));
             const dt = new Date(d.date + "T12:00:00");
             return (
-              <div key={d.date} className="flex-1 flex flex-col items-center gap-0.5" style={{ opacity: d.active === false ? 0.35 : 1 }} title={`${d.date}: ${fmtYards(d.yards)} CY${d.active === false ? " · before the program started" : d.earned ? ` · $${d.earned}` : ""}`}>
+              <div key={d.date} className="flex flex-col items-center gap-0.5" style={{ width: `${100 / 7}%` }} title={`${d.date}: ${fmtYards(d.yards)} CY${d.earned ? ` · $${d.earned}` : ""}`}>
                 <span className="text-[10px] font-bold" style={{ color: d.earned ? GREEN : "rgba(255,255,255,0.3)" }}>{d.earned ? `$${d.earned}` : ""}</span>
                 <div className="w-full rounded-sm" style={{ height: h, background: d.earned ? GREEN : d.date === g.date ? barColor : "rgba(255,255,255,0.18)" }} />
                 <span className="text-[10px] text-white/40">{dt.toLocaleDateString(undefined, { weekday: "narrow" })}</span>
