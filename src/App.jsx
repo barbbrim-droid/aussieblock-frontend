@@ -125,7 +125,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep15-v91";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep15-v92";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7891,7 +7891,7 @@ function ProfitModal({ onClose }) {
                           <tr key={m.name} className="text-white/80" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                             <td className="py-1 pr-2">{m.name}{m.estimated && <span className="text-white/35"> · part estimated</span>}</td>
                             <td className="py-1 pr-2 text-right whitespace-nowrap">{amt(m.used, m.unit)} {m.unit}</td>
-                            <td className="py-1 pr-2 text-right text-white/45 whitespace-nowrap">{m.cost_rate ? `${money(m.cost_rate)}/${m.unit}` : "no rate"}</td>
+                            <td className="py-1 pr-2 text-right text-white/45 whitespace-nowrap">{m.cost_rate ? `${money(m.cost_rate)}/${m.unit}` : "no charge"}</td>
                             <td className="py-1 pr-2 text-right font-semibold text-white whitespace-nowrap">{money(m.cost)}</td>
                             <td className="py-1 text-right whitespace-nowrap" style={{ color: m.haul_rate ? ORANGE : "rgba(255,255,255,0.3)" }}>{m.haul_rate ? `+ ${money(m.delivery)}` : ""}<div className="text-[10px] text-white/35">{m.haul_rate ? `${money(m.haul_rate)}/t haul` : ""}</div></td>
                           </tr>))}</tbody></table>
