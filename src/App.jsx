@@ -34,6 +34,18 @@ function truckColorMap(trucks) {
 // of every truck picker on an order or load (the backend refuses it too).
 const isMixer = (t) => (t.kind || "mixer") !== "aggregate";
 const mixerTrucks = (trucks) => (trucks || []).filter(isMixer);
+const AGG_COLOR = "#c77dff";   // aggregate haulers: purple everywhere (badge, card, map marker)
+// Where an aggregate hauler is, from GPS alone — it never has a concrete job.
+// Yard = within ~a third of a mile of the plant; parked elsewhere for a few
+// minutes reads as at the pit (loading) or a stop; otherwise it's on the road.
+function haulerStatus(t) {
+  if (t.lat == null || t.lng == null) return { label: "No GPS fix", color: "#7c8794" };
+  if (isStale(t.updated_at)) return { label: "GPS stale", color: "#7c8794" };
+  const yardMi = milesBetween({ lat: t.lat, lng: t.lng }, PLANT);
+  if (yardMi != null && yardMi < 0.35) return { label: "At the yard", color: AGG_COLOR };
+  if ((t.stopped_min || 0) >= 3) return { label: `Stopped · ${Math.round(t.stopped_min)} min`, color: "#e3c04a" };
+  return { label: "On the road", color: AGG_COLOR };
+}
 // Straight-line distance in miles between two {lat,lng} points (null if either missing).
 function milesBetween(a, b) {
   if (!a || !b || a.lat == null || b.lat == null) return null;
@@ -125,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep23-v93";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep23-v94";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -1636,12 +1648,15 @@ function FleetMap({ trucks }) {
         {located.map((t, i) => {
           const p = projectToMap(t.lat, t.lng, W, H, pad);
           const stale = isStale(t.updated_at);
-          const color = stale ? "#7c8794" : ORANGE_HOT;
+          const hauler = !isMixer(t);
+          const color = stale ? "#7c8794" : hauler ? AGG_COLOR : ORANGE_HOT;
           return (
             <g key={t.device || t.label || i} transform={`translate(${p.x},${p.y})`}>
-              {!stale && <circle r="13" fill={ORANGE} opacity="0.25"><animate attributeName="r" values="11;17;11" dur="1.8s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.35;0;0.35" dur="1.8s" repeatCount="indefinite" /></circle>}
-              <g transform={`rotate(${t.heading || 0})`}><circle r="11" fill="#fff" /><Navigation x={-6} y={-6} width={12} height={12} color={color} fill={color} /></g>
-              <text x="0" y="26" fill="rgba(255,255,255,0.7)" fontSize="10" textAnchor="middle" fontFamily="Barlow Condensed" fontWeight="600">{t.label}</text>
+              {!stale && <circle r="13" fill={hauler ? AGG_COLOR : ORANGE} opacity="0.25"><animate attributeName="r" values="11;17;11" dur="1.8s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.35;0;0.35" dur="1.8s" repeatCount="indefinite" /></circle>}
+              {hauler
+                ? <g><rect x="-8" y="-8" width="16" height="16" rx="2" fill="#fff" transform="rotate(45)" /><rect x="-5" y="-5" width="10" height="10" rx="1" fill={color} transform="rotate(45)" /></g>
+                : <g transform={`rotate(${t.heading || 0})`}><circle r="11" fill="#fff" /><Navigation x={-6} y={-6} width={12} height={12} color={color} fill={color} /></g>}
+              <text x="0" y="26" fill={hauler ? AGG_COLOR : "rgba(255,255,255,0.7)"} fontSize="10" textAnchor="middle" fontFamily="Barlow Condensed" fontWeight="600">{t.label}</text>
             </g>
           );
         })}
@@ -1730,10 +1745,13 @@ function GoogleFleetMap({ trucks, sites = [] }) {
     markersRef.current = trucksRef.current
       .filter((t) => t.lat != null && t.lng != null)
       .map((t) => new maps.Marker({
-        position: { lat: t.lat, lng: t.lng }, map: mapRef.current, title: t.label,
-        icon: { path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 6, rotation: t.heading || 0,
-                fillColor: isStale(t.updated_at) ? "#7c8794" : (colors[t.label] || "#ff7a3d"), fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 },
-        label: { text: t.label, color: "#fff", fontSize: "10px", fontWeight: "600" },
+        position: { lat: t.lat, lng: t.lng }, map: mapRef.current, title: isMixer(t) ? t.label : `${t.label} — aggregate hauler`,
+        icon: isMixer(t)
+          ? { path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 6, rotation: t.heading || 0,
+              fillColor: isStale(t.updated_at) ? "#7c8794" : (colors[t.label] || "#ff7a3d"), fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 }
+          : { path: "M 0,-1.2 L 1,0 L 0,1.2 L -1,0 z", scale: 9, rotation: 0, anchor: new maps.Point(0, 0),   // diamond: reads as "not a mixer" at a glance
+              fillColor: isStale(t.updated_at) ? "#7c8794" : AGG_COLOR, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
+        label: { text: isMixer(t) ? t.label : `▲ ${t.label}`, color: isMixer(t) ? "#fff" : AGG_COLOR, fontSize: "10px", fontWeight: "700" },
       }));
   };
 
@@ -8198,12 +8216,13 @@ function DispatchApp({ email, role, onLogout }) {
     if (best) return statusToTruck(best.ld.status, best.p.ref, best.p);
     return { label: "At yard", color: "#7c8794" };
   };
+  const cardStatus = (t) => (isMixer(t) ? truckStatus(t) : haulerStatus(t));
 
   // One fleet card (truck, status, job, yard ETA, mixer probe) — the map panel and
   // the phone "Now" view both render these.
   const fleetCard = (t) => {
-    const s = truckStatus(t);
-    const tColor = truckColorMap(trucks)[t.label] || ORANGE;
+    const s = cardStatus(t);
+    const tColor = isMixer(t) ? (truckColorMap(trucks)[t.label] || ORANGE) : AGG_COLOR;
     // ETA back to the yard while returning (straight-line ~30mph, 1.3x roads).
     // Key off the derived stage so pour loads count too (their order stays "ongoing").
     const yardMi = s.label === "Returning" && t.lat != null ? milesBetween({ lat: t.lat, lng: t.lng }, PLANT) : null;
@@ -8221,7 +8240,11 @@ function DispatchApp({ email, role, onLogout }) {
               {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}
             </div>
           ) : (
-            <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>{isMixer(t) ? "No active job" : "Hauls aggregate only"}{t.notes ? ` · ${t.notes}` : ""}</div>
+            <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>
+              {isMixer(t) ? "No active job" : (t.agg_today && t.agg_today.loads > 0
+                ? <span style={{ color: "rgba(255,255,255,0.7)" }}>Today: {t.agg_today.loads} load{t.agg_today.loads === 1 ? "" : "s"} · {Number(t.agg_today.tons).toLocaleString(undefined, { maximumFractionDigits: 1 })} t{t.agg_today.last_material ? ` ${t.agg_today.last_material}` : ""}{t.agg_today.last_pit ? ` from ${t.agg_today.last_pit}` : ""}</span>
+                : "Aggregate hauler · no loads yet today")}{t.notes ? ` · ${t.notes}` : ""}
+            </div>
           )}
           {yardEta != null && (
             <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#4da3ff", fontFamily: C.body }}>
