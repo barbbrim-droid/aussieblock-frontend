@@ -1094,3 +1094,8 @@ export function setTruckOdometer(label, odometer) {
 export function getIncentive(date) {
   return request(`/incentive/today${date ? `?date=${encodeURIComponent(date)}` : ""}`)
 }
+
+// GPS units on the One Step account (staff), each with the truck it's linked to.
+export function getGpsDevices() {
+  return request('/gps/devices')
+}
