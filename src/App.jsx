@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -125,7 +125,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep15-v92";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep23-v93";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -3301,11 +3301,13 @@ function ManageTrucksModal({ onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [odo, setOdo] = useState("");   // "dash odometer now" — sets the GPS odometer baseline for the truck being edited
+  const [devices, setDevices] = useState(null);   // One Step GPS units, to pick from (null = not loaded / unavailable)
 
   const load = async () => {
     try { setTrucks(await getTrucks()); } catch (e) { setMsg({ ok: false, text: e.message }); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); getGpsDevices().then((r) => setDevices(r.devices || [])).catch(() => setDevices(null)); }, []);
+  const deviceName = (id) => { const d = (devices || []).find((x) => x.id === id); return d ? (d.name || d.id) : id; };
 
   const saveOdo = async (lbl) => {
     const n = Number(odo);
@@ -3361,7 +3363,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
                 <div key={t.label} className="flex items-center justify-between rounded-lg px-3 py-2 mb-1.5" style={{ background: NAVY, border: `1px solid ${existing && existing.label === t.label ? ORANGE : "rgba(255,255,255,0.06)"}` }}>
                   <button onClick={() => { setLabel(t.label); setDevice(t.device || ""); setFuelVehicle(t.fuel_vehicle || ""); setNotes(t.notes || ""); setKind(t.kind || "mixer"); }} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate flex items-center gap-1.5" style={{ fontFamily: C.cond }}>{t.label}{!isMixer(t) && <AggregateBadge />}</div>
-                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${t.device}` : "No GPS device"}{t.fuel_vehicle ? ` · Fuel: ${t.fuel_vehicle}` : ""}{t.gps_odometer != null ? ` · Odometer ${Math.round(t.gps_odometer).toLocaleString()}` : (t.device ? " · Odometer not set" : "")}</div>
+                    <div className="text-white/40 text-xs truncate">{t.device ? `GPS: ${deviceName(t.device)}` : "No GPS device"}{t.fuel_vehicle ? ` · Fuel: ${t.fuel_vehicle}` : ""}{t.gps_odometer != null ? ` · Odometer ${Math.round(t.gps_odometer).toLocaleString()}` : (t.device ? " · Odometer not set" : "")}</div>
                     {t.notes && <div className="text-white/55 text-xs truncate mt-0.5 flex items-center gap-1"><FileText size={11} /> {t.notes}</div>}
                   </button>
                   <button onClick={() => remove(t.label)} disabled={busy} title="Remove truck" className="p-1.5 rounded-lg shrink-0 ml-2 active:scale-90 disabled:opacity-50" style={{ background: "rgba(239,83,80,0.12)" }}>
@@ -3376,7 +3378,17 @@ function ManageTrucksModal({ onClose, onChanged }) {
           <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.1)" }}>
             <div className="text-white text-sm font-semibold mb-2" style={{ fontFamily: C.cond }}>{existing ? `Edit ${existing.label}` : "Add a truck"}</div>
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Truck name (e.g. RTS 4554)" className={inCls + " mb-2"} style={inSt} />
-            <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-2"} style={inSt} />
+            {devices && devices.length > 0 ? (
+              <select value={device} onChange={(e) => setDevice(e.target.value)} className={inCls + " mb-2"} style={inSt}>
+                <option value="">No GPS unit</option>
+                {device && !devices.some((d) => d.id === device) && <option value={device}>{device} (current)</option>}
+                {devices.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name || d.id}{d.truck && d.truck !== label.trim() ? ` — on ${d.truck}` : ""}</option>
+                ))}
+              </select>
+            ) : (
+              <input value={device} onChange={(e) => setDevice(e.target.value)} placeholder="GPS device ID (optional)" className={inCls + " mb-2"} style={inSt} />
+            )}
             <input value={fuelVehicle} onChange={(e) => setFuelVehicle(e.target.value)} placeholder="Fuel meter truck # (optional)" className={inCls + " mb-2"} style={inSt} />
             <div className="flex gap-1.5 mb-2">
               {[["mixer", "Ready-mix truck"], ["aggregate", "Aggregate hauler"]].map(([k, lab]) => (
@@ -3396,7 +3408,7 @@ function ManageTrucksModal({ onClose, onChanged }) {
                 <p className="text-white/35 text-[11px] mt-1">Type what the dash shows today. From then on the app adds up GPS miles so a driver's fuel-fill mileage is pre-filled and checked. Re-set it any time it drifts.</p>
               </div>
             )}
-            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. GPS ID turns on live tracking (optional). Fuel fills match this truck by its name/number automatically — set a fuel meter # only if the meter reports a different number. An <b>aggregate hauler</b> (rock/sand only) stays on the fleet list and map but is never offered on a concrete order.</p>
+            <p className="text-white/35 text-xs mb-2">Tap a truck above to edit it. Pick the truck's GPS unit from One Step to track it on the board (a unit named with the truck's number links itself). Fuel fills match this truck by its name/number automatically — set a fuel meter # only if the meter reports a different number. An <b>aggregate hauler</b> (rock/sand only) stays on the fleet list and map but is never offered on a concrete order.</p>
             <button onClick={add} disabled={busy || !label.trim()} className="w-full rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98] transition-transform disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {existing ? "Update truck" : "Add truck"}
             </button>
