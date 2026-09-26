@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep23-v94";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Sep26-v95";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8004,6 +8004,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [showAgg, setShowAgg] = useState(false);   // aggregate weight tickets (rock/sand hauled in + costs)
   const [showProfit, setShowProfit] = useState(false);   // net profit on yards poured, by date
+  const [showBonus, setShowBonus] = useState(false);     // daily bonus: which days hit, who earned it, paid or not
   const [bonusYards, setBonusYards] = useState(null);   // yards poured today per the server (batched) — keeps the Poured chip on the same number as the bonus bar
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
@@ -8320,6 +8321,7 @@ function DispatchApp({ email, role, onLogout }) {
     canFinance && { key: "prices", label: "Price sheet", icon: Calculator, onClick: () => setShowPrices(true) },
     canFinance && { key: "costs", label: "Costs", icon: ClipboardList, onClick: () => setShowCosts(true) },
     canFinance && { key: "profit", label: "Profit", icon: DollarSign, onClick: () => setShowProfit(true) },
+    canFinance && { key: "bonus", label: "Bonus", icon: Trophy, onClick: () => setShowBonus(true) },
     canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
     canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
     canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
@@ -8370,6 +8372,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
       {showAgg && <AggregateTicketsModal onClose={() => setShowAgg(false)} />}
       {showProfit && <ProfitModal onClose={() => setShowProfit(false)} />}
+      {showBonus && <BonusModal onClose={() => setShowBonus(false)} />}
       {showPlant && <PlantChecklistModal onClose={() => setShowPlant(false)} />}
       {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
       {showTrucks && (
@@ -8944,6 +8947,139 @@ function DeliveryTicketModal({ order, onClose }) {
 // The DRIVER tablet app: today's deliveries assigned to this driver. Tap one to
 // see details, open the batch ticket, and capture the customer's signature
 // (which marks the delivery complete). No board, no billing.
+// Staff: daily bonus tracking. Which days hit the tiers, who earns it (the drivers
+// on that day's loads plus the plant operators — editable per day), and whether
+// it's been paid. Totals per person for payroll and a CSV export.
+function BonusModal({ onClose }) {
+  const today = localToday();
+  const monthStart = today.slice(0, 8) + "01";
+  const weekStart = (() => { const d = new Date(today + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
+  const [range, setRange] = useState({ from: "", to: "" });   // "" from = since the program started
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(null);        // date being edited
+  const [addName, setAddName] = useState("");
+  const load = async () => {
+    try { setData(await getIncentiveHistory(range)); setErr(""); } catch (e) { setErr(e.message || "Couldn't load"); }
+  };
+  useEffect(() => {
+    let live = true;
+    getIncentiveHistory({ from: range.from, to: range.to })
+      .then((r) => { if (live) { setData(r); setErr(""); } })
+      .catch((e) => { if (live) setErr(e.message || "Couldn't load"); });
+    return () => { live = false; };
+  }, [range.from, range.to]);
+  const save = async (day, body) => {
+    setBusy(true); setErr("");
+    try { await setIncentiveDay(day, body); await load(); } catch (e) { setErr(e.message || "Couldn't save"); }
+    finally { setBusy(false); }
+  };
+  const chip = (on) => ({ background: on ? ORANGE : NAVY, color: on ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.15)"}`, fontFamily: C.body });
+  const isRange = (f, t) => range.from === f && range.to === t;
+  const T = data?.totals;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-3xl rounded-2xl overflow-hidden max-h-[94vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 shrink-0" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Trophy size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Daily bonus</span><span className="hidden sm:inline text-sm font-semibold opacity-70" style={{ color: NAVY_DEEP, fontFamily: C.body }}>· who earned it, and what's owed</span></div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => downloadIncentiveCsv(range).catch((e) => setErr(e.message))} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}><Download size={13} /> CSV</button>
+            <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+          </div>
+        </div>
+        <div className="p-4 overflow-y-auto" style={{ fontFamily: C.body }}>
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            {[["Since start", "", ""], ["This week", weekStart, today], ["This month", monthStart, today]].map(([lab, f, t]) => (
+              <button key={lab} onClick={() => setRange({ from: f, to: t })} className="rounded-full px-3 py-1 text-xs font-bold active:scale-95" style={chip(isRange(f, t))}>{lab}</button>
+            ))}
+            <input type="date" value={range.from || (data?.from ?? "")} onChange={(e) => setRange({ ...range, from: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} />
+            <span className="text-white/40 text-xs">to</span>
+            <input type="date" value={range.to || (data?.to ?? "")} onChange={(e) => setRange({ ...range, to: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} />
+          </div>
+          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          {!data ? <div className="text-white/40 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={15} className="animate-spin" /> Loading…</div> : (
+            <>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {[["Bonus days", String(T.bonus_days), `of ${data.days.length} working day${data.days.length === 1 ? "" : "s"}`],
+                  ["Total bonus", money(T.payable), "everyone, this range"],
+                  ["Still to pay", money(T.unpaid), T.unpaid > 0 ? "tick a day once it's paid" : "all paid up"]].map(([k, v, sub]) => (
+                  <div key={k} className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="text-white/50 text-[10px] uppercase tracking-wide">{k}</div>
+                    <div className="text-white text-xl font-bold leading-tight" style={{ fontFamily: C.cond, color: k === "Still to pay" && T.unpaid > 0 ? "#ffb74d" : "#fff" }}>{v}</div>
+                    <div className="text-white/35 text-[10px]">{sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {data.people.length > 0 && (
+                <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-white text-sm font-semibold mb-1.5" style={{ fontFamily: C.cond }}>By person</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                    {data.people.map((p) => (
+                      <div key={p.name} className="flex items-center justify-between py-1 text-sm" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="text-white/85 truncate">{p.name} <span className="text-white/35 text-xs">· {p.days} day{p.days === 1 ? "" : "s"}</span></span>
+                        <span className="font-bold whitespace-nowrap" style={{ color: GREEN, fontFamily: C.cond }}>{money(p.bonus)}{p.unpaid > 0 && p.unpaid !== p.bonus && <span className="text-white/40 text-xs font-normal"> · {money(p.unpaid)} owed</span>}{p.unpaid > 0 && p.unpaid === p.bonus && <span className="text-[10px] font-normal ml-1" style={{ color: "#ffb74d" }}>owed</span>}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-white/50 text-xs uppercase tracking-wide mb-1.5">By day — tap a day to change who gets it</div>
+              {data.days.length === 0 ? <div className="text-white/40 text-sm py-4 text-center rounded-xl" style={{ background: NAVY }}>No pours in this range.</div> : data.days.map((d) => {
+                const hit = d.bonus > 0;
+                const editing = open === d.date;
+                return (
+                  <div key={d.date} className="rounded-xl mb-1.5 overflow-hidden" style={{ background: NAVY, border: `1px solid ${hit ? (d.paid ? GREEN + "55" : "rgba(255,183,77,0.45)") : "rgba(255,255,255,0.06)"}`, opacity: d.active === false ? 0.5 : 1 }}>
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <button onClick={() => { setOpen(editing ? null : d.date); setAddName(""); }} className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{formatOrderDate(d.date)}</span>
+                          <span className="text-white/55 text-xs">{fmtYards(d.yards)} CY</span>
+                          {hit ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>{fmtYards(d.tier)} CY hit · {money(d.bonus)} each</span>
+                               : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>{d.active === false ? "before program" : "no bonus"}</span>}
+                          {d.overridden && <span className="text-[10px] text-white/40">edited</span>}
+                        </div>
+                        <div className="text-white/50 text-xs truncate mt-0.5">{d.people.length ? d.people.join(", ") : "nobody on the loads — tap to add"}{hit ? ` · ${money(d.total)} total` : ""}{d.notes ? ` · ${d.notes}` : ""}</div>
+                      </button>
+                      {hit && (
+                        <label className="flex items-center gap-1.5 text-xs shrink-0 cursor-pointer" style={{ color: d.paid ? GREEN : "#ffb74d" }}>
+                          <input type="checkbox" checked={d.paid} disabled={busy} onChange={(e) => save(d.date, { paid: e.target.checked })} /> {d.paid ? "Paid" : "Unpaid"}
+                        </label>
+                      )}
+                    </div>
+                    {editing && (
+                      <div className="px-3 pb-3 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="text-white/45 text-[11px] mb-1.5">Automatic list: the drivers on this day's loads plus the plant operators. Remove anyone who shouldn't get it, or add a name that was missed.</div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {d.people.map((n) => (
+                            <span key={n} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs text-white" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                              {n}<button disabled={busy} onClick={() => save(d.date, { people: d.people.filter((x) => x !== n) })} title="Remove" className="p-0.5 rounded-full active:scale-90"><X size={12} color="#ff8a85" /></button>
+                            </span>
+                          ))}
+                          {d.people.length === 0 && <span className="text-white/35 text-xs">nobody</span>}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input value={addName} onChange={(e) => setAddName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && addName.trim()) { save(d.date, { people: [...d.people, addName.trim()] }); setAddName(""); } }} placeholder="Add a name" className="flex-1 rounded-lg px-3 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
+                          <button disabled={busy || !addName.trim()} onClick={() => { save(d.date, { people: [...d.people, addName.trim()] }); setAddName(""); }} className="rounded-lg px-3 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>Add</button>
+                          {d.overridden && <button disabled={busy} onClick={() => save(d.date, { reset_people: true })} className="rounded-lg px-3 text-xs font-semibold active:scale-95" style={{ background: "rgba(255,255,255,0.08)", color: "#cfe0ff" }}>Back to automatic</button>}
+                        </div>
+                        <input defaultValue={d.notes} onBlur={(e) => { if (e.target.value !== d.notes) save(d.date, { notes: e.target.value }); }} placeholder="Note (e.g. paid on the 30th check)" className="w-full mt-2 rounded-lg px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="text-white/35 text-[11px] mt-2 leading-snug">A day counts when the yards poured reach a tier ({data.tiers.map((t) => `${fmtYards(t.yards)} CY = ${money(t.bonus)}`).join(", ")}); everyone on the list gets that amount. Program started {formatOrderDate(data.start)}.</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Daily yardage bonus — the same bar for the drivers and the batch plant operator
 // (dispatch board). Yards poured today against the tiers ($25 at 100 CY, $50 at
 // 150 CY by default), with the % of the way to the next one. Refreshes every

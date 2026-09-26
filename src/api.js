@@ -1099,3 +1099,28 @@ export function getIncentive(date) {
 export function getGpsDevices() {
   return request('/gps/devices')
 }
+
+// ── Daily bonus tracking (staff) ──
+export function getIncentiveHistory({ from = '', to = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return request(`/incentive/history${qs ? '?' + qs : ''}`)
+}
+export function setIncentiveDay(day, body) {
+  return request(`/incentive/days/${encodeURIComponent(day)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+}
+export async function downloadIncentiveCsv({ from = '', to = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  const res = await fetch(`${API_BASE}/incentive/history.csv${qs ? '?' + qs : ''}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  if (!res.ok) { let d = res.statusText; try { d = (await res.json()).detail || d } catch { /* ignore */ } throw new Error(d) }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a'); a.href = url; a.download = `bonus_${from || 'start'}_to_${to || 'today'}.csv`; document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
