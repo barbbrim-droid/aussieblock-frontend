@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getIncentiveReport, getGpsDevices } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -7793,6 +7793,144 @@ function AggregateTicketsModal({ onClose }) {
   );
 }
 
+// ── Bonuses ────────────────────────────────────────────────────────────────
+// The daily yardage incentive, tracked for payroll: every day the plant poured,
+// the tier it hit, and who earned the per-person bonus (Aussieblock drivers who
+// ran loads that day + batch plant operators on the clock), with a per-person
+// total for the window. Same yard count as the live "Daily bonus" bar.
+function BonusModal({ onClose }) {
+  const today = localToday();
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const monday = (back = 0) => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - back * 7); return d; };
+  const weekStart = ymd(monday(0));
+  const lastWkStart = ymd(monday(1));
+  const lastWkEnd = (() => { const d = monday(1); d.setDate(d.getDate() + 6); return ymd(d); })();
+  const mb = monthBounds();
+  const [from, setFrom] = useState(weekStart);
+  const [to, setTo] = useState(today);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [tab, setTab] = useState("people");   // people | days
+  const winKey = `${from}|${to}`;
+  const busy = !err && (!data || data._key !== winKey);
+  const quick = [["This week", weekStart, today], ["Last week", lastWkStart, lastWkEnd], ["This month", mb.first, mb.last], ["Since start", "START", today]];
+
+  useEffect(() => {
+    let live = true;
+    const f = from === "START" ? (data?.start || "2026-09-14") : from;
+    getIncentiveReport({ from: f, to })
+      .then((d) => { if (live) { setData({ ...d, _key: winKey }); setErr(""); } })
+      .catch((e) => { if (live) setErr(e.message || "Couldn't load"); });
+    return () => { live = false; };
+  }, [from, to]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const T = data?.totals;
+  const inSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
+  const label = data ? (data.from === data.to ? (formatOrderDateLong(data.from) || data.from) : `${orderDateUS(data.from)} – ${orderDateUS(data.to)}`) : "";
+  const tile = (lbl, value, sub, color) => (
+    <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="text-white/50 text-[10px] uppercase tracking-wide">{lbl}</div>
+      <div className="text-2xl font-bold leading-tight" style={{ fontFamily: C.cond, color: color || "#fff" }}>{value}</div>
+      {sub && <div className="text-white/40 text-[10px] mt-0.5">{sub}</div>}
+    </div>
+  );
+  const tierText = data?.tiers?.map((t) => `${fmtYards(t.yards)} CY = $${t.bonus}`).join(" · ");
+  const downloadCsv = () => {
+    if (!data) return;
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Name", "Role", "Days earned", "Dates", "Total"].map(q).join(",")];
+    for (const p of data.people) rows.push([p.name, p.role, p.days, p.dates.map((d) => orderDateUS(d) || d).join("; "), p.total.toFixed(2)].map(q).join(","));
+    rows.push("");
+    rows.push(["Date", "Yards", "Tier hit", "Bonus each", "Drivers", "Plant operators", "Day payout"].map(q).join(","));
+    for (const d of data.days) rows.push([orderDateUS(d.date) || d.date, d.yards, d.tier_yards ? `${d.tier_yards} CY` : (d.active ? "none" : "before program"), d.earned.toFixed(2), d.drivers.join("; "), d.operators.join("; "), d.payout.toFixed(2)].map(q).join(","));
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    const a = document.createElement("a"); a.href = url; a.download = `aussieblock-bonuses-${data.from}-to-${data.to}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-4xl max-h-[95vh] flex flex-col rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 shrink-0" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Trophy size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Bonuses</span><span className="hidden sm:inline text-sm font-semibold opacity-70" style={{ color: NAVY_DEEP, fontFamily: C.body }}>· daily yardage incentive</span></div>
+          <div className="flex items-center gap-2">
+            <button onClick={downloadCsv} disabled={!data || busy} title="Download for payroll" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: NAVY_DEEP, color: ORANGE, fontFamily: C.body }}><Download size={13} /> CSV</button>
+            <button onClick={onClose} className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4" style={{ fontFamily: C.body }}>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {quick.map(([l, a, b]) => <button key={l} onClick={() => { setFrom(a); setTo(b); }} className="rounded-lg px-2.5 py-1 text-xs font-semibold active:scale-95" style={{ background: from === a && to === b ? ORANGE : NAVY, color: from === a && to === b ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)" }}>{l}</button>)}
+            <input type="date" value={from === "START" ? (data?.start || "") : from} onChange={(e) => setFrom(e.target.value)} aria-label="From" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
+            <span className="text-white/40 text-xs">to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
+            {busy && <Loader2 size={14} className="animate-spin text-white/50" />}
+          </div>
+          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          {!T ? (
+            !err && <div className="text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Adding it up…</div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                <div className="text-white text-base font-bold" style={{ fontFamily: C.cond }}>{label}</div>
+                <div className="text-white/45 text-[11px]">Per person, per day: {tierText} · program started {orderDateUS(data.start) || data.start}</div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                {tile("Bonus owed", money(T.payout), `${data.people.length} ${data.people.length === 1 ? "person" : "people"}`, ORANGE)}
+                {tile("Days hit", `${T.days_hit} / ${T.days_poured}`, "bonus days / days poured", T.days_hit ? GREEN : undefined)}
+                {tile("Yards poured", fmtYards(T.yards), "same count as the Daily bonus bar")}
+                {tile("Avg / pour day", T.days_poured ? fmtYards(T.yards / T.days_poured) : "—", "CY")}
+              </div>
+              <div className="flex gap-1 mb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                {[["people", "By person"], ["days", "By day"]].map(([k, l]) => (
+                  <button key={k} onClick={() => setTab(k)} className="px-3 py-2 text-sm font-bold" style={{ color: tab === k ? ORANGE : "rgba(255,255,255,0.45)", borderBottom: tab === k ? `2px solid ${ORANGE}` : "2px solid transparent" }}>{l}</button>
+                ))}
+              </div>
+
+              {tab === "people" && (
+                data.people.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>No bonus days in this window.</div> : (
+                  <div className="overflow-x-auto"><table className="w-full text-xs">
+                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Name</th><th className="py-1.5 pr-2 font-semibold">Role</th><th className="py-1.5 pr-2 font-semibold text-right">Days</th><th className="py-1.5 pr-2 font-semibold">Dates</th><th className="py-1.5 font-semibold text-right">Owed</th></tr></thead>
+                    <tbody>{data.people.map((p) => (
+                      <tr key={p.name + p.role} className="text-white/85" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <td className="py-1.5 pr-2 font-semibold text-white whitespace-nowrap">{p.name}</td>
+                        <td className="py-1.5 pr-2 text-white/60 whitespace-nowrap">{p.role}</td>
+                        <td className="py-1.5 pr-2 text-right">{p.days}</td>
+                        <td className="py-1.5 pr-2 text-white/55">{p.dates.map((d) => orderDateUS(d) || d).join(", ")}</td>
+                        <td className="py-1.5 text-right font-bold whitespace-nowrap" style={{ color: ORANGE }}>{money(p.total)}</td>
+                      </tr>))}
+                      <tr style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }}><td colSpan={4} className="py-2 pr-2 text-white font-bold" style={{ fontFamily: C.cond }}>Total</td><td className="py-2 text-right font-bold" style={{ color: ORANGE, fontFamily: C.cond }}>{money(T.payout)}</td></tr>
+                    </tbody>
+                  </table></div>
+                )
+              )}
+
+              {tab === "days" && (
+                data.days.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>Nothing poured in this window.</div> : (
+                  <div className="overflow-x-auto"><table className="w-full text-xs">
+                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Day</th><th className="py-1.5 pr-2 font-semibold text-right">CY</th><th className="py-1.5 pr-2 font-semibold">Tier</th><th className="py-1.5 pr-2 font-semibold text-right">Each</th><th className="py-1.5 pr-2 font-semibold">Drivers</th><th className="py-1.5 pr-2 font-semibold">Plant operator</th><th className="py-1.5 font-semibold text-right">Day total</th></tr></thead>
+                    <tbody>{data.days.map((d) => (
+                      <tr key={d.date} className="text-white/85 align-top" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", opacity: d.active ? 1 : 0.5 }}>
+                        <td className="py-1.5 pr-2 whitespace-nowrap font-semibold text-white">{orderDateUS(d.date) || d.date}</td>
+                        <td className="py-1.5 pr-2 text-right">{fmtYards(d.yards)}</td>
+                        <td className="py-1.5 pr-2 whitespace-nowrap">{!d.active ? <span className="text-white/40">before program</span> : d.tier_yards ? <span className="font-bold" style={{ color: GREEN }}>{fmtYards(d.tier_yards)}+ ✓</span> : <span className="text-white/40">not hit</span>}</td>
+                        <td className="py-1.5 pr-2 text-right">{d.earned ? money(d.earned) : "—"}</td>
+                        <td className="py-1.5 pr-2">{d.drivers.join(", ") || <span className="text-white/35">—</span>}{d.other_drivers.length > 0 && <div className="text-[10px] text-white/35">not in program: {d.other_drivers.join(", ")}</div>}</td>
+                        <td className="py-1.5 pr-2">{d.operators.join(", ") || (d.no_operator ? <span style={{ color: WARN }}>no plant operator clocked in</span> : <span className="text-white/35">—</span>)}</td>
+                        <td className="py-1.5 text-right font-bold whitespace-nowrap" style={{ color: d.payout ? ORANGE : "rgba(255,255,255,0.4)" }}>{d.payout ? money(d.payout) : "—"}</td>
+                      </tr>))}</tbody>
+                  </table></div>
+                )
+              )}
+              <div className="text-[10px] text-white/35 mt-3 leading-snug">Drivers = Aussieblock drivers (roster or tablet login) assigned to a load or delivery that went out that day; third-party hauler drivers aren't in the program. Plant operator = anyone set as "plant" on the time clock who punched in that day. Days count from the order's scheduled date, the same way the live Daily bonus bar does.</div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Profit ─────────────────────────────────────────────────────────────────
 // Net profit for a day or a date range, from the yards actually poured: revenue
 // billed on completed orders minus materials, hauling paid out, fuel and the
@@ -8004,6 +8142,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [showAgg, setShowAgg] = useState(false);   // aggregate weight tickets (rock/sand hauled in + costs)
   const [showProfit, setShowProfit] = useState(false);   // net profit on yards poured, by date
+  const [showBonus, setShowBonus] = useState(false);     // daily yardage bonus history, for payroll
   const [bonusYards, setBonusYards] = useState(null);   // yards poured today per the server (batched) — keeps the Poured chip on the same number as the bonus bar
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
@@ -8320,6 +8459,7 @@ function DispatchApp({ email, role, onLogout }) {
     canFinance && { key: "prices", label: "Price sheet", icon: Calculator, onClick: () => setShowPrices(true) },
     canFinance && { key: "costs", label: "Costs", icon: ClipboardList, onClick: () => setShowCosts(true) },
     canFinance && { key: "profit", label: "Profit", icon: DollarSign, onClick: () => setShowProfit(true) },
+    canFinance && { key: "bonuses", label: "Bonuses", icon: Trophy, onClick: () => setShowBonus(true) },
     canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
     canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
     canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
@@ -8370,6 +8510,7 @@ function DispatchApp({ email, role, onLogout }) {
       {showMaterials && <MaterialsModal onClose={() => setShowMaterials(false)} />}
       {showAgg && <AggregateTicketsModal onClose={() => setShowAgg(false)} />}
       {showProfit && <ProfitModal onClose={() => setShowProfit(false)} />}
+      {showBonus && <BonusModal onClose={() => setShowBonus(false)} />}
       {showPlant && <PlantChecklistModal onClose={() => setShowPlant(false)} />}
       {showMessages && <MessagesModal onClose={() => setShowMessages(false)} />}
       {showTrucks && (
