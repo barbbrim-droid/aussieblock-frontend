@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv, recordIncentivePayout, undoIncentivePayout } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv, recordIncentivePayout, undoIncentivePayout, addIncentiveExclusion, removeIncentiveExclusion } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Oct3-v96";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Oct3-v97";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8962,6 +8962,7 @@ function BonusModal({ onClose }) {
   const [addName, setAddName] = useState("");
   const [payForm, setPayForm] = useState({ paid_on: today, through: "", notes: "" });   // "we paid on X, through Y"
   const [showPayouts, setShowPayouts] = useState(false);
+  const [exclName, setExclName] = useState("");   // "never gets the bonus" — add a name
   const load = async () => {
     try { setData(await getIncentiveHistory(range)); setErr(""); } catch (e) { setErr(e.message || "Couldn't load"); }
   };
@@ -8982,6 +8983,18 @@ function BonusModal({ onClose }) {
     setBusy(true); setErr("");
     try { await recordIncentivePayout(payForm); setPayForm({ paid_on: today, through: "", notes: "" }); await load(); }
     catch (e) { setErr(e.message || "Couldn't record the payout"); }
+    finally { setBusy(false); }
+  };
+  const exclude = async (name) => {
+    const n = (name || "").trim();
+    if (!n) return;
+    setBusy(true); setErr("");
+    try { await addIncentiveExclusion(n, "hauler driver"); setExclName(""); await load(); } catch (e) { setErr(e.message || "Couldn't add"); }
+    finally { setBusy(false); }
+  };
+  const unexclude = async (name) => {
+    setBusy(true); setErr("");
+    try { await removeIncentiveExclusion(name); await load(); } catch (e) { setErr(e.message || "Couldn't remove"); }
     finally { setBusy(false); }
   };
   const undoPayout = async (po) => {
@@ -9076,6 +9089,26 @@ function BonusModal({ onClose }) {
                   </div>
                 </div>
               )}
+
+              <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Never gets the bonus</div>
+                  <div className="text-white/35 text-[11px]">hauler drivers on our loads</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {(data.exclusions || []).map((n) => (
+                    <span key={n} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs text-white" style={{ background: "rgba(255,138,133,0.12)", border: "1px solid rgba(255,138,133,0.35)" }}>
+                      {n}<button disabled={busy} onClick={() => unexclude(n)} title="Let them earn it again" className="p-0.5 rounded-full active:scale-90"><X size={12} color="#ff8a85" /></button>
+                    </span>
+                  ))}
+                  {(data.exclusions || []).length === 0 && <span className="text-white/35 text-xs">nobody</span>}
+                </div>
+                <div className="flex gap-1.5">
+                  <input value={exclName} onChange={(e) => setExclName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") exclude(exclName); }} placeholder="Add a name (as it appears on the loads)" className="flex-1 rounded-lg px-3 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
+                  <button disabled={busy || !exclName.trim()} onClick={() => exclude(exclName)} className="rounded-lg px-3 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>Add</button>
+                </div>
+                <div className="text-white/35 text-[11px] mt-1">Taken off every day's automatic list, past and future. A day you've edited by hand keeps its own list.</div>
+              </div>
 
               <div className="text-white/50 text-xs uppercase tracking-wide mb-1.5">By day — tap a day to change who gets it</div>
               {data.days.length === 0 ? <div className="text-white/40 text-sm py-4 text-center rounded-xl" style={{ background: NAVY }}>No pours in this range.</div> : data.days.map((d) => {
