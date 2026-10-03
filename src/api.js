@@ -1140,3 +1140,10 @@ export function recordIncentivePayout(body) {
 export function undoIncentivePayout(id) {
   return request(`/incentive/payouts/${id}`, { method: 'DELETE' })
 }
+// Names that never get the daily bonus (third-party hauler drivers).
+export function addIncentiveExclusion(name, note = '') {
+  return request('/incentive/exclusions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, note }) })
+}
+export function removeIncentiveExclusion(name) {
+  return request(`/incentive/exclusions/${encodeURIComponent(name)}`, { method: 'DELETE' })
+}
