@@ -1090,6 +1090,16 @@ export function setTruckOdometer(label, odometer) {
   })
 }
 
+// Bonus history for a date window (staff): per day yards / tier / who earned it,
+// plus per-person totals for payroll. Blank from/to = the current Mon–Sun week.
+export function getIncentiveReport({ from = '', to = '' } = {}) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return request(`/incentive/report${qs ? '?' + qs : ''}`, { timeoutMs: 60000 })
+}
+
 // Daily yardage bonus progress (drivers + staff). Today unless a date is given.
 export function getIncentive(date) {
   return request(`/incentive/today${date ? `?date=${encodeURIComponent(date)}` : ""}`)
