@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv, recordIncentivePayout, undoIncentivePayout } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep26-v95";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Oct3-v96";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8960,6 +8960,8 @@ function BonusModal({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(null);        // date being edited
   const [addName, setAddName] = useState("");
+  const [payForm, setPayForm] = useState({ paid_on: today, through: "", notes: "" });   // "we paid on X, through Y"
+  const [showPayouts, setShowPayouts] = useState(false);
   const load = async () => {
     try { setData(await getIncentiveHistory(range)); setErr(""); } catch (e) { setErr(e.message || "Couldn't load"); }
   };
@@ -8975,6 +8977,22 @@ function BonusModal({ onClose }) {
     try { await setIncentiveDay(day, body); await load(); } catch (e) { setErr(e.message || "Couldn't save"); }
     finally { setBusy(false); }
   };
+  const recordPayout = async () => {
+    if (!payForm.through) { setErr("Pick the last day this payment covers."); return; }
+    setBusy(true); setErr("");
+    try { await recordIncentivePayout(payForm); setPayForm({ paid_on: today, through: "", notes: "" }); await load(); }
+    catch (e) { setErr(e.message || "Couldn't record the payout"); }
+    finally { setBusy(false); }
+  };
+  const undoPayout = async (po) => {
+    if (!window.confirm(`Undo the payout of ${money(po.amount)} made ${formatOrderDate(po.paid_on)} (covering ${formatOrderDate(po.from_day)} – ${formatOrderDate(po.through)})?\n\nThose days go back to unpaid.`)) return;
+    setBusy(true); setErr("");
+    try { await undoIncentivePayout(po.id); await load(); } catch (e) { setErr(e.message || "Couldn't undo"); }
+    finally { setBusy(false); }
+  };
+  // Owed since the last payout: every unpaid bonus day after paid_through, across the loaded range.
+  const owedDays = data ? data.days.filter((d) => d.bonus > 0 && !d.paid) : [];
+  const owedSince = owedDays.length ? owedDays[owedDays.length - 1].date : null;
   const chip = (on) => ({ background: on ? ORANGE : NAVY, color: on ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.15)"}`, fontFamily: C.body });
   const isRange = (f, t) => range.from === f && range.to === t;
   const T = data?.totals;
@@ -9000,6 +9018,39 @@ function BonusModal({ onClose }) {
           {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
           {!data ? <div className="text-white/40 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={15} className="animate-spin" /> Loading…</div> : (
             <>
+              {/* Paid-through status + record a payout */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: `1px solid ${T.unpaid > 0 ? "rgba(255,183,77,0.45)" : GREEN + "55"}` }}>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="text-sm">
+                    {data.paid_through
+                      ? <span className="text-white"><span className="font-bold" style={{ fontFamily: C.cond }}>Paid through {formatOrderDate(data.paid_through)}</span><span className="text-white/50"> · last paid {formatOrderDate(data.last_payout.paid_on)} ({money(data.last_payout.amount)}, {data.last_payout.days} day{data.last_payout.days === 1 ? "" : "s"})</span></span>
+                      : <span className="text-white/70">No payout recorded yet.</span>}
+                    {T.unpaid > 0
+                      ? <div className="text-xs mt-0.5" style={{ color: "#ffb74d" }}>Owed{owedSince ? ` since ${formatOrderDate(owedSince)}` : ""}: {money(T.unpaid)} across {owedDays.length} bonus day{owedDays.length === 1 ? "" : "s"}</div>
+                      : <div className="text-xs mt-0.5" style={{ color: GREEN }}>Nothing owed in this range.</div>}
+                  </div>
+                  {data.payouts.length > 0 && <button onClick={() => setShowPayouts((v) => !v)} className="text-xs font-semibold rounded-lg px-2.5 py-1 active:scale-95" style={{ background: "rgba(255,255,255,0.08)", color: "#cfe0ff" }}>{showPayouts ? "Hide" : "Show"} payouts ({data.payouts.length})</button>}
+                </div>
+                {showPayouts && (
+                  <div className="mb-2">
+                    {data.payouts.map((po, i) => (
+                      <div key={po.id} className="flex items-center justify-between gap-2 py-1 text-xs" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="text-white/80">Paid <span className="text-white font-semibold">{formatOrderDate(po.paid_on)}</span> · covers {formatOrderDate(po.from_day)} – {formatOrderDate(po.through)} · {po.days} day{po.days === 1 ? "" : "s"}{po.notes ? ` · ${po.notes}` : ""}</span>
+                        <span className="flex items-center gap-2 shrink-0"><span className="font-bold" style={{ color: GREEN, fontFamily: C.cond }}>{money(po.amount)}</span>{i === 0 && <button disabled={busy} onClick={() => undoPayout(po)} className="text-[11px] underline" style={{ color: "#ff8a85" }}>undo</button>}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="text-white/50 text-[11px] uppercase tracking-wide mb-1">Record a payout</div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="text-xs text-white/60">Paid on<br /><input type="date" value={payForm.paid_on} onChange={(e) => setPayForm({ ...payForm, paid_on: e.target.value })} className="rounded-md px-2 py-1.5 text-sm outline-none mt-0.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} /></label>
+                  <label className="text-xs text-white/60">Covers through<br /><input type="date" value={payForm.through} min={data.paid_through || data.start} max={today} onChange={(e) => setPayForm({ ...payForm, through: e.target.value })} className="rounded-md px-2 py-1.5 text-sm outline-none mt-0.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} /></label>
+                  <input value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} placeholder="Note (check #, pay period…)" className="flex-1 min-w-[10rem] rounded-md px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
+                  <button disabled={busy || !payForm.through || !payForm.paid_on} onClick={recordPayout} className="rounded-lg px-3 py-1.5 text-sm font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : "Record payout"}</button>
+                </div>
+                <div className="text-white/35 text-[11px] mt-1">Marks every bonus day{data.paid_through ? ` after ${formatOrderDate(data.paid_through)}` : " since the program started"} through the date you pick as paid on that day.</div>
+              </div>
+
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {[["Bonus days", String(T.bonus_days), `of ${data.days.length} working day${data.days.length === 1 ? "" : "s"}`],
                   ["Total bonus", money(T.payable), "everyone, this range"],
@@ -9045,7 +9096,7 @@ function BonusModal({ onClose }) {
                       </button>
                       {hit && (
                         <label className="flex items-center gap-1.5 text-xs shrink-0 cursor-pointer" style={{ color: d.paid ? GREEN : "#ffb74d" }}>
-                          <input type="checkbox" checked={d.paid} disabled={busy} onChange={(e) => save(d.date, { paid: e.target.checked })} /> {d.paid ? "Paid" : "Unpaid"}
+                          <input type="checkbox" checked={d.paid} disabled={busy} onChange={(e) => save(d.date, { paid: e.target.checked })} /> {d.paid ? (d.paid_on ? `Paid ${formatOrderDate(d.paid_on)}` : "Paid") : "Unpaid"}
                         </label>
                       )}
                     </div>

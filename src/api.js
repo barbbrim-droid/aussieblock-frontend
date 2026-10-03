@@ -1124,3 +1124,9 @@ export async function downloadIncentiveCsv({ from = '', to = '' } = {}) {
   const a = document.createElement('a'); a.href = url; a.download = `bonus_${from || 'start'}_to_${to || 'today'}.csv`; document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
+export function recordIncentivePayout(body) {
+  return request('/incentive/payouts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+}
+export function undoIncentivePayout(id) {
+  return request(`/incentive/payouts/${id}`, { method: 'DELETE' })
+}
