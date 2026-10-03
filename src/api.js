@@ -1147,3 +1147,8 @@ export function addIncentiveExclusion(name, note = '') {
 export function removeIncentiveExclusion(name) {
   return request(`/incentive/exclusions/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
+
+// The delivery terms printed on every ticket (public) — shown at signing.
+export function getDeliveryTerms() {
+  return request('/terms')
+}

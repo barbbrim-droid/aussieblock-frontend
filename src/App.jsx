@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv, recordIncentivePayout, undoIncentivePayout, addIncentiveExclusion, removeIncentiveExclusion } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv, recordIncentivePayout, undoIncentivePayout, addIncentiveExclusion, removeIncentiveExclusion, getDeliveryTerms } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Oct3-v97";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Oct3-v98";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8706,8 +8706,19 @@ function DispatchApp({ email, role, onLogout }) {
 
 // On-screen signature pad: the customer signs with a finger/stylus on the tablet.
 // White background so the captured PNG is legible anywhere. onSubmit(blob, name).
+// Fallback copy of the ticket terms (the pad fetches the live text from /terms so
+// the screen always matches what prints on the ticket).
+const DELIVERY_TERMS_FALLBACK = "Purchaser must provide safe, suitable roadways and approaches to the delivery point; we may stop delivery if they are unsatisfactory. We deliver only. Purchaser controls the site; we do not direct placement, pumping, finishing, curing or site safety, including clearance from overhead power lines, and we are not the renter or customer for any pump or other equipment used on the job, even if we help arrange or bill for it. TO THE FULLEST EXTENT THE LAW ALLOWS, PURCHASER WILL DEFEND, INDEMNIFY AND HOLD US HARMLESS FROM ALL CLAIMS FOR INJURY, DEATH OR PROPERTY DAMAGE ARISING FROM THE SITE OR THE WORK, INCLUDING PUMPING, OVERHEAD LINES AND DELIVERY BEYOND THE CURB LINE, AND INCLUDING CLAIMS BY PURCHASER'S EMPLOYEES AND CONTRACTORS, EVEN IF CAUSED IN PART BY OUR NEGLIGENCE. This concrete meets the mix designated above. If water or other material is added on site, or the concrete is not placed and cured per ASTM specifications, Purchaser assumes all responsibility for strength, slump and quality. We assume no liability for architectural finishes, including polished floors, colored concrete and exposed aggregate. Our liability is limited to replacing the concrete or refunding its price. WE ARE NOT LIABLE FOR REMOVAL, REPLACEMENT OR OTHER CONSEQUENTIAL DAMAGES, AND WE DISCLAIM ALL IMPLIED WARRANTIES, INCLUDING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. Free unloading time is 5 min/yd after arrival; excess is billed at $150.00/hr. Purchaser pays any wrecker fees for this delivery and may be charged a fuel adjustment per load. The person signing confirms they are authorized to accept this delivery and these terms for Purchaser.";
+
 function SignaturePad({ orderRef, onCancel, onSubmit }) {
   const canvasRef = useRef(null);
+  const [terms, setTerms] = useState(DELIVERY_TERMS_FALLBACK);
+  const [termsOpen, setTermsOpen] = useState(false);   // phone: collapsed to a few lines until tapped
+  useEffect(() => {
+    let live = true;
+    getDeliveryTerms().then((r) => { if (live && r && r.terms) setTerms(r.terms); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   const drawing = useRef(false);
   const last = useRef(null);
   const [hasInk, setHasInk] = useState(false);
@@ -8806,12 +8817,13 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
-      <div className="w-full max-w-lg md:max-w-4xl rounded-2xl overflow-hidden flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
-        <div className="px-5 py-3.5 md:py-5 flex items-center justify-between" style={{ background: ORANGE }}>
+      <div className="w-full max-w-lg md:max-w-4xl rounded-2xl overflow-hidden flex flex-col max-h-[96vh]" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }}>
+        <div className="px-5 py-3.5 md:py-4 flex items-center justify-between shrink-0" style={{ background: ORANGE }}>
           <span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg md:text-2xl font-bold">Customer sign-off · {orderRef}</span>
           <button onClick={onCancel} disabled={busy} className="p-1 md:p-2 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
-        <div className="p-5" style={{ fontFamily: C.body }}>
+        {/* Scrolls on a short landscape tablet now that the terms sit above the pad; the pad itself never scrolls. */}
+        <div className="p-5 overflow-y-auto overscroll-contain" style={{ fontFamily: C.body }}>
           <div className="text-white/60 text-xs md:text-base mb-2">
             <span className="font-bold" style={{ color: ORANGE }}>Step 1</span> — fill both boxes in first. The pad won't take a signature until they're done.
           </div>
@@ -8825,11 +8837,18 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
               <input value={water} onChange={(e) => { setWater(e.target.value); setErr(""); }} placeholder="0 if none" inputMode="decimal" className="rounded-lg px-3 py-2.5 md:py-3.5 text-base md:text-lg outline-none" style={{ background: NAVY, color: "#fff", border: `1px solid ${waterOk ? "rgba(255,255,255,0.15)" : ORANGE}` }} />
             </label>
           </div>
-          <div className="text-white/60 text-xs md:text-base mt-4 mb-2">
-            <span className="font-bold" style={{ color: ready ? GREEN : "rgba(255,255,255,0.35)" }}>Step 2</span> — have the customer sign below to confirm delivery.
+          <div className="text-white/60 text-xs md:text-base mt-4 mb-1.5">
+            <span className="font-bold" style={{ color: ready ? GREEN : "rgba(255,255,255,0.35)" }}>Step 2</span> — the customer reads the delivery terms, then signs below to accept the delivery and the terms.
+          </div>
+          <div className="rounded-xl mb-2.5 overflow-hidden" style={{ background: "#fff", border: "1px solid rgba(255,255,255,0.2)" }}>
+            <div className="px-3 pt-2 text-[10px] md:text-xs font-bold uppercase tracking-wide" style={{ color: "#6b7280" }}>Terms &amp; conditions — printed on the ticket</div>
+            <div onClick={() => setTermsOpen((v) => !v)} className={`px-3 pb-2 pt-1 text-[11px] md:text-[13px] leading-snug ${termsOpen ? "max-h-56 md:max-h-40 overflow-y-auto" : "max-h-16 md:max-h-40 overflow-hidden md:overflow-y-auto"}`} style={{ color: "#1f2a37", textAlign: "justify" }}>
+              {terms}
+            </div>
+            <button type="button" onClick={() => setTermsOpen((v) => !v)} className="md:hidden w-full py-1.5 text-xs font-bold" style={{ background: "#eff1f4", color: "#1f2a37" }}>{termsOpen ? "Show less" : "Read the full terms"}</button>
           </div>
           <div className="relative">
-            <canvas ref={canvasRef} className="w-full h-56 md:h-96 rounded-xl touch-none" style={{ background: "#fff", border: `2px solid ${ready ? "rgba(255,255,255,0.15)" : ORANGE}`, opacity: ready ? 1 : 0.45 }}
+            <canvas ref={canvasRef} className="w-full h-56 md:h-64 rounded-xl touch-none" style={{ background: "#fff", border: `2px solid ${ready ? "rgba(255,255,255,0.15)" : ORANGE}`, opacity: ready ? 1 : 0.45 }}
               onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} onPointerCancel={end} />
             {!ready && (
               <div className="absolute inset-0 flex items-center justify-center rounded-xl pointer-events-none px-4 text-center">
