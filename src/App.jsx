@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, Fragment } from "react";
 import { Truck, MapPin, Clock, ChevronLeft, CheckCircle2, Circle, Plus, FileText, Bell, User, List, Building2, Send, CreditCard, ChevronRight, Phone, Download, LogOut, Loader2, RefreshCw, Inbox, Navigation, Activity, Package, KeyRound, Search, X, CalendarPlus, Trash2, CalendarDays, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Wind, Moon, CloudMoon, Droplets, Calculator, ClipboardList, Save, Printer, BookOpen, UploadCloud, AlertTriangle, Layers, Check, Camera, Pencil, MessageSquare, Power, ClipboardCheck, Menu, Thermometer, Battery, Scale, DollarSign, Trophy } from "lucide-react";
-import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getIncentiveReport, getGpsDevices } from "./api";
+import { login, pinLogin, getMe, getOrders, getOrder, getBilling, syncBilling, getInvoicePayLink, markInvoicePaid, unmarkInvoicePaid, placeSuggestions, getTrucks, setOrderStatus, assignTruck, assignDriver, getCustomers, setCustomerLogin, removeCustomerLogin, createOrder, deleteOrder, editOrder, requestOrder, addTruck, deleteTruck, getFuel, saveFuelPrices, getTruckFuel, addFuelFill, editFuelFill, deleteFuelFill, getMixerReadings, resetMixerTotal, getDrivers, addDriver, deleteDriver, getDriverOrders, saveDriverNotes, setDriverStatus, attachFuelMileage, logManualFuel, signOffOrder, signOffLoad, getSignatureDataUrl, getBatchTicketImages, getLoadBatchTicketImages, getSmsEnabled, textInvite, listStaff, createStaff, deleteStaff, staffTextInvite, setCustomerCod, setCustomerPrice, codFromAging, getOrderPaymentStatus, getPriceSheet, savePriceSheet, getOrderPricing, getOrdersPricingBulk, setOrderDelivery, setOrderPrice, setOrderFiber, getMixes, addLoad, updateLoad, removeLoad, uploadBatchTicket, openBatchTicket, deleteBatchTicket, uploadLoadBatchTicket, openLoadBatchTicket, deleteLoadBatchTicket, saveBatchData, setOrderArchived, getDocs, uploadDoc, openDoc, deleteDoc, getMaterials, updateMaterial, getReceipts, addReceipt, editReceipt, deleteReceipt, uploadReceiptPhoto, fetchReceiptPhotoUrl, deleteReceiptPhoto, getPOs, createPO, editPO, deletePO, getMessageThreads, getMessageThread, sendMessage, getDriverMessages, getDriverUnread, sendDriverMessage, sendMessagePhoto, sendDriverPhoto, fetchMessageImageUrl, logout, isLoggedIn, getPumpState, pumpControl, listPumpPins, createPumpPin, deletePumpPin, submitPlantChecklist, getPlantChecklists, getPlantChecklist, getEmployees, saveEmployee, deactivateEmployee, removeEmployee, timeclockPunch, getTimeEntries, addTimeEntry, editTimeEntry, deleteTimeEntry, getWeightTicketOptions, createWeightTicket, getWeightTickets, getMyWeightTickets, editWeightTicket, deleteWeightTicket, rereadWeightTicket, uploadWeightTicketPhoto, fetchWeightTicketPhotoUrl, deleteWeightTicketPhoto, openWeightTicketPdf, getProfit, openProfitReport, getFuelOdometer, setTruckOdometer, getIncentive, getGpsDevices, getIncentiveHistory, setIncentiveDay, downloadIncentiveCsv, recordIncentivePayout, undoIncentivePayout } from "./api";
 
 // True when the logged-in office user may see financials & account info (full
 // staff). False for "worker" logins (concrete crew / TxDOT engineers). Provided
@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Sep23-v94";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Oct3-v96";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -7793,144 +7793,6 @@ function AggregateTicketsModal({ onClose }) {
   );
 }
 
-// ── Bonuses ────────────────────────────────────────────────────────────────
-// The daily yardage incentive, tracked for payroll: every day the plant poured,
-// the tier it hit, and who earned the per-person bonus (Aussieblock drivers who
-// ran loads that day + batch plant operators on the clock), with a per-person
-// total for the window. Same yard count as the live "Daily bonus" bar.
-function BonusModal({ onClose }) {
-  const today = localToday();
-  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const monday = (back = 0) => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - back * 7); return d; };
-  const weekStart = ymd(monday(0));
-  const lastWkStart = ymd(monday(1));
-  const lastWkEnd = (() => { const d = monday(1); d.setDate(d.getDate() + 6); return ymd(d); })();
-  const mb = monthBounds();
-  const [from, setFrom] = useState(weekStart);
-  const [to, setTo] = useState(today);
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState("");
-  const [tab, setTab] = useState("people");   // people | days
-  const winKey = `${from}|${to}`;
-  const busy = !err && (!data || data._key !== winKey);
-  const quick = [["This week", weekStart, today], ["Last week", lastWkStart, lastWkEnd], ["This month", mb.first, mb.last], ["Since start", "START", today]];
-
-  useEffect(() => {
-    let live = true;
-    const f = from === "START" ? (data?.start || "2026-09-14") : from;
-    getIncentiveReport({ from: f, to })
-      .then((d) => { if (live) { setData({ ...d, _key: winKey }); setErr(""); } })
-      .catch((e) => { if (live) setErr(e.message || "Couldn't load"); });
-    return () => { live = false; };
-  }, [from, to]);   // eslint-disable-line react-hooks/exhaustive-deps
-
-  const T = data?.totals;
-  const inSt = { background: NAVY_DEEP, color: "#fff", border: "1px solid rgba(255,255,255,0.12)", fontFamily: C.body };
-  const label = data ? (data.from === data.to ? (formatOrderDateLong(data.from) || data.from) : `${orderDateUS(data.from)} – ${orderDateUS(data.to)}`) : "";
-  const tile = (lbl, value, sub, color) => (
-    <div className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div className="text-white/50 text-[10px] uppercase tracking-wide">{lbl}</div>
-      <div className="text-2xl font-bold leading-tight" style={{ fontFamily: C.cond, color: color || "#fff" }}>{value}</div>
-      {sub && <div className="text-white/40 text-[10px] mt-0.5">{sub}</div>}
-    </div>
-  );
-  const tierText = data?.tiers?.map((t) => `${fmtYards(t.yards)} CY = $${t.bonus}`).join(" · ");
-  const downloadCsv = () => {
-    if (!data) return;
-    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const rows = [["Name", "Role", "Days earned", "Dates", "Total"].map(q).join(",")];
-    for (const p of data.people) rows.push([p.name, p.role, p.days, p.dates.map((d) => orderDateUS(d) || d).join("; "), p.total.toFixed(2)].map(q).join(","));
-    rows.push("");
-    rows.push(["Date", "Yards", "Tier hit", "Bonus each", "Drivers", "Plant operators", "Day payout"].map(q).join(","));
-    for (const d of data.days) rows.push([orderDateUS(d.date) || d.date, d.yards, d.tier_yards ? `${d.tier_yards} CY` : (d.active ? "none" : "before program"), d.earned.toFixed(2), d.drivers.join("; "), d.operators.join("; "), d.payout.toFixed(2)].map(q).join(","));
-    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
-    const a = document.createElement("a"); a.href = url; a.download = `aussieblock-bonuses-${data.from}-to-${data.to}.csv`; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
-      <div className="w-full max-w-4xl max-h-[95vh] flex flex-col rounded-2xl overflow-hidden" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 shrink-0" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><Trophy size={20} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Bonuses</span><span className="hidden sm:inline text-sm font-semibold opacity-70" style={{ color: NAVY_DEEP, fontFamily: C.body }}>· daily yardage incentive</span></div>
-          <div className="flex items-center gap-2">
-            <button onClick={downloadCsv} disabled={!data || busy} title="Download for payroll" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: NAVY_DEEP, color: ORANGE, fontFamily: C.body }}><Download size={13} /> CSV</button>
-            <button onClick={onClose} className="p-1.5 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
-          </div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4" style={{ fontFamily: C.body }}>
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            {quick.map(([l, a, b]) => <button key={l} onClick={() => { setFrom(a); setTo(b); }} className="rounded-lg px-2.5 py-1 text-xs font-semibold active:scale-95" style={{ background: from === a && to === b ? ORANGE : NAVY, color: from === a && to === b ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)" }}>{l}</button>)}
-            <input type="date" value={from === "START" ? (data?.start || "") : from} onChange={(e) => setFrom(e.target.value)} aria-label="From" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
-            <span className="text-white/40 text-xs">to</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inSt, width: 150 }} />
-            {busy && <Loader2 size={14} className="animate-spin text-white/50" />}
-          </div>
-          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
-          {!T ? (
-            !err && <div className="text-white/50 text-sm py-10 text-center flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Adding it up…</div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
-                <div className="text-white text-base font-bold" style={{ fontFamily: C.cond }}>{label}</div>
-                <div className="text-white/45 text-[11px]">Per person, per day: {tierText} · program started {orderDateUS(data.start) || data.start}</div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                {tile("Bonus owed", money(T.payout), `${data.people.length} ${data.people.length === 1 ? "person" : "people"}`, ORANGE)}
-                {tile("Days hit", `${T.days_hit} / ${T.days_poured}`, "bonus days / days poured", T.days_hit ? GREEN : undefined)}
-                {tile("Yards poured", fmtYards(T.yards), "same count as the Daily bonus bar")}
-                {tile("Avg / pour day", T.days_poured ? fmtYards(T.yards / T.days_poured) : "—", "CY")}
-              </div>
-              <div className="flex gap-1 mb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                {[["people", "By person"], ["days", "By day"]].map(([k, l]) => (
-                  <button key={k} onClick={() => setTab(k)} className="px-3 py-2 text-sm font-bold" style={{ color: tab === k ? ORANGE : "rgba(255,255,255,0.45)", borderBottom: tab === k ? `2px solid ${ORANGE}` : "2px solid transparent" }}>{l}</button>
-                ))}
-              </div>
-
-              {tab === "people" && (
-                data.people.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>No bonus days in this window.</div> : (
-                  <div className="overflow-x-auto"><table className="w-full text-xs">
-                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Name</th><th className="py-1.5 pr-2 font-semibold">Role</th><th className="py-1.5 pr-2 font-semibold text-right">Days</th><th className="py-1.5 pr-2 font-semibold">Dates</th><th className="py-1.5 font-semibold text-right">Owed</th></tr></thead>
-                    <tbody>{data.people.map((p) => (
-                      <tr key={p.name + p.role} className="text-white/85" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                        <td className="py-1.5 pr-2 font-semibold text-white whitespace-nowrap">{p.name}</td>
-                        <td className="py-1.5 pr-2 text-white/60 whitespace-nowrap">{p.role}</td>
-                        <td className="py-1.5 pr-2 text-right">{p.days}</td>
-                        <td className="py-1.5 pr-2 text-white/55">{p.dates.map((d) => orderDateUS(d) || d).join(", ")}</td>
-                        <td className="py-1.5 text-right font-bold whitespace-nowrap" style={{ color: ORANGE }}>{money(p.total)}</td>
-                      </tr>))}
-                      <tr style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }}><td colSpan={4} className="py-2 pr-2 text-white font-bold" style={{ fontFamily: C.cond }}>Total</td><td className="py-2 text-right font-bold" style={{ color: ORANGE, fontFamily: C.cond }}>{money(T.payout)}</td></tr>
-                    </tbody>
-                  </table></div>
-                )
-              )}
-
-              {tab === "days" && (
-                data.days.length === 0 ? <div className="text-white/40 text-sm py-8 text-center rounded-xl" style={{ background: NAVY }}>Nothing poured in this window.</div> : (
-                  <div className="overflow-x-auto"><table className="w-full text-xs">
-                    <thead><tr className="text-white/45 text-left"><th className="py-1.5 pr-2 font-semibold">Day</th><th className="py-1.5 pr-2 font-semibold text-right">CY</th><th className="py-1.5 pr-2 font-semibold">Tier</th><th className="py-1.5 pr-2 font-semibold text-right">Each</th><th className="py-1.5 pr-2 font-semibold">Drivers</th><th className="py-1.5 pr-2 font-semibold">Plant operator</th><th className="py-1.5 font-semibold text-right">Day total</th></tr></thead>
-                    <tbody>{data.days.map((d) => (
-                      <tr key={d.date} className="text-white/85 align-top" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", opacity: d.active ? 1 : 0.5 }}>
-                        <td className="py-1.5 pr-2 whitespace-nowrap font-semibold text-white">{orderDateUS(d.date) || d.date}</td>
-                        <td className="py-1.5 pr-2 text-right">{fmtYards(d.yards)}</td>
-                        <td className="py-1.5 pr-2 whitespace-nowrap">{!d.active ? <span className="text-white/40">before program</span> : d.tier_yards ? <span className="font-bold" style={{ color: GREEN }}>{fmtYards(d.tier_yards)}+ ✓</span> : <span className="text-white/40">not hit</span>}</td>
-                        <td className="py-1.5 pr-2 text-right">{d.earned ? money(d.earned) : "—"}</td>
-                        <td className="py-1.5 pr-2">{d.drivers.join(", ") || <span className="text-white/35">—</span>}{d.other_drivers.length > 0 && <div className="text-[10px] text-white/35">not in program: {d.other_drivers.join(", ")}</div>}</td>
-                        <td className="py-1.5 pr-2">{d.operators.join(", ") || (d.no_operator ? <span style={{ color: WARN }}>no plant operator clocked in</span> : <span className="text-white/35">—</span>)}</td>
-                        <td className="py-1.5 text-right font-bold whitespace-nowrap" style={{ color: d.payout ? ORANGE : "rgba(255,255,255,0.4)" }}>{d.payout ? money(d.payout) : "—"}</td>
-                      </tr>))}</tbody>
-                  </table></div>
-                )
-              )}
-              <div className="text-[10px] text-white/35 mt-3 leading-snug">Drivers = Aussieblock drivers (roster or tablet login) assigned to a load or delivery that went out that day; third-party hauler drivers aren't in the program. Plant operator = anyone set as "plant" on the time clock who punched in that day. Days count from the order's scheduled date, the same way the live Daily bonus bar does.</div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Profit ─────────────────────────────────────────────────────────────────
 // Net profit for a day or a date range, from the yards actually poured: revenue
 // billed on completed orders minus materials, hauling paid out, fuel and the
@@ -8142,7 +8004,7 @@ function DispatchApp({ email, role, onLogout }) {
   const [showMaterials, setShowMaterials] = useState(false);   // cement & slag tracker modal
   const [showAgg, setShowAgg] = useState(false);   // aggregate weight tickets (rock/sand hauled in + costs)
   const [showProfit, setShowProfit] = useState(false);   // net profit on yards poured, by date
-  const [showBonus, setShowBonus] = useState(false);     // daily yardage bonus history, for payroll
+  const [showBonus, setShowBonus] = useState(false);     // daily bonus: which days hit, who earned it, paid or not
   const [bonusYards, setBonusYards] = useState(null);   // yards poured today per the server (batched) — keeps the Poured chip on the same number as the bonus bar
   const [showPlant, setShowPlant] = useState(false);   // daily batch-plant operator checklist modal
   const [showMessages, setShowMessages] = useState(false);   // dispatch ↔ driver chat modal
@@ -8459,7 +8321,7 @@ function DispatchApp({ email, role, onLogout }) {
     canFinance && { key: "prices", label: "Price sheet", icon: Calculator, onClick: () => setShowPrices(true) },
     canFinance && { key: "costs", label: "Costs", icon: ClipboardList, onClick: () => setShowCosts(true) },
     canFinance && { key: "profit", label: "Profit", icon: DollarSign, onClick: () => setShowProfit(true) },
-    canFinance && { key: "bonuses", label: "Bonuses", icon: Trophy, onClick: () => setShowBonus(true) },
+    canFinance && { key: "bonus", label: "Bonus", icon: Trophy, onClick: () => setShowBonus(true) },
     canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
     canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
     canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
@@ -9085,6 +8947,190 @@ function DeliveryTicketModal({ order, onClose }) {
 // The DRIVER tablet app: today's deliveries assigned to this driver. Tap one to
 // see details, open the batch ticket, and capture the customer's signature
 // (which marks the delivery complete). No board, no billing.
+// Staff: daily bonus tracking. Which days hit the tiers, who earns it (the drivers
+// on that day's loads plus the plant operators — editable per day), and whether
+// it's been paid. Totals per person for payroll and a CSV export.
+function BonusModal({ onClose }) {
+  const today = localToday();
+  const monthStart = today.slice(0, 8) + "01";
+  const weekStart = (() => { const d = new Date(today + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
+  const [range, setRange] = useState({ from: "", to: "" });   // "" from = since the program started
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(null);        // date being edited
+  const [addName, setAddName] = useState("");
+  const [payForm, setPayForm] = useState({ paid_on: today, through: "", notes: "" });   // "we paid on X, through Y"
+  const [showPayouts, setShowPayouts] = useState(false);
+  const load = async () => {
+    try { setData(await getIncentiveHistory(range)); setErr(""); } catch (e) { setErr(e.message || "Couldn't load"); }
+  };
+  useEffect(() => {
+    let live = true;
+    getIncentiveHistory({ from: range.from, to: range.to })
+      .then((r) => { if (live) { setData(r); setErr(""); } })
+      .catch((e) => { if (live) setErr(e.message || "Couldn't load"); });
+    return () => { live = false; };
+  }, [range.from, range.to]);
+  const save = async (day, body) => {
+    setBusy(true); setErr("");
+    try { await setIncentiveDay(day, body); await load(); } catch (e) { setErr(e.message || "Couldn't save"); }
+    finally { setBusy(false); }
+  };
+  const recordPayout = async () => {
+    if (!payForm.through) { setErr("Pick the last day this payment covers."); return; }
+    setBusy(true); setErr("");
+    try { await recordIncentivePayout(payForm); setPayForm({ paid_on: today, through: "", notes: "" }); await load(); }
+    catch (e) { setErr(e.message || "Couldn't record the payout"); }
+    finally { setBusy(false); }
+  };
+  const undoPayout = async (po) => {
+    if (!window.confirm(`Undo the payout of ${money(po.amount)} made ${formatOrderDate(po.paid_on)} (covering ${formatOrderDate(po.from_day)} – ${formatOrderDate(po.through)})?\n\nThose days go back to unpaid.`)) return;
+    setBusy(true); setErr("");
+    try { await undoIncentivePayout(po.id); await load(); } catch (e) { setErr(e.message || "Couldn't undo"); }
+    finally { setBusy(false); }
+  };
+  // Owed since the last payout: every unpaid bonus day after paid_through, across the loaded range.
+  const owedDays = data ? data.days.filter((d) => d.bonus > 0 && !d.paid) : [];
+  const owedSince = owedDays.length ? owedDays[owedDays.length - 1].date : null;
+  const chip = (on) => ({ background: on ? ORANGE : NAVY, color: on ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: `1px solid ${on ? ORANGE : "rgba(255,255,255,0.15)"}`, fontFamily: C.body });
+  const isRange = (f, t) => range.from === f && range.to === t;
+  const T = data?.totals;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-3xl rounded-2xl overflow-hidden max-h-[94vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 shrink-0" style={{ background: ORANGE }}>
+          <div className="flex items-center gap-2"><Trophy size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Daily bonus</span><span className="hidden sm:inline text-sm font-semibold opacity-70" style={{ color: NAVY_DEEP, fontFamily: C.body }}>· who earned it, and what's owed</span></div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => downloadIncentiveCsv(range).catch((e) => setErr(e.message))} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold active:scale-95" style={{ background: NAVY_DEEP, color: ORANGE }}><Download size={13} /> CSV</button>
+            <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
+          </div>
+        </div>
+        <div className="p-4 overflow-y-auto" style={{ fontFamily: C.body }}>
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            {[["Since start", "", ""], ["This week", weekStart, today], ["This month", monthStart, today]].map(([lab, f, t]) => (
+              <button key={lab} onClick={() => setRange({ from: f, to: t })} className="rounded-full px-3 py-1 text-xs font-bold active:scale-95" style={chip(isRange(f, t))}>{lab}</button>
+            ))}
+            <input type="date" value={range.from || (data?.from ?? "")} onChange={(e) => setRange({ ...range, from: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} />
+            <span className="text-white/40 text-xs">to</span>
+            <input type="date" value={range.to || (data?.to ?? "")} onChange={(e) => setRange({ ...range, to: e.target.value })} className="rounded-md px-2 py-1 text-xs outline-none" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} />
+          </div>
+          {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+          {!data ? <div className="text-white/40 text-sm py-6 text-center flex items-center justify-center gap-2"><Loader2 size={15} className="animate-spin" /> Loading…</div> : (
+            <>
+              {/* Paid-through status + record a payout */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: `1px solid ${T.unpaid > 0 ? "rgba(255,183,77,0.45)" : GREEN + "55"}` }}>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="text-sm">
+                    {data.paid_through
+                      ? <span className="text-white"><span className="font-bold" style={{ fontFamily: C.cond }}>Paid through {formatOrderDate(data.paid_through)}</span><span className="text-white/50"> · last paid {formatOrderDate(data.last_payout.paid_on)} ({money(data.last_payout.amount)}, {data.last_payout.days} day{data.last_payout.days === 1 ? "" : "s"})</span></span>
+                      : <span className="text-white/70">No payout recorded yet.</span>}
+                    {T.unpaid > 0
+                      ? <div className="text-xs mt-0.5" style={{ color: "#ffb74d" }}>Owed{owedSince ? ` since ${formatOrderDate(owedSince)}` : ""}: {money(T.unpaid)} across {owedDays.length} bonus day{owedDays.length === 1 ? "" : "s"}</div>
+                      : <div className="text-xs mt-0.5" style={{ color: GREEN }}>Nothing owed in this range.</div>}
+                  </div>
+                  {data.payouts.length > 0 && <button onClick={() => setShowPayouts((v) => !v)} className="text-xs font-semibold rounded-lg px-2.5 py-1 active:scale-95" style={{ background: "rgba(255,255,255,0.08)", color: "#cfe0ff" }}>{showPayouts ? "Hide" : "Show"} payouts ({data.payouts.length})</button>}
+                </div>
+                {showPayouts && (
+                  <div className="mb-2">
+                    {data.payouts.map((po, i) => (
+                      <div key={po.id} className="flex items-center justify-between gap-2 py-1 text-xs" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="text-white/80">Paid <span className="text-white font-semibold">{formatOrderDate(po.paid_on)}</span> · covers {formatOrderDate(po.from_day)} – {formatOrderDate(po.through)} · {po.days} day{po.days === 1 ? "" : "s"}{po.notes ? ` · ${po.notes}` : ""}</span>
+                        <span className="flex items-center gap-2 shrink-0"><span className="font-bold" style={{ color: GREEN, fontFamily: C.cond }}>{money(po.amount)}</span>{i === 0 && <button disabled={busy} onClick={() => undoPayout(po)} className="text-[11px] underline" style={{ color: "#ff8a85" }}>undo</button>}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="text-white/50 text-[11px] uppercase tracking-wide mb-1">Record a payout</div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="text-xs text-white/60">Paid on<br /><input type="date" value={payForm.paid_on} onChange={(e) => setPayForm({ ...payForm, paid_on: e.target.value })} className="rounded-md px-2 py-1.5 text-sm outline-none mt-0.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} /></label>
+                  <label className="text-xs text-white/60">Covers through<br /><input type="date" value={payForm.through} min={data.paid_through || data.start} max={today} onChange={(e) => setPayForm({ ...payForm, through: e.target.value })} className="rounded-md px-2 py-1.5 text-sm outline-none mt-0.5" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)", color: "#fff", width: "auto" }} /></label>
+                  <input value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} placeholder="Note (check #, pay period…)" className="flex-1 min-w-[10rem] rounded-md px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
+                  <button disabled={busy || !payForm.through || !payForm.paid_on} onClick={recordPayout} className="rounded-lg px-3 py-1.5 text-sm font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>{busy ? <Loader2 size={14} className="animate-spin" /> : "Record payout"}</button>
+                </div>
+                <div className="text-white/35 text-[11px] mt-1">Marks every bonus day{data.paid_through ? ` after ${formatOrderDate(data.paid_through)}` : " since the program started"} through the date you pick as paid on that day.</div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {[["Bonus days", String(T.bonus_days), `of ${data.days.length} working day${data.days.length === 1 ? "" : "s"}`],
+                  ["Total bonus", money(T.payable), "everyone, this range"],
+                  ["Still to pay", money(T.unpaid), T.unpaid > 0 ? "tick a day once it's paid" : "all paid up"]].map(([k, v, sub]) => (
+                  <div key={k} className="rounded-xl p-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="text-white/50 text-[10px] uppercase tracking-wide">{k}</div>
+                    <div className="text-white text-xl font-bold leading-tight" style={{ fontFamily: C.cond, color: k === "Still to pay" && T.unpaid > 0 ? "#ffb74d" : "#fff" }}>{v}</div>
+                    <div className="text-white/35 text-[10px]">{sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {data.people.length > 0 && (
+                <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-white text-sm font-semibold mb-1.5" style={{ fontFamily: C.cond }}>By person</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                    {data.people.map((p) => (
+                      <div key={p.name} className="flex items-center justify-between py-1 text-sm" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="text-white/85 truncate">{p.name} <span className="text-white/35 text-xs">· {p.days} day{p.days === 1 ? "" : "s"}</span></span>
+                        <span className="font-bold whitespace-nowrap" style={{ color: GREEN, fontFamily: C.cond }}>{money(p.bonus)}{p.unpaid > 0 && p.unpaid !== p.bonus && <span className="text-white/40 text-xs font-normal"> · {money(p.unpaid)} owed</span>}{p.unpaid > 0 && p.unpaid === p.bonus && <span className="text-[10px] font-normal ml-1" style={{ color: "#ffb74d" }}>owed</span>}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-white/50 text-xs uppercase tracking-wide mb-1.5">By day — tap a day to change who gets it</div>
+              {data.days.length === 0 ? <div className="text-white/40 text-sm py-4 text-center rounded-xl" style={{ background: NAVY }}>No pours in this range.</div> : data.days.map((d) => {
+                const hit = d.bonus > 0;
+                const editing = open === d.date;
+                return (
+                  <div key={d.date} className="rounded-xl mb-1.5 overflow-hidden" style={{ background: NAVY, border: `1px solid ${hit ? (d.paid ? GREEN + "55" : "rgba(255,183,77,0.45)") : "rgba(255,255,255,0.06)"}`, opacity: d.active === false ? 0.5 : 1 }}>
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <button onClick={() => { setOpen(editing ? null : d.date); setAddName(""); }} className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{formatOrderDate(d.date)}</span>
+                          <span className="text-white/55 text-xs">{fmtYards(d.yards)} CY</span>
+                          {hit ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>{fmtYards(d.tier)} CY hit · {money(d.bonus)} each</span>
+                               : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>{d.active === false ? "before program" : "no bonus"}</span>}
+                          {d.overridden && <span className="text-[10px] text-white/40">edited</span>}
+                        </div>
+                        <div className="text-white/50 text-xs truncate mt-0.5">{d.people.length ? d.people.join(", ") : "nobody on the loads — tap to add"}{hit ? ` · ${money(d.total)} total` : ""}{d.notes ? ` · ${d.notes}` : ""}</div>
+                      </button>
+                      {hit && (
+                        <label className="flex items-center gap-1.5 text-xs shrink-0 cursor-pointer" style={{ color: d.paid ? GREEN : "#ffb74d" }}>
+                          <input type="checkbox" checked={d.paid} disabled={busy} onChange={(e) => save(d.date, { paid: e.target.checked })} /> {d.paid ? (d.paid_on ? `Paid ${formatOrderDate(d.paid_on)}` : "Paid") : "Unpaid"}
+                        </label>
+                      )}
+                    </div>
+                    {editing && (
+                      <div className="px-3 pb-3 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="text-white/45 text-[11px] mb-1.5">Automatic list: the drivers on this day's loads plus the plant operators. Remove anyone who shouldn't get it, or add a name that was missed.</div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {d.people.map((n) => (
+                            <span key={n} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs text-white" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                              {n}<button disabled={busy} onClick={() => save(d.date, { people: d.people.filter((x) => x !== n) })} title="Remove" className="p-0.5 rounded-full active:scale-90"><X size={12} color="#ff8a85" /></button>
+                            </span>
+                          ))}
+                          {d.people.length === 0 && <span className="text-white/35 text-xs">nobody</span>}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input value={addName} onChange={(e) => setAddName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && addName.trim()) { save(d.date, { people: [...d.people, addName.trim()] }); setAddName(""); } }} placeholder="Add a name" className="flex-1 rounded-lg px-3 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
+                          <button disabled={busy || !addName.trim()} onClick={() => { save(d.date, { people: [...d.people, addName.trim()] }); setAddName(""); }} className="rounded-lg px-3 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>Add</button>
+                          {d.overridden && <button disabled={busy} onClick={() => save(d.date, { reset_people: true })} className="rounded-lg px-3 text-xs font-semibold active:scale-95" style={{ background: "rgba(255,255,255,0.08)", color: "#cfe0ff" }}>Back to automatic</button>}
+                        </div>
+                        <input defaultValue={d.notes} onBlur={(e) => { if (e.target.value !== d.notes) save(d.date, { notes: e.target.value }); }} placeholder="Note (e.g. paid on the 30th check)" className="w-full mt-2 rounded-lg px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.12)" }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="text-white/35 text-[11px] mt-2 leading-snug">A day counts when the yards poured reach a tier ({data.tiers.map((t) => `${fmtYards(t.yards)} CY = ${money(t.bonus)}`).join(", ")}); everyone on the list gets that amount. Program started {formatOrderDate(data.start)}.</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Daily yardage bonus — the same bar for the drivers and the batch plant operator
 // (dispatch board). Yards poured today against the tiers ($25 at 100 CY, $50 at
 // 150 CY by default), with the % of the way to the next one. Refreshes every
