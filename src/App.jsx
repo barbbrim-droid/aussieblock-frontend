@@ -6041,6 +6041,15 @@ function CostsModal({ orders, onClose }) {
     return true;
   };
 
+  // The orders actually in the date range, as one stable string. The pricing
+  // effect keys on THIS rather than the `orders` array: the dispatch board polls
+  // every few seconds and hands this modal a freshly-built array each time, and
+  // keying on the array re-fired the (slow, multi-second) bulk pricing request on
+  // every poll and discarded the previous one — so a wide range (hundreds of
+  // orders, 10+ s to price) never finished and every older order sat at $0 /
+  // blank while the backend drowned in duplicate requests.
+  const rangeKey = (orders || []).filter(inRange).map((o) => o.ref).join("\n");
+
   useEffect(() => {
     let live = true;
     (async () => {
@@ -6106,7 +6115,7 @@ function CostsModal({ orders, onClose }) {
       if (live) setLoading(false);
     })();
     return () => { live = false; };
-  }, [orders, reloadKey, from, to]);
+  }, [rangeKey, reloadKey]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
   const Drow = ({ label, val }) => (
