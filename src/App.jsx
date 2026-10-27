@@ -5507,7 +5507,7 @@ function TimeClockKiosk({ onClose, standalone }) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState(null);       // confirmation / error
   const [outFor, setOutFor] = useState(null);     // clock-out flow: { pin, employee, step: "leaving"|"lunch"|"custom" }
-  const [customMin, setCustomMin] = useState(90); // custom lunch minutes (the "additional lunch" stepper)
+  const [customStr, setCustomStr] = useState(""); // custom lunch minutes typed on the keypad ("" = nothing entered yet)
   const timer = useRef(null);
 
   const getPos = () => new Promise((resolve, reject) => {
@@ -5597,22 +5597,47 @@ function TimeClockKiosk({ onClose, standalone }) {
                   <button disabled={busy} onClick={() => punch({ lunch_minutes: 90, end_of_day: true })} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>90 min</button>
                   <button disabled={busy} onClick={() => punch({ lunch_minutes: 120, end_of_day: true })} className="py-5 rounded-2xl text-2xl font-bold text-white active:scale-95 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>2 hr</button>
                 </div>
-                <button disabled={busy} onClick={() => { setCustomMin(90); setOutFor((o) => ({ ...o, step: "custom" })); }} className="w-full mt-3 py-3.5 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}66` }}>Other amount · Otra cantidad</button>
+                <button disabled={busy} onClick={() => { setCustomStr(""); setOutFor((o) => ({ ...o, step: "custom" })); }} className="w-full mt-3 py-3.5 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE + "22", color: ORANGE, border: `1px solid ${ORANGE}66` }}>Other amount · Otra cantidad</button>
                 <button disabled={busy} onClick={() => punch({ lunch_minutes: 0, end_of_day: true })} className="w-full mt-3 py-3.5 rounded-2xl text-lg font-bold active:scale-95 disabled:opacity-50" style={{ background: WARN + "22", color: WARN, border: `1px solid ${WARN}66` }}>Worked through · Sin almuerzo</button>
               </>
             ) : (
               <>
                 <div className="text-white text-xl font-bold mt-4">How long was lunch?</div>
                 <div className="text-white/60 text-lg">¿Cuánto duró el almuerzo?</div>
-                <div className="flex items-center justify-center gap-4 mt-6">
-                  <button disabled={busy} onClick={() => setCustomMin((m) => Math.max(0, m - 15))} className="w-16 h-16 rounded-2xl text-3xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>−</button>
-                  <div className="text-center min-w-[7rem]">
-                    <div style={{ fontFamily: C.cond }} className="text-white text-4xl font-bold">{customMin >= 60 ? `${Math.floor(customMin / 60)}h ${customMin % 60 ? (customMin % 60) + "m" : ""}`.trim() : `${customMin}m`}</div>
-                    <div className="text-white/40 text-xs">{customMin} min</div>
-                  </div>
-                  <button disabled={busy} onClick={() => setCustomMin((m) => Math.min(600, m + 15))} className="w-16 h-16 rounded-2xl text-3xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }}>+</button>
-                </div>
-                <button disabled={busy} onClick={() => punch({ lunch_minutes: customMin, end_of_day: true })} className="w-full mt-6 py-4 rounded-2xl text-xl font-bold active:scale-95 disabled:opacity-50" style={{ background: GREEN, color: NAVY_DEEP }}>Confirm · Confirmar</button>
+                <div className="text-white/40 text-xs mt-1">Type the minutes · Escriba los minutos</div>
+                {(() => {
+                  const mins = customStr === "" ? 0 : Number(customStr);
+                  const fmt = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60 ? (m % 60) + "m" : ""}`.trim() : `${m} min`);
+                  const typeDigit = (d) => setCustomStr((c) => { const next = (c + d).replace(/^0+(?=\d)/, ""); return Number(next) > 600 ? c : next; });
+                  const nudge = (delta) => setCustomStr((c) => String(Math.max(0, Math.min(600, (c === "" ? 0 : Number(c)) + delta))));
+                  const keyCls = "py-3.5 rounded-2xl text-2xl font-bold text-white active:scale-90 disabled:opacity-50";
+                  const keySt = { background: NAVY, border: "1px solid rgba(255,255,255,0.1)" };
+                  return (
+                    <>
+                      <div className="flex items-center justify-center gap-3 mt-4">
+                        <button disabled={busy} onClick={() => nudge(-5)} className="w-14 h-14 rounded-2xl text-2xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }} title="−5 min">−5</button>
+                        <div className="flex-1 h-16 rounded-2xl flex flex-col items-center justify-center" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>
+                          {customStr === "" ? <span className="text-white/25 text-lg">— — —</span> : (
+                            <>
+                              <div style={{ fontFamily: C.cond }} className="text-white text-3xl font-bold leading-none">{fmt(mins)}</div>
+                              {mins >= 60 && <div className="text-white/40 text-xs mt-0.5">{mins} min</div>}
+                            </>
+                          )}
+                        </div>
+                        <button disabled={busy} onClick={() => nudge(5)} className="w-14 h-14 rounded-2xl text-2xl font-bold text-white active:scale-90 disabled:opacity-50" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.15)" }} title="+5 min">+5</button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2.5 mt-3">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                          <button key={n} disabled={busy} onClick={() => typeDigit(String(n))} className={keyCls} style={keySt}>{n}</button>
+                        ))}
+                        <button disabled={busy} onClick={() => setCustomStr((c) => c.slice(0, -1))} className="py-3.5 rounded-2xl text-lg font-bold text-white/70 active:scale-90 disabled:opacity-50" style={keySt}>⌫</button>
+                        <button disabled={busy} onClick={() => typeDigit("0")} className={keyCls} style={keySt}>0</button>
+                        <button disabled={busy || customStr === "" || mins === 0} onClick={() => punch({ lunch_minutes: mins, end_of_day: true })} className="py-3.5 rounded-2xl font-bold active:scale-90 disabled:opacity-40 flex items-center justify-center" style={{ background: GREEN, color: NAVY_DEEP }} title="Confirm · Confirmar"><Check size={24} /></button>
+                      </div>
+                      <div className="text-white/40 text-xs mt-3 leading-relaxed">Type the minutes (e.g. 45), then the green check. Max 10 hours.<br />Escriba los minutos (p. ej. 45) y toque el círculo verde.</div>
+                    </>
+                  );
+                })()}
                 <button disabled={busy} onClick={() => setOutFor((o) => ({ ...o, step: "lunch" }))} className="w-full mt-2 py-2.5 text-sm text-white/50 active:scale-95">Back · Atrás</button>
               </>
             )}
