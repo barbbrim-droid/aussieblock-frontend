@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov2-v101";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov2-v102";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -6478,7 +6478,7 @@ function CostsModal({ orders, onClose }) {
     <div><div class="lab">Customers</div><div class="big">${selfHaulers.length}</div></div>
   </div>
   ${selfHaulers.length ? sections : `<p class="muted" style="margin-top:24px;">No self-pickup loads in this period.</p>`}
-  <div class="muted">"Amount owed" = concrete + admixtures + sales tax for the loads this customer hauled themselves — no delivery or haul fees. One page per customer — send each their page.</div>
+  <div class="muted">"Amount owed" = concrete + admixtures + sales tax where it applies (none for a tax-exempt customer) for the loads this customer hauled themselves — no delivery or haul fees. One page per customer — send each their page.</div>
   <div class="foot"><span class="co">Aussieblock Ready Mix</span><span>Office 325-213-5315 &middot; Dispatch 940-577-7475</span></div>
   <button onclick="window.print()">Print / Save as PDF</button>
   <button onclick="window.close()" style="background:#161d27;margin-left:8px;">Close</button>
