@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Oct3-v98";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov2-v100";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -9016,6 +9016,7 @@ function BonusModal({ onClose }) {
   const [payForm, setPayForm] = useState({ paid_on: today, through: "", notes: "" });   // "we paid on X, through Y"
   const [showPayouts, setShowPayouts] = useState(false);
   const [exclName, setExclName] = useState("");   // "never gets the bonus" — add a name
+  const [exclCust, setExclCust] = useState("");   // "yards that don't count" — add a customer
   const load = async () => {
     try { setData(await getIncentiveHistory(range)); setErr(""); } catch (e) { setErr(e.message || "Couldn't load"); }
   };
@@ -9038,11 +9039,11 @@ function BonusModal({ onClose }) {
     catch (e) { setErr(e.message || "Couldn't record the payout"); }
     finally { setBusy(false); }
   };
-  const exclude = async (name) => {
+  const exclude = async (name, kind = "person") => {
     const n = (name || "").trim();
     if (!n) return;
     setBusy(true); setErr("");
-    try { await addIncentiveExclusion(n, "hauler driver"); setExclName(""); await load(); } catch (e) { setErr(e.message || "Couldn't add"); }
+    try { await addIncentiveExclusion(n, kind === "customer" ? "their crew hauls it" : "hauler driver", kind); setExclName(""); setExclCust(""); await load(); } catch (e) { setErr(e.message || "Couldn't add"); }
     finally { setBusy(false); }
   };
   const unexclude = async (name) => {
@@ -9163,6 +9164,31 @@ function BonusModal({ onClose }) {
                 <div className="text-white/35 text-[11px] mt-1">Taken off every day's automatic list, past and future. A day you've edited by hand keeps its own list.</div>
               </div>
 
+              <div className="rounded-xl p-3 mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>Yards that don't count</div>
+                  <div className="text-white/35 text-[11px]">customers whose crew hauls it</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {(data.pickup_customers || []).map((n) => (
+                    <span key={"pickup:" + n} title="Self-pickup customer on the Price sheet — their own trucks haul it" className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs text-white" style={{ background: "rgba(255,138,133,0.12)", border: "1px solid rgba(255,138,133,0.35)" }}>
+                      {n} <span className="text-white/40">· pickup</span>
+                    </span>
+                  ))}
+                  {(data.excluded_customers || []).filter((n) => !(data.pickup_customers || []).some((p) => p.replace(/[^a-z0-9]/gi, "").toLowerCase() === n.replace(/[^a-z0-9]/gi, "").toLowerCase())).map((n) => (
+                    <span key={n} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs text-white" style={{ background: "rgba(255,138,133,0.12)", border: "1px solid rgba(255,138,133,0.35)" }}>
+                      {n}<button disabled={busy} onClick={() => unexclude(n)} title="Count their yards again" className="p-0.5 rounded-full active:scale-90"><X size={12} color="#ff8a85" /></button>
+                    </span>
+                  ))}
+                  {(data.excluded_customers || []).length === 0 && (data.pickup_customers || []).length === 0 && <span className="text-white/35 text-xs">none — every customer's yards count</span>}
+                </div>
+                <div className="flex gap-1.5">
+                  <input value={exclCust} onChange={(e) => setExclCust(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") exclude(exclCust, "customer"); }} placeholder="Add a customer (as named on their orders)" className="flex-1 rounded-lg px-3 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
+                  <button disabled={busy || !exclCust.trim()} onClick={() => exclude(exclCust, "customer")} className="rounded-lg px-3 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>Add</button>
+                </div>
+                <div className="text-white/35 text-[11px] mt-1">Self-pickups (customers marked as pickup on the Price sheet, like P&L) and anyone added here are left out of the day's yards and the people on it, past and future. The board's "Poured today" still shows everything.</div>
+              </div>
+
               <div className="text-white/50 text-xs uppercase tracking-wide mb-1.5">By day — tap a day to change who gets it</div>
               {data.days.length === 0 ? <div className="text-white/40 text-sm py-4 text-center rounded-xl" style={{ background: NAVY }}>No pours in this range.</div> : data.days.map((d) => {
                 const hit = d.bonus > 0;
@@ -9173,7 +9199,7 @@ function BonusModal({ onClose }) {
                       <button onClick={() => { setOpen(editing ? null : d.date); setAddName(""); }} className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-white text-sm font-semibold" style={{ fontFamily: C.cond }}>{formatOrderDate(d.date)}</span>
-                          <span className="text-white/55 text-xs">{fmtYards(d.yards)} CY</span>
+                          <span className="text-white/55 text-xs">{fmtYards(d.yards)} CY{d.excluded_yards > 0 ? <span className="text-white/35"> (+{fmtYards(d.excluded_yards)} to P&L, not counted)</span> : ""}</span>
                           {hit ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: GREEN + "22", color: GREEN }}>{fmtYards(d.tier)} CY hit · {money(d.bonus)} each</span>
                                : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>{d.active === false ? "before program" : "no bonus"}</span>}
                           {d.overridden && <span className="text-[10px] text-white/40">edited</span>}
@@ -9227,7 +9253,7 @@ function DailyGoal({ compact = false, refreshKey = 0, onYards }) {
   useEffect(() => { onYardsRef.current = onYards; });
   useEffect(() => {
     let live = true;
-    const load = () => getIncentive().then((r) => { if (live) { setG(r); onYardsRef.current && onYardsRef.current(r.yards); } }).catch(() => {});
+    const load = () => getIncentive().then((r) => { if (live) { setG(r); onYardsRef.current && onYardsRef.current(r.yards_all != null ? r.yards_all : r.yards); } }).catch(() => {});
     load();
     const t = setInterval(load, 60000);
     return () => { live = false; clearInterval(t); };
@@ -9246,7 +9272,8 @@ function DailyGoal({ compact = false, refreshKey = 0, onYards }) {
     : g.next
       ? `${g.next.pct}% of the way to $${g.next.bonus}${g.earned > 0 ? ` · $${g.earned} already earned` : ""}`
       : "";
-  const sub = g.maxed ? `${fmtYards(g.yards)} CY poured today` : g.next ? `${fmtYards(g.yards)} CY poured · ${fmtYards(g.next.remaining)} more to ${fmtYards(g.next.yards)}` : "";
+  const notCounted = g.excluded_yards > 0 ? ` (+${fmtYards(g.excluded_yards)} CY to ${(g.excluded_customers || [])[0] || "an excluded customer"}, not counted)` : "";
+  const sub = (g.maxed ? `${fmtYards(g.yards)} CY poured today` : g.next ? `${fmtYards(g.yards)} CY poured · ${fmtYards(g.next.remaining)} more to ${fmtYards(g.next.yards)}` : "") + notCounted;
   const Bar = (
     <div className="relative w-full rounded-full overflow-visible" style={{ height: compact ? 8 : 12, background: "rgba(255,255,255,0.10)" }}>
       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: barColor }} />
