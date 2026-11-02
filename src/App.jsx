@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov2-v99";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov2-v100";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -9136,18 +9136,23 @@ function BonusModal({ onClose }) {
                   <div className="text-white/35 text-[11px]">customers whose crew hauls it</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {(data.excluded_customers || []).map((n) => (
+                  {(data.pickup_customers || []).map((n) => (
+                    <span key={"pickup:" + n} title="Self-pickup customer on the Price sheet — their own trucks haul it" className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs text-white" style={{ background: "rgba(255,138,133,0.12)", border: "1px solid rgba(255,138,133,0.35)" }}>
+                      {n} <span className="text-white/40">· pickup</span>
+                    </span>
+                  ))}
+                  {(data.excluded_customers || []).filter((n) => !(data.pickup_customers || []).some((p) => p.replace(/[^a-z0-9]/gi, "").toLowerCase() === n.replace(/[^a-z0-9]/gi, "").toLowerCase())).map((n) => (
                     <span key={n} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs text-white" style={{ background: "rgba(255,138,133,0.12)", border: "1px solid rgba(255,138,133,0.35)" }}>
                       {n}<button disabled={busy} onClick={() => unexclude(n)} title="Count their yards again" className="p-0.5 rounded-full active:scale-90"><X size={12} color="#ff8a85" /></button>
                     </span>
                   ))}
-                  {(data.excluded_customers || []).length === 0 && <span className="text-white/35 text-xs">none — every customer's yards count</span>}
+                  {(data.excluded_customers || []).length === 0 && (data.pickup_customers || []).length === 0 && <span className="text-white/35 text-xs">none — every customer's yards count</span>}
                 </div>
                 <div className="flex gap-1.5">
                   <input value={exclCust} onChange={(e) => setExclCust(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") exclude(exclCust, "customer"); }} placeholder="Add a customer (as named on their orders)" className="flex-1 rounded-lg px-3 py-1.5 text-sm text-white outline-none placeholder:text-white/30" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.15)" }} />
                   <button disabled={busy || !exclCust.trim()} onClick={() => exclude(exclCust, "customer")} className="rounded-lg px-3 text-xs font-bold active:scale-95 disabled:opacity-50" style={{ background: ORANGE, color: NAVY_DEEP }}>Add</button>
                 </div>
-                <div className="text-white/35 text-[11px] mt-1">Concrete sold to these customers is left out of the day's yards and the people on it, past and future. The board's "Poured today" still shows everything.</div>
+                <div className="text-white/35 text-[11px] mt-1">Self-pickups (customers marked as pickup on the Price sheet, like P&L) and anyone added here are left out of the day's yards and the people on it, past and future. The board's "Poured today" still shows everything.</div>
               </div>
 
               <div className="text-white/50 text-xs uppercase tracking-wide mb-1.5">By day — tap a day to change who gets it</div>
