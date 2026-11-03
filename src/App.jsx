@@ -137,7 +137,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov2-v102";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov3-v103";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8263,7 +8263,18 @@ function DispatchApp({ email, role, onLogout }) {
       }
     }
     if (best) return statusToTruck(best.ld.status, best.p.ref, best.p);
-    return { label: "At yard", color: "#7c8794" };
+    // No live stage on any order or load for this truck. Don't assume "At yard" —
+    // the dispatcher may not have moved the load off Scheduled. Read the GPS: at
+    // the plant, at a live job's site (learned pin), parked elsewhere, or moving.
+    if (t.lat == null || t.lng == null || isStale(t.updated_at)) return { label: "At yard", color: "#7c8794" };
+    const here = { lat: t.lat, lng: t.lng };
+    const yardMi = milesBetween(here, PLANT);
+    if (yardMi != null && yardMi < 0.35) return { label: "At yard", color: "#7c8794" };
+    const atJob = activeOrders.find((o) => o.site_lat != null && o.site_lng != null && (isLivePour(o) || LIVE_POUR_STATUS.includes(o.status) || o.status === "scheduled")
+      && (milesBetween(here, { lat: o.site_lat, lng: o.site_lng }) ?? 99) < 0.3);
+    if (atJob) return { label: "On site", color: GREEN, order: atJob.ref, job: atJob, byGps: true };
+    if ((t.stopped_min || 0) >= 3) return { label: `Stopped · ${Math.round(t.stopped_min)} min`, color: "#e3c04a", byGps: true };
+    return { label: "On the road", color: ORANGE_HOT, byGps: true };
   };
   const cardStatus = (t) => (isMixer(t) ? truckStatus(t) : haulerStatus(t));
 
@@ -8286,7 +8297,7 @@ function DispatchApp({ email, role, onLogout }) {
           </div>
           {s.job ? (
             <div className="text-xs truncate mt-0.5" style={{ color: "rgba(255,255,255,0.7)", fontFamily: C.body }}>
-              {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}
+              {s.job.ref} · {s.job.customer} · {s.job.site}{s.job.qty ? ` · ${s.job.qty}` : ""}{s.byGps ? <span className="text-white/40"> · by GPS — load not started on the board</span> : ""}
             </div>
           ) : (
             <div className="text-white/35 text-xs truncate mt-0.5" style={{ fontFamily: C.body }}>
