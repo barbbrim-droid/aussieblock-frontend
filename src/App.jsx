@@ -19,22 +19,25 @@ const NAVY_DEEP = "#161d27";
 const GREEN = "#27c08a";
 const WARN = "#f5a524";   // amber — double-booked slot warning on the dispatch board
 
-// Give each truck its own color on the maps so they're easy to tell apart.
-// Distinct, readable on the dark map; assigned by sorted label so colors are
-// stable for a given fleet.
-const TRUCK_COLORS = ["#ff7a3d", "#4da3ff", "#27c08a", "#c77dff", "#ffd23d", "#ff5d8f", "#3dd6d6", "#ff9f1c"];
-function truckColorMap(trucks) {
-  const m = {};
-  [...new Set((trucks || []).map((t) => t.label))].sort()
-    .forEach((label, i) => { m[label] = TRUCK_COLORS[i % TRUCK_COLORS.length]; });
-  return m;
-}
 // Ready-mix trucks only. An aggregate hauler (rock/sand) is still a truck for
 // GPS, fuel and the fleet list, but it never carries concrete — so it's kept out
 // of every truck picker on an order or load (the backend refuses it too).
 const isMixer = (t) => (t.kind || "mixer") !== "aggregate";
 const mixerTrucks = (trucks) => (trucks || []).filter(isMixer);
 const AGG_COLOR = "#c77dff";   // aggregate haulers: purple everywhere (badge, card, map marker)
+// Give each mixer its own color on the maps, fleet cards and load dots so they're
+// easy to tell apart. Eight well-separated hues, readable on the dark map; no
+// purple (that's the aggregate haulers) and no grey (that's a stale GPS fix).
+// Assigned by sorted label across the MIXERS only, so a hauler never uses up a
+// slot and no mixer can end up the same color as the hauler.
+const TRUCK_COLORS = ["#ff7a3d", "#4da3ff", "#27c08a", "#ffd23d", "#ff5d8f", "#3dd6d6", "#b5e853", "#ff4d4d"];
+function truckColorMap(trucks) {
+  const m = {};
+  [...new Set(mixerTrucks(trucks).map((t) => t.label))].sort()
+    .forEach((label, i) => { m[label] = TRUCK_COLORS[i % TRUCK_COLORS.length]; });
+  (trucks || []).forEach((t) => { if (!isMixer(t)) m[t.label] = AGG_COLOR; });
+  return m;
+}
 // Where an aggregate hauler is, from GPS alone — it never has a concrete job.
 // Yard = within ~a third of a mile of the plant; parked elsewhere for a few
 // minutes reads as at the pit (loading) or a stop; otherwise it's on the road.
@@ -137,7 +140,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov3-v103";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov6-v104";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -1631,6 +1634,7 @@ function projectToMap(lat, lng, W, H, pad) {
 function FleetMap({ trucks }) {
   const W = 460, H = 300, pad = 26;
   const located = trucks.filter((t) => t.lat != null && t.lng != null);
+  const colors = truckColorMap(trucks);
   const plant = projectToMap(PLANT.lat, PLANT.lng, W, H, pad);
   return (
     <div>
@@ -1649,14 +1653,15 @@ function FleetMap({ trucks }) {
           const p = projectToMap(t.lat, t.lng, W, H, pad);
           const stale = isStale(t.updated_at);
           const hauler = !isMixer(t);
-          const color = stale ? "#7c8794" : hauler ? AGG_COLOR : ORANGE_HOT;
+          const own = hauler ? AGG_COLOR : (colors[t.label] || ORANGE_HOT);   // each mixer its own color
+          const color = stale ? "#7c8794" : own;
           return (
             <g key={t.device || t.label || i} transform={`translate(${p.x},${p.y})`}>
-              {!stale && <circle r="13" fill={hauler ? AGG_COLOR : ORANGE} opacity="0.25"><animate attributeName="r" values="11;17;11" dur="1.8s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.35;0;0.35" dur="1.8s" repeatCount="indefinite" /></circle>}
+              {!stale && <circle r="13" fill={own} opacity="0.25"><animate attributeName="r" values="11;17;11" dur="1.8s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.35;0;0.35" dur="1.8s" repeatCount="indefinite" /></circle>}
               {hauler
                 ? <g><rect x="-8" y="-8" width="16" height="16" rx="2" fill="#fff" transform="rotate(45)" /><rect x="-5" y="-5" width="10" height="10" rx="1" fill={color} transform="rotate(45)" /></g>
                 : <g transform={`rotate(${t.heading || 0})`}><circle r="11" fill="#fff" /><Navigation x={-6} y={-6} width={12} height={12} color={color} fill={color} /></g>}
-              <text x="0" y="26" fill={hauler ? AGG_COLOR : "rgba(255,255,255,0.7)"} fontSize="10" textAnchor="middle" fontFamily="Barlow Condensed" fontWeight="600">{t.label}</text>
+              <text x="0" y="26" fill={stale ? "rgba(255,255,255,0.5)" : own} fontSize="10" textAnchor="middle" fontFamily="Barlow Condensed" fontWeight="600">{t.label}</text>
             </g>
           );
         })}
@@ -1751,7 +1756,7 @@ function GoogleFleetMap({ trucks, sites = [] }) {
               fillColor: isStale(t.updated_at) ? "#7c8794" : (colors[t.label] || "#ff7a3d"), fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.5 }
           : { path: "M 0,-1.2 L 1,0 L 0,1.2 L -1,0 z", scale: 9, rotation: 0, anchor: new maps.Point(0, 0),   // diamond: reads as "not a mixer" at a glance
               fillColor: isStale(t.updated_at) ? "#7c8794" : AGG_COLOR, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
-        label: { text: isMixer(t) ? t.label : `▲ ${t.label}`, color: isMixer(t) ? "#fff" : AGG_COLOR, fontSize: "10px", fontWeight: "700" },
+        label: { text: isMixer(t) ? t.label : `▲ ${t.label}`, color: isStale(t.updated_at) ? "#c4ccd6" : (colors[t.label] || "#fff"), fontSize: "10px", fontWeight: "700" },
       }));
   };
 
