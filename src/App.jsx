@@ -140,7 +140,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov6-v104";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov6-v105";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -8282,6 +8282,26 @@ function DispatchApp({ email, role, onLogout }) {
     return { label: "On the road", color: ORANGE_HOT, byGps: true };
   };
   const cardStatus = (t) => (isMixer(t) ? truckStatus(t) : haulerStatus(t));
+  // Fleet cards are mixers only. Aggregate haulers (rock/sand) never carry a
+  // pour, so each one gets a slim purple line under the cards instead of a card
+  // in among the mixers: where it is, and what it has hauled today.
+  const fleetMixers = mixerTrucks(trucks);
+  const fleetHaulers = (trucks || []).filter((t) => !isMixer(t));
+  const haulerLine = (t) => {
+    const s = haulerStatus(t);
+    const a = t.agg_today;
+    const hauled = a && a.loads > 0
+      ? `Today: ${a.loads} load${a.loads === 1 ? "" : "s"} · ${Number(a.tons).toLocaleString(undefined, { maximumFractionDigits: 1 })} t${a.last_material ? ` ${a.last_material}` : ""}${a.last_pit ? ` from ${a.last_pit}` : ""}`
+      : "No loads yet today";
+    return (
+      <div key={t.label} className="flex items-center gap-2 rounded-md px-2 py-1 min-w-0" style={{ background: AGG_COLOR + "12", border: `1px solid ${AGG_COLOR}33` }}>
+        <span className="text-xs font-bold shrink-0" style={{ color: AGG_COLOR, fontFamily: C.cond }}>▲ {t.label}</span>
+        <AggregateBadge />
+        <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.65)", fontFamily: C.body }}>{hauled}{t.notes ? ` · ${t.notes}` : ""}</span>
+        <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: s.color + "22", color: s.color, fontFamily: C.body }}>{s.label}</span>
+      </div>
+    );
+  };
 
   // One fleet card (truck, status, job, yard ETA, mixer probe) — the map panel and
   // the phone "Now" view both render these.
@@ -8656,13 +8676,14 @@ function DispatchApp({ email, role, onLogout }) {
                     <div className="flex items-center gap-2 mb-2 mt-1">
                       <Truck size={15} color={ORANGE} />
                       <span className="text-white text-base font-bold" style={{ fontFamily: C.cond }}>Fleet</span>
-                      <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({trucks.length})</span>
+                      <span className="text-white/40 text-sm" style={{ fontFamily: C.body }}>({fleetMixers.length})</span>
                       <button onClick={() => setShowMobileMap((v) => !v)} className="ml-auto text-xs font-semibold flex items-center gap-1 rounded-lg px-2 py-1 active:scale-95" style={{ color: showMobileMap ? NAVY_DEEP : ORANGE, background: showMobileMap ? ORANGE : "transparent", border: `1px solid ${ORANGE}66`, fontFamily: C.body }}><MapPin size={12} /> {showMobileMap ? "Hide map" : "Map"}</button>
                     </div>
                     {showMobileMap && <div className="rounded-xl overflow-hidden mb-2" style={{ height: 240 }}><GoogleFleetMap trucks={trucks} sites={mapSites} /></div>}
-                    {trucks.length === 0 ? (
+                    {fleetMixers.length === 0 ? (
                       <div className="text-white/40 text-sm text-center py-2 mb-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
-                    ) : <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-2">{trucks.map(fleetCard)}</div>}
+                    ) : <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-2">{fleetMixers.map(fleetCard)}</div>}
+                    {fleetHaulers.length > 0 && <div className="flex flex-col gap-1 mb-2">{fleetHaulers.map(haulerLine)}</div>}
                     {head(List, ORANGE, "Today's orders", todayOrders.length, "today")}
                     {todayOrders.length === 0
                       ? <div className="text-white/40 text-sm text-center py-2 mb-2 rounded-xl" style={{ background: NAVY, fontFamily: C.body }}>No orders scheduled for today.</div>
@@ -8693,9 +8714,11 @@ function DispatchApp({ email, role, onLogout }) {
                     scrolling — the map above gives up the room. Scrolls only if the fleet
                     outgrows a bit over half the panel. */}
                 <div className="shrink-0 overflow-y-auto grid grid-cols-2 gap-1.5 mt-2 content-start" style={{ maxHeight: "55%" }}>
-                {trucks.length === 0 ? (
+                {fleetMixers.length === 0 ? (
                   <div className="col-span-2 text-white/40 text-sm text-center py-2" style={{ fontFamily: C.body }}>No trucks — add them under “Trucks”.</div>
-                ) : trucks.map(fleetCard)}
+                ) : fleetMixers.map(fleetCard)}
+                {/* Aggregate haulers sit under the mixer cards on one slim line each */}
+                {fleetHaulers.map((t) => <div key={t.label} className="col-span-2">{haulerLine(t)}</div>)}
                 </div>
               </div>
             </Panel>
