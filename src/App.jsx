@@ -140,7 +140,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov14-v106";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov14-v107";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -4345,7 +4345,7 @@ function ManageStaffModal({ onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ background: NAVY_DEEP, border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5" style={{ background: ORANGE }}>
-          <div className="flex items-center gap-2"><User size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Workers &amp; admins</span></div>
+          <div className="flex items-center gap-2"><User size={18} color={NAVY_DEEP} /><span style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-lg font-bold">Logins · staff, sales, customers, drivers</span></div>
           <button onClick={onClose} title="Close" className="p-1 rounded-full active:scale-90" style={{ background: NAVY_DEEP }}><X size={16} color={ORANGE} /></button>
         </div>
         <div className="p-5 overflow-y-auto" style={{ fontFamily: C.body }}>
@@ -8412,7 +8412,7 @@ function DispatchApp({ email, role, onLogout }) {
     canFinance && { key: "profit", label: "Profit", icon: DollarSign, onClick: () => setShowProfit(true) },
     canFinance && { key: "bonus", label: "Bonus", icon: Trophy, onClick: () => setShowBonus(true) },
     canFinance && { key: "timeclock", label: "Time clock", icon: Clock, onClick: () => setShowTimeclock(true) },
-    canFinance && { key: "staff", label: "Workers", icon: User, onClick: () => setShowStaff(true) },
+    canFinance && { key: "staff", label: "Logins", icon: User, onClick: () => setShowStaff(true) },
     canFinance && { key: "materials", label: "Materials", icon: Layers, onClick: () => setShowMaterials(true) },
     canFinance && { key: "aggregate", label: "Aggregate", icon: Scale, onClick: () => setShowAgg(true) },
     { key: "plant", label: "Plant check", icon: ClipboardCheck, onClick: () => setShowPlant(true) },
@@ -8484,7 +8484,7 @@ function DispatchApp({ email, role, onLogout }) {
               <Roo size={34} />
               <div className="leading-none">
                 <div style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-xl font-bold tracking-tight">AUSSIEBLOCK</div>
-                <div style={{ color: NAVY_DEEP, fontFamily: C.body }} className="text-[11px] font-semibold opacity-70 -mt-0.5">Dispatch · Office Console</div>
+                <div style={{ color: NAVY_DEEP, fontFamily: C.body }} className="text-[11px] font-semibold opacity-70 -mt-0.5">Dispatch · Office Console · {BUILD_TAG}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
