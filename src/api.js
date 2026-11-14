@@ -725,11 +725,13 @@ export function getOrderPricing(ref) {
 // Pricing for many completed orders in one request — the Costs screen uses this
 // instead of one request per order (which flooded the server and locked the DB,
 // breaking the dispatch board's poll). Returns { ref: pricingPayload }.
-export function getOrdersPricingBulk(refs) {
+// `includeOpen` (sales screen) also prices orders not yet complete, so a
+// salesperson sees what an upcoming order will come to.
+export function getOrdersPricingBulk(refs, includeOpen = false) {
   return request('/orders/pricing-bulk', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refs: refs || null }),
+    body: JSON.stringify({ refs: refs || null, include_open: !!includeOpen }),
     timeoutMs: 90000,   // generous: covers a backend cold-start + first-time mileage lookups
   })
 }

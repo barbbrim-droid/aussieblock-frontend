@@ -140,7 +140,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov6-v105";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov14-v106";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -4266,6 +4266,8 @@ function ManageStaffModal({ onClose }) {
         const linkLine = quickLink ? (driverPin ? ` Or just tap this link to open already signed in: ${quickLink}` : ` Tap this link and it opens already signed in — no typing: ${quickLink}`) : "";
         const text = (role === "staff"
           ? `Hi, you've been set up on the Aussieblock dispatch board — the office system for scheduling and tracking concrete deliveries. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
+          : role === "sales"
+          ? `Hi, you've been set up on the Aussieblock sales app — every customer's current and upcoming orders, the price list, and a New order button. Open ${appUrl} and sign in — email: ${r.email}, password: ${pw}. Call or text dispatch at ${DISPATCH_PHONE}.`
           : role === "driver"
           ? `Hi ${r.company || ""} — you're set up on the Aussieblock driver app for your truck tablet.${pinLine}${linkLine} You'll see today's deliveries, the batch ticket, and can get the customer's signature on delivery. Questions? Call dispatch at ${DISPATCH_PHONE}.`
           : role === "customer"
@@ -4358,7 +4360,7 @@ function ManageStaffModal({ onClose }) {
                   <button onClick={() => pick(u)} className="min-w-0 flex-1 text-left">
                     <div className="text-white text-sm font-semibold truncate flex items-center gap-2" style={{ fontFamily: C.cond }}>
                       {u.email}
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : u.role === "customer" ? { background: GREEN + "22", color: GREEN } : u.role === "driver" ? { background: ORANGE_HOT + "22", color: ORANGE_HOT } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "OPERATOR" : u.role === "customer" ? "ADMIN" : u.role === "driver" ? "DRIVER" : "WORKER"}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={u.role === "staff" ? { background: ORANGE + "22", color: ORANGE } : u.role === "sales" ? { background: "#c77dff22", color: "#c77dff" } : u.role === "customer" ? { background: GREEN + "22", color: GREEN } : u.role === "driver" ? { background: ORANGE_HOT + "22", color: ORANGE_HOT } : { background: "#6aa9ff22", color: "#6aa9ff" }}>{u.role === "staff" ? "OPERATOR" : u.role === "sales" ? "SALES" : u.role === "customer" ? "ADMIN" : u.role === "driver" ? "DRIVER" : "WORKER"}</span>
                     </div>
                     {(u.company || u.project) && (
                       <div className="text-white/55 text-xs truncate flex items-center gap-1" style={{ fontFamily: C.body }}><Building2 size={11} color={ORANGE} /> {[u.company, u.project].filter(Boolean).join(" · ")}</div>
@@ -4448,6 +4450,7 @@ function ManageStaffModal({ onClose }) {
             ) : (
               <div className="flex items-center gap-2 mb-2">
                 <button onClick={() => setRole("staff")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "staff" ? ORANGE + "22" : NAVY_DEEP, color: role === "staff" ? ORANGE : "rgba(255,255,255,0.5)", border: `1px solid ${role === "staff" ? ORANGE : "rgba(255,255,255,0.12)"}` }}>Operator — full office</button>
+                <button onClick={() => setRole("sales")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "sales" ? "#c77dff22" : NAVY_DEEP, color: role === "sales" ? "#c77dff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "sales" ? "#c77dff" : "rgba(255,255,255,0.12)"}` }}>Sales</button>
                 <button onClick={() => setRole("worker")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "worker" ? "#6aa9ff22" : NAVY_DEEP, color: role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.5)", border: `1px solid ${role === "worker" ? "#6aa9ff" : "rgba(255,255,255,0.12)"}` }}>Worker</button>
                 <button onClick={() => setRole("customer")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "customer" ? GREEN + "22" : NAVY_DEEP, color: role === "customer" ? GREEN : "rgba(255,255,255,0.5)", border: `1px solid ${role === "customer" ? GREEN : "rgba(255,255,255,0.12)"}` }}>Admin</button>
                 <button onClick={() => setRole("driver")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: role === "driver" ? ORANGE_HOT + "22" : NAVY_DEEP, color: role === "driver" ? ORANGE_HOT : "rgba(255,255,255,0.5)", border: `1px solid ${role === "driver" ? ORANGE_HOT : "rgba(255,255,255,0.12)"}` }}>Driver</button>
@@ -4483,7 +4486,7 @@ function ManageStaffModal({ onClose }) {
               <p className="text-white/45 text-xs mb-2 -mt-1">No PIN and no email = a name-only driver: assignable on orders, but no truck-tablet login. Add a PIN (above) or an email to give them the driver app.</p>
             )}
             {role !== "driver" && <input value={project} onChange={(e) => setProject(e.target.value)} placeholder="project / job (optional)" className={inCls + " mb-1"} style={inSt} />}
-            <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : role === "driver" ? "A driver uses the truck tablet — today's deliveries assigned to them, the batch ticket, and customer sign-off. No board, no billing, no other companies." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
+            <p className="text-white/35 text-xs mb-2">{role === "staff" ? "An operator has full access — all companies, the dispatch board, and billing." : role === "sales" ? "A salesperson sees every customer's current and upcoming orders and the customer price list, and can place and change orders. No dispatch board, costs, billing or logins." : role === "customer" ? "An admin manages one company's account — orders, tracking, AND billing — for that company only. No other companies, no dispatch board." : role === "driver" ? "A driver uses the truck tablet — today's deliveries assigned to them, the batch ticket, and customer sign-off. No board, no billing, no other companies." : "A worker sees one company's orders + delivery tracking — no billing, no other companies, no dispatch board."}</p>
             {(() => {
               const pinDigits = role === "driver" ? loginPin.replace(/\D/g, "") : "";
               const driverPinOnly = role === "driver" && !email.trim() && pinDigits.length >= 4;   // PIN login, no email/password needed
@@ -6840,7 +6843,7 @@ function CalendarModal({ orders, trucks, onStatus, onAssign, onCancel, onEdited,
 
 // Staff modal: schedule a new order for a customer. Truck is optional — orders
 // start 'scheduled' and a truck can be assigned later from the board.
-function NewOrderModal({ trucks, onClose, onCreated, initial }) {
+function NewOrderModal({ trucks, onClose, onCreated, initial, simple = false }) {
   // `initial` (from "Order again") pre-fills spec/site/notes/time and the
   // customer (matched by name once the roster loads). Date is always re-picked.
   const canFinance = useContext(FinanceContext);   // workers don't see the COD payment box
@@ -6945,6 +6948,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
             <div className="min-w-0"><label className={lbl}>Time (optional)</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inCls} style={inSt} /></div>
           </div>
 
+          {!simple && (<>
           <label className={lbl}>Truck (optional)</label>
           <select value={truck} onChange={(e) => setTruck(e.target.value)} className={inCls} style={inSt}>
             <option value="">Unassigned</option>
@@ -6957,6 +6961,7 @@ function NewOrderModal({ trucks, onClose, onCreated, initial }) {
             <option value="">Unassigned</option>
             {drivers.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
+          </>)}
 
           <label className={lbl}>Notes (optional)</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="e.g. pump truck needed, call on arrival" className={inCls + " mb-3 resize-none"} style={inSt} />
@@ -8961,6 +8966,231 @@ function SignaturePad({ orderRef, onCancel, onSubmit }) {
 // The signed Delivery Ticket: order details + water added on site + the captured
 // customer signature. In-app overlay (works in the installed PWA) with a
 // Print / Save-PDF option. Shown wherever an order has_signature.
+// ── Sales app ──
+// A salesperson's screen: every customer's orders for today and the days ahead
+// (with what each will come to at the customer's price), the customer price
+// list, and a New order button. No dispatch, no costs, no billing. Orders still
+// requested/scheduled can be edited here; once a truck has it, call dispatch.
+function SalesApp({ email, onLogout }) {
+  const [orders, setOrders] = useState([]);
+  const [pricing, setPricing] = useState({});     // ref -> { customer: { unit_price, total, ... } }
+  const [sheet, setSheet] = useState(null);
+  const [tab, setTab] = useState("today");        // today | upcoming | prices
+  const [err, setErr] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [open, setOpen] = useState(null);         // expanded order ref
+  const [filter, setFilter] = useState("");
+  const pricedRef = useRef("");
+
+  const today = localToday();
+  const load = async () => {
+    try {
+      const os = await getOrders();
+      setOrders(os); setErr("");
+    } catch (e) { setErr(e.message || "Could not load orders"); }
+    finally { setLoaded(true); }
+  };
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    getPriceSheet().then(setSheet).catch(() => {});
+    return () => { clearInterval(t); window.removeEventListener("focus", onFocus); };
+  }, []);
+
+  const live = orders.filter((o) => !o.archived && o.status !== "complete");
+  const todayOrders = live.filter((o) => orderDay(o.when, today) === "today").sort(byTimeAsc);
+  const upcoming = live.filter((o) => orderDay(o.when, today) === "upcoming");
+  const upcomingByDay = {};
+  upcoming.forEach((o) => { (upcomingByDay[o.when] = upcomingByDay[o.when] || []).push(o); });
+  const upcomingDays = Object.keys(upcomingByDay).sort();
+
+  // Price every open order once per set of refs (not on every 15s poll).
+  useEffect(() => {
+    const refs = live.map((o) => o.ref).sort();
+    const key = refs.join(",");
+    if (!refs.length || key === pricedRef.current) return;
+    pricedRef.current = key;
+    getOrdersPricingBulk(refs, true).then((p) => setPricing((prev) => ({ ...prev, ...p }))).catch(() => {});
+  }, [orders]);
+
+  const f = filter.trim().toLowerCase();
+  const matches = (o) => !f || [o.customer, o.site, o.ref, o.mix, o.project].some((v) => String(v || "").toLowerCase().includes(f));
+  const editable = (o) => o.status === "requested" || o.status === "scheduled";
+  const priceOf = (o) => pricing[o.ref]?.customer;
+  const yardsOf = (list) => list.reduce((sum, o) => sum + parseYards(o.qty), 0);
+  const totalOf = (list) => list.reduce((sum, o) => sum + (Number(priceOf(o)?.total) || 0), 0);
+
+  const row = (o) => {
+    const meta = STATUS_META[o.status] || STATUS_META.scheduled;
+    const cp = priceOf(o);
+    const isOpen = open === o.ref;
+    const t12 = /^\d{2}:\d{2}/.test(o.time || "") ? new Date(`2000-01-01T${o.time.slice(0, 5)}`).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : (o.time || "");
+    return (
+      <div key={o.ref} className="rounded-xl mb-1.5 overflow-hidden" style={{ background: NAVY, border: `1px solid ${isOpen ? ORANGE + "88" : "rgba(255,255,255,0.08)"}` }}>
+        <button onClick={() => setOpen(isOpen ? null : o.ref)} className="w-full text-left px-3 py-2.5 flex items-center gap-3">
+          <div className="w-16 shrink-0">
+            <div className="text-white text-sm font-bold" style={{ fontFamily: C.cond }}>{t12 || "—"}</div>
+            <div className="text-[10px] font-semibold" style={{ color: ORANGE, fontFamily: C.body }}>{o.ref}</div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-white text-sm font-semibold truncate" style={{ fontFamily: C.cond }}>{o.customer}{o.project ? <span className="text-white/45 font-normal"> · {o.project}</span> : ""}</div>
+            <div className="text-white/55 text-xs truncate" style={{ fontFamily: C.body }}>{o.site}</div>
+            <div className="text-white/70 text-xs truncate" style={{ fontFamily: C.body }}><span className="font-bold" style={{ color: ORANGE }}>{o.qty}{/cy|yd/i.test(o.qty || "") ? "" : " CY"}</span> · {o.mix}{orderExtras(o) ? ` · ${orderExtras(o)}` : ""}</div>
+          </div>
+          <div className="shrink-0 text-right">
+            {cp ? (
+              <>
+                <div className="text-white text-sm font-bold" style={{ fontFamily: C.cond }}>{money(cp.total)}</div>
+                <div className="text-white/45 text-[10px]" style={{ fontFamily: C.body }}>{money(cp.unit_price)}/yd{cp.tax_exempt ? " · no tax" : ""}</div>
+              </>
+            ) : <div className="text-white/30 text-[10px]" style={{ fontFamily: C.body }}>pricing…</div>}
+            <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: meta.color + "22", color: meta.color, fontFamily: C.body }}>{meta.label}</span>
+          </div>
+        </button>
+        {isOpen && (
+          <div className="px-3 pb-3 pt-1 text-xs" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", fontFamily: C.body }}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-white/70">
+              <div><span className="text-white/40">Date</span> · {formatOrderDate(o.when)}</div>
+              <div><span className="text-white/40">Use</span> · {o.use_for || "—"}</div>
+              <div><span className="text-white/40">Truck</span> · {o.truck && o.truck !== "—" ? `${o.truck}${o.driver && o.driver !== "—" ? ` / ${o.driver}` : ""}` : "not assigned yet"}</div>
+              {cp && <div><span className="text-white/40">Concrete</span> · {money(cp.extended)}</div>}
+              {cp && Number(cp.delivery) > 0 && <div><span className="text-white/40">Delivery</span> · {money(cp.delivery)}{cp.delivery_rate ? ` (${money(cp.delivery_rate)}/yd)` : ""}</div>}
+              {cp && Number(cp.short_load) > 0 && <div><span className="text-white/40">Short load</span> · {money(cp.short_load)}</div>}
+              {cp && Number(cp.admixtures) > 0 && <div><span className="text-white/40">Admixtures</span> · {money(cp.admixtures)}</div>}
+              {cp && <div><span className="text-white/40">Tax</span> · {cp.tax_exempt ? "exempt" : `${money(cp.tax)} (${cp.tax_pct}%)`}</div>}
+            </div>
+            {o.notes && <div className="mt-1.5 text-white/60"><span className="text-white/40">Notes</span> · {o.notes}</div>}
+            <div className="flex items-center gap-2 mt-2.5">
+              {editable(o)
+                ? <button onClick={() => setEditing(o)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold active:scale-95" style={{ background: ORANGE, color: NAVY_DEEP }}><Pencil size={12} /> Edit order</button>
+                : <span className="text-white/40">On a truck — call dispatch at {DISPATCH_PHONE} to change it.</span>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const dayHead = (label, list) => (
+    <div className="flex items-center justify-between mt-3 mb-1.5">
+      <span className="text-white text-base font-bold" style={{ fontFamily: C.cond }}>{label}</span>
+      <span className="text-white/50 text-xs" style={{ fontFamily: C.body }}>{list.length} order{list.length === 1 ? "" : "s"} · <span className="font-bold" style={{ color: ORANGE }}>{fmtYards(yardsOf(list))} CY</span>{totalOf(list) > 0 ? ` · ${money(totalOf(list))}` : ""}</span>
+    </div>
+  );
+  const empty = (text) => <div className="text-white/40 text-sm text-center py-6 rounded-xl" style={{ background: NAVY, fontFamily: C.body }}>{text}</div>;
+
+  const sheetTable = (title, rows, cols) => (
+    <div className="rounded-xl overflow-hidden mb-3" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="px-3 py-2 text-white text-sm font-bold" style={{ fontFamily: C.cond, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>{title}</div>
+      {rows.length === 0 ? <div className="px-3 py-2 text-white/35 text-xs" style={{ fontFamily: C.body }}>None listed.</div> : rows.map((r, i) => (
+        <div key={i} className="px-3 py-1.5 flex items-center justify-between gap-3 text-xs" style={{ borderTop: i ? "1px solid rgba(255,255,255,0.04)" : "none", fontFamily: C.body }}>
+          <span className="text-white/80 truncate">{cols[0](r)}</span>
+          <span className="text-white font-bold shrink-0" style={{ fontFamily: C.cond }}>{cols[1](r)}</span>
+        </div>
+      ))}
+    </div>
+  );
+  const n = (v) => Number(v) || 0;
+  const prices = sheet && (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
+      <div>
+        {sheetTable("Concrete · price per yard", sheet.mixes || [], [(m) => m.mix, (m) => `${money(m.price)}/yd`])}
+        {sheetTable("Customer set prices", sheet.overrides || [], [(o) => `${o.customer}${o.mix ? ` · ${o.mix}` : " · all mixes"}`, (o) => `${money(o.price)}/yd`])}
+        {sheetTable("Admixtures", sheet.admixtures || [], [(a) => a.name, (a) => `${money(a.rate)}/${a.per === "lb" ? "lb" : "yd"}`])}
+      </div>
+      <div>
+        {sheetTable("Fees", [
+          { k: `Short load (under ${n(sheet.short_load_under_yd)} yd)`, v: money(sheet.short_load_fee) },
+          { k: `Back-haul (continuation load of ${n(sheet.backhaul_under_yd)} yd or less)`, v: `${money(sheet.backhaul_per_yd)}/yd` },
+          { k: `Standby after ${n(sheet.standby_free_hours)} free hour${n(sheet.standby_free_hours) === 1 ? "" : "s"} on site, per truck`, v: `${money(sheet.standby_per_hour)}/hr` },
+          { k: "Sales tax", v: `${n(sheet.tax_pct)}%` },
+        ], [(r) => r.k, (r) => r.v])}
+        {sheetTable("Delivery · per yard by road miles from the yard", sheet.delivery_brackets || [], [(b) => `Up to ${b.max_mi} mi`, (b) => `${money(b.rate)}/yd`])}
+        {sheetTable("Self-haul (pickup) customers · no delivery or load fees", (sheet.self_haul_customers || []).map((c) => ({ c })), [(r) => r.c, () => ""])}
+        {sheetTable("No standby charge", (sheet.standby_exempt_customers || []).map((c) => ({ c })), [(r) => r.c, () => ""])}
+        {sheetTable("Tax-exempt customers", (sheet.tax_exempt_customers || []).map((c) => ({ c })), [(r) => r.c, () => ""])}
+      </div>
+    </div>
+  );
+
+  const tabBtn = (k, label, count) => (
+    <button onClick={() => setTab(k)} className="rounded-full px-3.5 py-1.5 text-sm font-semibold active:scale-95 transition-transform" style={{ background: tab === k ? ORANGE : NAVY, color: tab === k ? NAVY_DEEP : "rgba(255,255,255,0.7)", border: `1px solid ${tab === k ? ORANGE : "rgba(255,255,255,0.12)"}`, fontFamily: C.body }}>
+      {label}{count != null ? <span className="opacity-70"> ({count})</span> : ""}
+    </button>
+  );
+
+  return (
+    <FinanceContext.Provider value={false}>
+      <div className="w-full flex justify-center overflow-hidden" style={{ minHeight: "100dvh", background: "#0c1117" }}>
+        <style>{FONT}</style>
+        <div className="w-full max-w-5xl min-h-full flex flex-col" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
+          <div className="px-4 sm:px-6 pb-2.5 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.625rem)" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Roo size={34} />
+                <div className="leading-none">
+                  <div style={{ color: NAVY_DEEP, fontFamily: C.cond }} className="text-xl font-bold tracking-tight">AUSSIEBLOCK</div>
+                  <div style={{ color: NAVY_DEEP, fontFamily: C.body }} className="text-[11px] font-semibold opacity-70 -mt-0.5">Sales · {email}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <LivePill live={!err} />
+                <button onClick={onLogout} title="Log out" className="p-1.5 rounded-full active:scale-90 transition-transform" style={{ background: NAVY_DEEP }}><LogOut size={14} color={ORANGE} /></button>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-4 sm:px-6 py-3 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {tabBtn("today", "Today", todayOrders.length)}
+              {tabBtn("upcoming", "Upcoming", upcoming.length)}
+              {tabBtn("prices", "Prices")}
+              <div className="flex-1" />
+              {tab !== "prices" && (
+                <div className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{ background: NAVY, border: "1px solid rgba(255,255,255,0.12)" }}>
+                  <Search size={14} className="text-white/40" />
+                  <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Customer, site, job…" className="bg-transparent outline-none text-sm text-white w-36 sm:w-48 placeholder:text-white/30" />
+                </div>
+              )}
+              <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-bold active:scale-95 transition-transform" style={{ background: ORANGE, color: NAVY_DEEP, fontFamily: C.body }}><CalendarPlus size={15} /> New order</button>
+            </div>
+            {err && <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ background: "rgba(239,83,80,0.12)", color: "#ff8a85" }}>{err}</div>}
+
+            {tab === "today" && (loaded ? (
+              todayOrders.filter(matches).length === 0 ? empty(f ? "No orders match." : "Nothing scheduled for today.") : (
+                <>{dayHead(formatOrderDateLong(today), todayOrders.filter(matches))}{todayOrders.filter(matches).map(row)}</>
+              )
+            ) : empty("Loading orders…"))}
+
+            {tab === "upcoming" && (loaded ? (
+              upcoming.filter(matches).length === 0 ? empty(f ? "No orders match." : "Nothing scheduled ahead yet.") : (
+                upcomingDays.map((d) => {
+                  const list = upcomingByDay[d].filter(matches).sort(byTimeAsc);
+                  return list.length ? <Fragment key={d}>{dayHead(formatOrderDateLong(d), list)}{list.map(row)}</Fragment> : null;
+                })
+              )
+            ) : empty("Loading orders…"))}
+
+            {tab === "prices" && (sheet ? (
+              <>
+                <div className="text-white/45 text-xs mb-3" style={{ fontFamily: C.body }}>Current customer price list. Read-only — the office updates it from the dispatch board.</div>
+                {prices}
+              </>
+            ) : empty("Loading prices…"))}
+          </div>
+        </div>
+
+        {showNew && <NewOrderModal trucks={[]} simple onClose={() => setShowNew(false)} onCreated={(o) => { setShowNew(false); setOrders((os) => [o, ...os.filter((x) => x.ref !== o.ref)]); setTab(orderDay(o.when, today)); setOpen(o.ref); }} />}
+        {editing && <EditOrderModal order={editing} onClose={() => setEditing(null)} onSaved={(o) => { setEditing(null); setOrders((os) => os.map((x) => (x.ref === o.ref ? o : x))); pricedRef.current = ""; }} />}
+      </div>
+    </FinanceContext.Provider>
+  );
+}
+
 function DeliveryTicketModal({ order, onClose }) {
   const [sig, setSig] = useState(null);
   const [sigErr, setSigErr] = useState(false);   // fetch failed / image missing
@@ -10168,6 +10398,7 @@ export default function App() {
   if (!authChecked) return <Splash label="Starting…" />;
   if (!me) return <LoginScreen onLoggedIn={setMe} />;
   if (me.role === "staff") return <DispatchApp email={me.email} role={me.role} onLogout={handleLogout} />;   // the dispatch board is the operator's only
+  if (me.role === "sales") return <SalesApp email={me.email} onLogout={handleLogout} />;   // salesperson: orders + prices, no board
   if (me.role === "kiosk") return <TimeClockKiosk standalone onClose={handleLogout} />;   // dedicated plant time-clock tablet — punch pad only, never the board
   if (me.role === "driver") return <DriverApp driver={me.company || me.email} onLogout={handleLogout} />;   // truck tablet
   if (loading) return <Splash label="Loading your orders…" />;
