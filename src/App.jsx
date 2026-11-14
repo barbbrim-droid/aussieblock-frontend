@@ -140,7 +140,7 @@ function pickCurrentOrder(orders) {
 }
 // Options for the customer order form. Edit to match what you sell.
 const MIXES = ["3000 PSI", "3500 PSI", "4000 PSI", "4500 PSI", "5000 PSI"];
-const BUILD_TAG = "build Nov14-v107";   // bump on each deploy to verify clients aren't cached
+const BUILD_TAG = "build Nov14-v108";   // bump on each deploy to verify clients aren't cached
 const DISPATCH_PHONE = "940-577-7475";   // dispatch line — customers can call OR text it (one number, two-way)
 const DISPATCH_TEL = "+19405777475";     // E.164 for tel:/sms: links
 // A driver's phone as stored on their login (any punctuation) -> "325-262-1710" for
@@ -9125,9 +9125,9 @@ function SalesApp({ email, onLogout }) {
 
   return (
     <FinanceContext.Provider value={false}>
-      <div className="w-full flex justify-center overflow-hidden" style={{ minHeight: "100dvh", background: "#0c1117" }}>
+      <div className="w-full flex justify-center overflow-hidden" style={{ height: "100dvh", background: "#0c1117" }}>
         <style>{FONT}</style>
-        <div className="w-full max-w-5xl min-h-full flex flex-col" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
+        <div className="w-full max-w-5xl h-full flex flex-col overflow-hidden" style={{ background: NAVY_DEEP, fontFamily: C.body }}>
           <div className="px-4 sm:px-6 pb-2.5 shrink-0" style={{ background: ORANGE, paddingTop: "calc(env(safe-area-inset-top) + 0.625rem)" }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -9144,7 +9144,8 @@ function SalesApp({ email, onLogout }) {
             </div>
           </div>
 
-          <div className="px-4 sm:px-6 py-3 flex-1">
+          {/* The lists and the price sheet scroll inside this pane; header and tabs stay put. */}
+          <div className="px-4 sm:px-6 py-3 flex-1 min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {tabBtn("today", "Today", todayOrders.length)}
               {tabBtn("upcoming", "Upcoming", upcoming.length)}
